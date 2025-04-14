@@ -24,6 +24,7 @@
     "@remix-run/node": "^2.16.5",
     "@remix-run/react": "^2.16.5",
     "@remix-run/serve": "^2.16.5",
+    "dotenv": "^16.5.0",
     "firebase": "^10.12.3",
     "firebase-admin": "^13.2.0",
     "googleapis": "^148.0.0",
