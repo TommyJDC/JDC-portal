@@ -23,6 +23,5 @@ for = "/build/*"
   GOOGLE_APPLICATION_CREDENTIALS = "" # Please set the path to your Google application credentials file
   FIREBASE_PROJECT_ID = "sap-jdc" # Please set your Firebase project ID
   FIREBASE_PRIVATE_KEY = "AIzaSyADAy8ySvJsUP5diMyR9eIUgtPFimpydcA" # Please set your Firebase private key
-  FIREBASE_CLIENT_EMAIL = "1079234336489" # Please set your Firebase client email
-
-  
+  FIREBASE_CLIENT_EMAIL = "remix-server-firestore@sap-jdc.iam.gserviceaccount.com" # Please set your Firebase client email
+  FIREBASE_API_KEY = "AIzaSyADAy8ySvJsUP5diMyR9eIUgtPFimpydcA"
