@@ -19,4 +19,4 @@ for = "/build/*"
   GOOGLE_CLIENT_ID = "1079234336489-rkeiomsnsejcfb670qt1riph0gvcpv62.apps.googleusercontent.com"
   GOOGLE_CLIENT_SECRET = "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"
   APP_BASE_URL = "https://jdc-portal-grenoble.netlify.app/"
-  GOOGLE_APPLICATION_CREDENTIALS = "app/services/google-credentials.json"
+  
