@@ -7,7 +7,6 @@ import { parseFrenchDate } from '~/utils/dateUtils';
 import { dbAdmin } from '~/firebase.admin.config.server'; // Import the configured instance
 import type * as admin from 'firebase-admin'; // Import admin types if needed elsewhere
 
-
 // --- Helper for Status Correction (remains the same, uses data object) ---
 const correctTicketStatus = (ticketData: admin.firestore.DocumentData): { correctedStatus: string | null, needsUpdate: boolean } => {
   let currentStatus = ticketData.statut;
@@ -122,9 +121,12 @@ export const createUserProfileSdk = async (
 
   } catch (error: any) {
     console.error(`[FirestoreService Admin] Error creating user profile for ID ${id}:`, error);
-     if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
+    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
         console.error("[FirestoreService Admin] CRITICAL: Firestore permission denied during profile creation. Check service account permissions and Firestore rules.");
         throw new Error("Permission refusée par Firestore lors de la création du profil.");
+    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded. Consider optimizing queries or increasing quota.");
+        throw new Error("Quota Firestore dépassé. Veuillez réessayer plus tard.");
     }
     throw new Error(`Impossible de créer le profil utilisateur (ID: ${id}). Cause: ${error.message || error}`);
   }
@@ -147,9 +149,12 @@ export const updateUserProfileSdk = async (uid: string, data: Partial<Omit<UserP
     console.log(`[FirestoreService Admin] User profile updated successfully for UID: ${uid}`);
   } catch (error: any) {
     console.error(`[FirestoreService Admin] Error updating user profile for UID ${uid}:`, error);
-     if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
+    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
         console.error("[FirestoreService Admin] CRITICAL: Firestore permission denied during profile update.");
         throw new Error("Permission refusée par Firestore lors de la mise à jour du profil.");
+    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during update. Consider optimizing queries or increasing quota.");
+        throw new Error("Quota Firestore dépassé lors de la mise à jour. Veuillez réessayer plus tard.");
     }
     throw new Error(`Impossible de mettre à jour le profil utilisateur (UID: ${uid}). Cause: ${error.message || error}`);
   }
@@ -182,6 +187,10 @@ export const getAllUserProfilesSdk = async (): Promise<UserProfile[]> => {
     return profiles;
   } catch (error: any) {
     console.error("[FirestoreService Admin] Error fetching all user profiles:", error);
+    if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during user profiles fetch.");
+        throw new Error("Quota Firestore dépassé lors de la récupération des profils utilisateurs. Veuillez réessayer plus tard.");
+    }
     throw new Error(`Impossible de récupérer la liste des utilisateurs. Cause: ${error.message || error}`);
   }
 };
@@ -202,10 +211,13 @@ export const addArticleImageUrl = async (articleId: string, imageUrl: string): P
     console.log(`[FirestoreService Admin] Image URL successfully added to article ${articleId}.`);
   } catch (error: any) {
     console.error(`[FirestoreService Admin] Error adding image URL to article ${articleId}:`, error);
-     if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
+    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
         throw new Error("Permission refusée pour mettre à jour l'article.");
     } else if (error.code === 5 || error.code === 'NOT_FOUND') {
         throw new Error(`L'article avec l'ID ${articleId} n'a pas été trouvé.`);
+    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during article image update.");
+        throw new Error("Quota Firestore dépassé lors de la mise à jour de l'image. Veuillez réessayer plus tard.");
     }
     throw new Error(`Impossible d'ajouter l'URL de l'image à l'article : ${error.message || error.code}`);
   }
@@ -224,10 +236,13 @@ export const deleteArticleImageUrl = async (articleId: string, imageUrl: string)
     console.log(`[FirestoreService Admin] Image URL successfully removed from article ${articleId}.`);
   } catch (error: any) {
     console.error(`[FirestoreService Admin] Error removing image URL from article ${articleId}:`, error);
-     if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
+    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
         throw new Error("Permission refusée pour mettre à jour l'article.");
     } else if (error.code === 5 || error.code === 'NOT_FOUND') {
         throw new Error(`L'article avec l'ID ${articleId} n'a pas été trouvé.`);
+    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during article image deletion.");
+        throw new Error("Quota Firestore dépassé lors de la suppression de l'image. Veuillez réessayer plus tard.");
     }
     throw new Error(`Impossible de supprimer l'URL de l'image de l'article : ${error.message || error.code}`);
   }
@@ -298,6 +313,9 @@ export const searchArticles = async (criteria: { code?: string; nom?: string }):
     if (error.code === 9 || error.code === 'FAILED_PRECONDITION') {
         console.error("[FirestoreService Admin] Firestore Error: Likely missing a composite index. Check the Firestore console error message for a link to create it. You'll likely need an index on 'Désignation' (ascending).");
         throw new Error("Erreur Firestore: Index manquant requis pour la recherche par nom (sur 'Désignation'). Vérifiez la console Firebase.");
+    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during article search.");
+        throw new Error("Quota Firestore dépassé lors de la recherche d'articles. Veuillez réessayer plus tard.");
     }
     throw new Error(`Échec de la recherche d'articles. Cause: ${error.message || error}`);
   }
@@ -328,6 +346,9 @@ export const updateSAPTICKET = async (sectorId: string, ticketId: string, data: 
     } else if (error.code === 5 || error.code === 'NOT_FOUND') {
         console.error(`[FirestoreService Admin] Error: Document ${ticketId} not found in collection ${sectorId}.`);
         throw new Error(`Le ticket ${ticketId} n'a pas été trouvé dans le secteur ${sectorId}.`);
+    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during ticket update.");
+        throw new Error("Quota Firestore dépassé lors de la mise à jour du ticket. Veuillez réessayer plus tard.");
     }
     throw new Error(`Impossible de mettre à jour le ticket SAP ${ticketId}. Cause: ${error.message || error}`);
   }
@@ -657,6 +678,9 @@ export const deleteShipmentSdk = async (shipmentId: string): Promise<void> => {
     if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
       console.error("[FirestoreService Admin] CRITICAL: Firestore permission denied for delete operation.");
       throw new Error("Permission refusée par Firestore pour la suppression.");
+    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during shipment deletion.");
+        throw new Error("Quota Firestore dépassé lors de la suppression de l'envoi. Veuillez réessayer plus tard.");
     }
     throw new Error(`Impossible de supprimer l'envoi. Cause: ${error.message || error}`);
   }
@@ -691,6 +715,9 @@ export const getLatestStatsSnapshotsSdk = async (count: number = 1): Promise<Sta
      if (error.code === 9 || error.code === 'FAILED_PRECONDITION') {
          console.error("[FirestoreService Admin] CRITICAL: Firestore query requires an index (likely on timestamp desc). Check Firestore console.");
          throw new Error("Index Firestore manquant (probablement sur timestamp). Vérifiez la console Firestore.");
+     } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+         console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during stats snapshot fetch.");
+         throw new Error("Quota Firestore dépassé lors de la récupération des statistiques. Veuillez réessayer plus tard.");
      }
     throw new Error(`Impossible de récupérer le dernier snapshot de statistiques. Cause: ${error.message || error}`);
   }
@@ -733,6 +760,10 @@ export const getArticles = async (): Promise<Article[]> => {
     return articles;
   } catch (error: any) {
     console.error("[FirestoreService Admin] Error fetching articles:", error);
+    if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during articles fetch.");
+        throw new Error("Quota Firestore dépassé lors de la récupération des articles. Veuillez réessayer plus tard.");
+    }
     throw new Error(`Impossible de récupérer les articles. Cause: ${error.message || error}`);
   }
 };
@@ -753,6 +784,8 @@ export const saveGeocodeToCache = async (address: string, latitude: number, long
     console.error("[FirestoreService Admin] Error saving geocode to cache:", error);
      if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
         console.error("[FirestoreService Admin] CRITICAL: Firestore permission denied saving geocode cache.");
+    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
+        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during geocode cache save.");
     }
   }
 };
