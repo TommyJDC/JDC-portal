@@ -1,0 +1,26 @@
+/* Add any global styles here */
+body {
+  /* Example global style */
+  overscroll-behavior: none; /* Prevent pull-to-refresh */
+}
+
+/* Leaflet map container */
+.leaflet-container {
+  height: 400px; /* Default height, can be overridden */
+  width: 100%;
+  /* Ensure overflow is hidden */
+  overflow: hidden;
+}
+
+/* --- ADDED: Force tile visibility --- */
+/* Ensure tile pane and tiles are visible and have appropriate z-index */
+.leaflet-tile-pane {
+  z-index: 2 !important; /* Default is 2, ensure it's not overridden lower */
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.leaflet-tile {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+/* --- END ADDED --- */

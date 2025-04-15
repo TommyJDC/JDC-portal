@@ -1,0 +1,24 @@
+[build]
+command = "npm run build"
+publish = "build/client" # ✅ pour servir correctement les assets
+
+[dev]
+command = "npm run dev"
+framework = "vite"
+
+[[headers]]
+for = "/assets/*" # ✅ vise bien les fichiers d'assets, pas "/build/*"
+
+  [headers.values]
+  Cache-Control = "public, max-age=31536000, immutable"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+
+[build.environment]
+  SESSION_SECRET = "7gZfSqVQSHS9M9c/x9YVBSRPq+E1T/M6jN8dybzRhUY=" 
+  GOOGLE_CLIENT_ID = "1079234336489-rkeiomsnsejcfb670qt1riph0gvcpv62.apps.googleusercontent.com"
+  GOOGLE_CLIENT_SECRET = "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"
+  APP_BASE_URL = "https://jdc-portal-grenoble.netlify.app/"
