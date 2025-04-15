@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 
 /**
  * Props for the ClientOnly component.
@@ -26,7 +26,7 @@ interface ClientOnlyProps {
 export const ClientOnly = ({ children, fallback = null }: ClientOnlyProps) => {
   const [isMounted, setIsMounted] = useState(false);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     setIsMounted(true);
   }, []);
 

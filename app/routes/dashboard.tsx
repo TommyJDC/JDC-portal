@@ -171,20 +171,24 @@ export default function Dashboard() {
         />
       </ClientOnly>
 
-      <div className="w-full mb-6">
-        <ClientOnly fallback={<MapLoadingFallback />}>
-          {user ? (
-            <Suspense fallback={<MapLoadingFallback />}>
-              <InteractiveMap
-                tickets={recentTickets}
-                isLoadingTickets={false}
-              />
-            </Suspense>
-          ) : (
-            <MapLoginPrompt />
-          )}
-        </ClientOnly>
-      </div>
+      <ClientOnly fallback={<div className="w-full mb-6 h-[500px] bg-jdc-card animate-pulse rounded-lg" />}>
+        {() => (
+          <div className="w-full mb-6" key={user?.userId}>
+            <ClientOnly fallback={<MapLoadingFallback />}>
+              {user ? (
+                <Suspense fallback={<MapLoadingFallback />}>
+                  <InteractiveMap
+                    tickets={recentTickets}
+                    isLoadingTickets={false}
+                  />
+                </Suspense>
+              ) : (
+                <MapLoginPrompt />
+              )}
+            </ClientOnly>
+          </div>
+        )}
+      </ClientOnly>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <RecentTickets
