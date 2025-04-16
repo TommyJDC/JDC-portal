@@ -7,8 +7,8 @@ export interface UserProfile {
   uid: string;
   email: string;
   role: 'Admin' | 'Technician' | string;
-  secteurs: string[];
-  sectors: string[];
+  secteurs: string[]; // Liste des secteurs de l'utilisateur (Kezia, HACCP, CHR, Tabac)
+  sectors?: string[]; // Champ à supprimer progressivement, rendu optionnel
   displayName: string;
   nom: string;
   password: string;

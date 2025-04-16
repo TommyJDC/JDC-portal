@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, NavLink } from '@remix-run/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
- import { faTimes, faUserCircle, faSignOutAlt, faSignInAlt, faTachometerAlt, faTicketAlt, faTruck, faCog } from '@fortawesome/free-solid-svg-icons'; // Added faCog
+ import { faTimes, faUserCircle, faSignOutAlt, faSignInAlt, faTachometerAlt, faTicketAlt, faTruck, faCog, faBug, faSearch } from '@fortawesome/free-solid-svg-icons'; // Added faCog and faBug
  import { Button } from './ui/Button';
  // Use UserSession from server loader instead of AppUser from client-side auth
  // import type { AppUser } from '~/services/auth.service';
@@ -22,10 +22,14 @@ const navItems = [
   { name: 'Tableau de Bord', to: '/dashboard', icon: faTachometerAlt },
   { name: 'Tickets SAP', to: '/tickets-sap', icon: faTicketAlt },
   { name: 'Envois CTN', to: '/envois-ctn', icon: faTruck },
+  { name: 'Recherche Articles', to: '/articles', icon: faSearch },
 ];
 
 // Define Admin item separately
 const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
+
+// Debug item - always visible
+const debugItem = { name: 'Diagnostic', to: '/debug-index', icon: faBug };
 
  const JDC_LOGO_URL = "https://www.jdc.fr/images/logo_jdc_blanc.svg"; // Re-add logo URL if needed
 
@@ -91,6 +95,18 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
                 >
                   <FontAwesomeIcon icon={adminItem.icon} className="mr-3 h-5 w-5" />
                   {adminItem.name}
+                </NavLink>
+              )}
+              
+              {/* Debug Link - Only visible for admins */}
+              {showAdminLink && (
+                <NavLink
+                  to={debugItem.to}
+                  onClick={onClose}
+                  className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
+                >
+                  <FontAwesomeIcon icon={debugItem.icon} className="mr-3 h-5 w-5" />
+                  {debugItem.name}
                 </NavLink>
               )}
             </>

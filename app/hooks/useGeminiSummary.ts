@@ -11,22 +11,19 @@ const useGeminiSummary = (apiKey: string) => {
     const [error, setError] = useState<string | null>(null);
     const [isCached, setIsCached] = useState<boolean>(false); // Track if summary came from cache
 
-    // Initialize the Generative AI client
+    // Instance statique de l'API pour éviter les réinitialisations multiples
     const genAI = useMemo(() => {
-        console.log("[useGeminiSummary] Initializing with API Key:", apiKey ? 'Provided' : 'Missing');
-        if (!apiKey) {
-            // No need to set error here, initialization check happens before generation
-            return null;
-        }
+        // Vérifier si l'instance existe déjà
+        if (!apiKey) return null;
+        
         try {
             return new GoogleGenerativeAI(apiKey);
         } catch (err: any) {
             console.error("[useGeminiSummary] Error initializing GoogleGenerativeAI:", err);
-            // Set error state here if initialization itself fails critically
             setError("Erreur d'initialisation de l'API Gemini. Vérifiez la clé API.");
-            return null; // Return null if initialization failed
+            return null;
         }
-    }, [apiKey]);
+    }, []); // Dépendance vide pour n'initialiser qu'une seule fois
 
     // Reset state when hook is potentially reused with different context
     const resetSummaryState = useCallback(() => {
@@ -37,42 +34,44 @@ const useGeminiSummary = (apiKey: string) => {
     }, []);
 
 
+    // Ref pour suivre les générations en cours par ticket
+    const generatingTickets = useMemo(() => new Set<string>(), []);
+
     const generateSummary = useCallback(async (
         ticket: SapTicket | null,
         prompt: string,
         saveSummaryCallback: SaveSummaryCallback
     ) => {
-        console.log("[useGeminiSummary] generateSummary called for ticket:", ticket?.id);
-        if (isLoading) {
-            console.warn("[useGeminiSummary] Generation already in progress");
+        if (!ticket?.id) {
+            console.warn("[useGeminiSummary] No valid ticket provided.");
+            setError("Ticket non valide.");
             return;
         }
+
+        // Vérifier si une génération est déjà en cours pour ce ticket
+        if (generatingTickets.has(ticket.id)) {
+            console.log(`[useGeminiSummary] Generation already in progress for ticket ${ticket.id}`);
+            return;
+        }
+
+        // Vérification du cache
+        const targetField = prompt.includes('solution') ? 'solution' : 'summary';
+        const existingContent = ticket[targetField];
+        
+        if (existingContent && typeof existingContent === 'string' && existingContent.trim() !== '') {
+            console.log(`[useGeminiSummary] Using cached ${targetField} for ticket ${ticket.id}`);
+            setSummary(existingContent);
+            setIsCached(true);
+            setError(null);
+            return;
+        }
+
+        // Marquer le début de la génération
+        generatingTickets.add(ticket.id);
         setIsLoading(true);
         setError(null);
         setIsCached(false);
-
-        if (!ticket) {
-            console.warn("[useGeminiSummary] No ticket provided.");
-            setError("Ticket non fourni.");
-            setIsLoading(false);
-            return;
-        }
-
-        // --- Cache Check ---
-        if (ticket.summary && typeof ticket.summary === 'string' && ticket.summary.trim() !== '') {
-            console.log(`[useGeminiSummary] Cache hit for ticket ${ticket.id}. Using existing summary.`);
-            setSummary(ticket.summary);
-            setIsCached(true);
-            setIsLoading(false);
-            setError(null);
-            console.log(`[useGeminiSummary] Cache check successful for ticket ${ticket.id}. State set from cache.`);
-            return; // Stop here, use cached summary
-        }
-        // --- End Cache Check ---
-
-        // If we reach here, cache check failed (or summary was empty/invalid)
-        console.log("[useGeminiSummary] Cache miss or summary empty. Proceeding towards API call.");
-        setSummary(''); // NOW clear the summary state before potential generation
+        setSummary('');
 
         if (!prompt) {
             console.log("[useGeminiSummary] No prompt provided, skipping generation.");
@@ -126,22 +125,26 @@ const useGeminiSummary = (apiKey: string) => {
             console.log("[useGeminiSummary] Raw API Response:", response);
 
             if (response?.candidates?.[0]?.content?.parts?.[0]?.text) {
-                 const generatedText = response.candidates[0].content.parts[0].text;
+                 const generatedText = response.candidates[0].content.parts[0]?.text || '';
                  console.log("[useGeminiSummary] Generated text:", generatedText);
-                 setSummary(generatedText);
-                 setIsCached(false); // Explicitly mark as not cached
-
-                 // --- Save the generated summary ---
-                 try {
-                     console.log(`[useGeminiSummary] Attempting to save generated summary for ticket ${ticket.id}...`);
-                     await saveSummaryCallback(generatedText);
-                     console.log(`[useGeminiSummary] Successfully saved summary for ticket ${ticket.id}.`);
-                 } catch (saveError: any) {
-                     console.error(`[useGeminiSummary] Failed to save summary for ticket ${ticket.id}:`, saveError);
-                     // Set a specific error related to saving, but keep the generated summary displayed
-                     setError(`Résumé généré mais échec de la sauvegarde: ${saveError.message || 'Erreur inconnue'}`);
+                 
+                 if (generatedText) {
+                     setSummary(generatedText);
+                     setIsCached(false);
+                 } else {
+                     console.warn("[useGeminiSummary] Empty generated text");
+                     throw new Error("Réponse vide de l'API Gemini");
                  }
-                 // --- End Save ---
+
+                 // Sauvegarder uniquement si le contenu est différent
+                 if (generatedText.trim() !== existingContent?.trim()) {
+                     try {
+                         await saveSummaryCallback(generatedText);
+                     } catch (saveError: any) {
+                         console.error(`[useGeminiSummary] Save failed for ticket ${ticket.id}:`, saveError);
+                         setError(`Échec de la sauvegarde: ${saveError.message || 'Erreur inconnue'}`);
+                     }
+                 }
 
             } else {
                  const blockReason = response?.promptFeedback?.blockReason;
@@ -165,10 +168,9 @@ const useGeminiSummary = (apiKey: string) => {
             setSummary(''); // Ensure summary is cleared on error
         } finally {
             setIsLoading(false);
+            generatingTickets.delete(ticket.id);
         }
-    // Removed saveSummaryCallback from the dependency array as it's a parameter, not a dependency from the outer scope.
-    // The stability of the callback is the responsibility of the calling component.
-    }, [genAI]); // apiKey already handled by genAI memo
+    }, [genAI, generatingTickets]);
 
         // Let's stick with the original dependency array for generateSummary for now.
         // The parent component needs to ensure the callback is stable if needed.

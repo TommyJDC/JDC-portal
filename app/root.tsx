@@ -22,7 +22,8 @@ import { type ReactNode, useEffect, useState, Suspense } from 'react';
      // Import FontAwesome CSS for manual inclusion
      import fontAwesomeStylesHref from '@fortawesome/fontawesome-svg-core/styles.css?url';
 
-     import { Header } from "~/components/Header";
+import { Header } from "~/components/Header";
+import { DebugAuth } from "~/components/DebugAuth";
     import { MobileMenu } from "~/components/MobileMenu";
     import { AuthModal } from "~/components/AuthModal";
     import ToastContainer from '~/components/Toast'; // Correct: Import default export
@@ -74,36 +75,96 @@ import type { UserSession } from "~/services/session.server"; // Import UserSess
     // --- Client-side Profile Fetch Function ---
     // Uses the Firebase Client SDK
     async function getClientUserProfile(userId: string): Promise<UserProfile | null> {
-        if (!userId) return null;
+        if (!userId) {
+            console.warn(`[getClientUserProfile] Called with empty userId`);
+            return null;
+        }
         console.log(`[getClientUserProfile] Fetching profile client-side for ID: ${userId}`);
+        
         try {
-            const userDocRef = doc(clientDb, 'users', userId); // Use clientDb
+            // Essayer de récupérer le profil depuis Firestore
+            const userDocRef = doc(clientDb, 'users', userId);
+            console.log(`[getClientUserProfile] Document reference created for 'users/${userId}'`);
+            
             const userDocSnap = await getDoc(userDocRef);
+            console.log(`[getClientUserProfile] Document snapshot retrieved, exists: ${userDocSnap.exists()}`);
 
+            // Si le document existe dans Firestore
             if (userDocSnap.exists()) {
                 const data = userDocSnap.data();
+                console.log(`[getClientUserProfile] Raw data from Firestore:`, data);
+                
                 // Convert Timestamps to Dates
                 const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined;
                 const updatedAt = data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined;
-                console.log(`[getClientUserProfile] Profile found for ID: ${userId}`);
-                return {
-                    uid: userId, // Use the passed userId as uid
-                    email: data.email,
-                    displayName: data.displayName,
-                    role: data.role,
-                    secteurs: data.secteurs,
-                    createdAt: createdAt,
-                    updatedAt: updatedAt,
+                
+                // Vérifier si le rôle est présent
+                if (!data.role) {
+                    console.warn(`[getClientUserProfile] Role is missing or empty for user ${userId}, defaulting to Utilisateur`);
+                    data.role = 'Utilisateur'; // Définir le rôle par défaut à Utilisateur si manquant
+                } else {
+                    console.log(`[getClientUserProfile] User role: ${data.role} (${typeof data.role})`);
+                }
+                
+                const profile = {
+                    uid: userId,
+                    email: data.email || '',
+                    displayName: data.displayName || '',
+                    role: data.role || 'Utilisateur', // Utiliser Utilisateur comme valeur par défaut
+                    nom: data.nom || '',
+                    password: data.password || '',
+                    secteurs: data.secteurs || [],
+                    sectors: data.sectors || [],
+                    createdAt: createdAt || new Date(),
+                    updatedAt: updatedAt || new Date(),
                 } as UserProfile;
-            } else {
-                console.warn(`[getClientUserProfile] No profile found for ID: ${userId}`);
-                return null; // Return null if profile doesn't exist
+                
+                console.log(`[getClientUserProfile] Profile constructed:`, profile);
+                return profile;
+            } 
+            // Si le document n'existe pas dans Firestore
+            else {
+                console.warn(`[getClientUserProfile] No profile found for ID: ${userId}, creating default Admin profile`);
+                
+                // Créer un profil par défaut avec le rôle Utilisateur
+                // Utiliser les informations de la session si disponibles
+                const profile = {
+                    uid: userId,
+                    email: userId.includes('@') ? userId : `${userId}@jdc.fr`,
+                    displayName: `Utilisateur ${userId.substring(0, 8)}`,
+                    role: 'Utilisateur', // Définir le rôle par défaut à Utilisateur
+                    nom: `Utilisateur`,
+                    password: '',
+                    secteurs: ['Kezia'],
+                    sectors: ['HACCP', 'Kezia'],
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                } as UserProfile;
+                
+                console.log(`[getClientUserProfile] Default Admin profile created:`, profile);
+                return profile;
             }
         } catch (error) {
             console.error(`[getClientUserProfile] Error fetching profile for ID ${userId}:`, error);
-            // Re-throw or return null based on how you want to handle errors
-            throw new Error(`Impossible de récupérer le profil client (ID: ${userId}).`);
-            // return null;
+            
+            // En cas d'erreur, créer un profil par défaut avec le rôle Utilisateur
+            console.log(`[getClientUserProfile] Error occurred, creating default Utilisateur profile`);
+            
+            const profile = {
+                uid: userId,
+                email: userId.includes('@') ? userId : `${userId}@jdc.fr`,
+                displayName: `Utilisateur ${userId.substring(0, 8)}`,
+                role: 'Utilisateur', // Définir le rôle par défaut à Utilisateur
+                nom: `Utilisateur`,
+                password: '',
+                secteurs: ['Kezia'],
+                sectors: ['HACCP', 'Kezia'],
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            } as UserProfile;
+            
+            console.log(`[getClientUserProfile] Default Admin profile created:`, profile);
+            return profile;
         }
     }
 
@@ -139,8 +200,16 @@ import type { UserSession } from "~/services/session.server"; // Import UserSess
         const auth = getAuth(clientApp);
         const timeoutRef = { current: null as NodeJS.Timeout | null };
         
+        console.log('[Profile Fetch] Initializing profile fetch effect');
+        console.log('[Profile Fetch] User from server session:', user);
+        
+        // Définir profileLoading à true au début
+        setProfileLoading(true);
+        
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
           if (!isMounted) return;
+          
+          console.log('[Profile Fetch] Firebase auth state changed:', firebaseUser);
 
           // Annuler le délai précédent
           if (timeoutRef.current) {
@@ -154,18 +223,40 @@ import type { UserSession } from "~/services/session.server"; // Import UserSess
             const serverUserId = user?.userId;
             const firebaseUserId = firebaseUser?.uid;
             console.log(`[Auth Check] Firebase: ${firebaseUserId}, Server: ${serverUserId}`);
+            
+            // Si l'utilisateur n'est pas connecté côté serveur, ne pas essayer de récupérer le profil
+            if (!serverUserId) {
+              console.log('[Profile Fetch] No server user ID, setting profile to null');
+              if (isMounted) {
+                setProfile(null);
+                setProfileLoading(false);
+              }
+              return;
+            }
 
-            // Synchronisation des états
-            if (firebaseUserId === serverUserId && firebaseUserId) {
+            // Synchronisation des états - Utiliser l'ID serveur directement
+            if (serverUserId) {
+              console.log('[Profile Fetch] Using server ID directly to fetch profile:', serverUserId);
               try {
-                const profile = await getClientUserProfile(firebaseUserId);
-                if (isMounted) setProfile(profile);
+                const profile = await getClientUserProfile(serverUserId);
+                console.log('[Profile Fetch] Profile fetched successfully:', profile);
+                if (isMounted) {
+                  setProfile(profile);
+                  setProfileLoading(false);
+                }
               } catch (error) {
-                console.error('Profile fetch failed:', error);
-                if (isMounted) setProfile(null);
+                console.error('[Profile Fetch] Profile fetch failed:', error);
+                if (isMounted) {
+                  setProfile(null);
+                  setProfileLoading(false);
+                }
               }
             } else {
-              if (isMounted) setProfile(null);
+              console.log('[Profile Fetch] No server user ID available, setting profile to null');
+              if (isMounted) {
+                setProfile(null);
+                setProfileLoading(false);
+              }
             }
           }, 300);
         });
@@ -205,6 +296,10 @@ import type { UserSession } from "~/services/session.server"; // Import UserSess
           />
            <AuthModal isOpen={isAuthModalOpen} onClose={closeAuthModal} /> {/* Keep for modal login */}
            <main className={`container mx-auto px-4 py-6 ${isDashboard ? 'mt-0' : 'mt-16 md:mt-20'}`}>
+              {/* Composant de débogage - visible uniquement pour les administrateurs */}
+              {profile?.role?.toLowerCase() === 'admin' && (
+                <DebugAuth user={user} profile={profile} loadingAuth={navigation.state !== 'idle' || profileLoading} />
+              )}
               {/* Render the Outlet and provide context */}
               <Outlet context={{ user }} /> {/* Provide context to child routes */}
            </main>

@@ -7,9 +7,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // The authenticator handles the callback verification, token exchange,
   // calls the verify function, sets the session, and handles redirection.
   return await authenticator.authenticate("google", request, {
-    // Let the authenticator handle the redirection on success.
-    // This ensures the session cookie is set correctly before redirecting.
-    successRedirect: "/dashboard",
+    // Rediriger vers la page de création de profil après l'authentification réussie
+    // La page create-profile vérifiera si l'utilisateur a déjà configuré ses secteurs
+    // et le redirigera vers le dashboard si c'est le cas
+    successRedirect: "/create-profile",
     failureRedirect: "/?error=google-auth-failed",
   });
   // No need for manual redirect here, authenticator handles it.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
     import ReactDOM from 'react-dom';
     import { useFetcher } from '@remix-run/react'; // Import useFetcher
     // Use ~ alias for imports relative to the app root
@@ -118,51 +118,88 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 
         // --- Effects ---
+        const isProcessingRef = useRef<boolean>(false);
+        const processedTicketsRef = useRef<Set<string>>(new Set());
+
         useEffect(() => {
-            console.log("[TicketSAPDetails Effect] Running for ticket:", ticket?.id);
-            resetSummaryHookState();
-            resetSolutionHookState();
-
-            if (ticket) {
-                setCurrentStatus(getInitialSAPStatus(ticket));
-                if (summaryPrompt) {
-                    console.log("[TicketSAPDetails Effect] Triggering SUMMARY generation for ticket:", ticket.id);
-                    triggerSummaryGeneration(ticket, summaryPrompt, handleSaveSummary);
-                } else {
-                    console.log("[TicketSAPDetails Effect] Skipping SUMMARY generation.");
-                }
-                if (solutionPrompt) {
-                    console.log("[TicketSAPDetails Effect] Triggering SOLUTION generation for ticket:", ticket.id);
-                    triggerSolutionGeneration(ticket, solutionPrompt, handleSaveSolution);
-                } else {
-                     console.log("[TicketSAPDetails Effect] Skipping SOLUTION generation.");
-                }
-            } else {
-                console.log("[TicketSAPDetails Effect] No ticket, resetting status.");
-                setCurrentStatus('');
+            if (!ticket?.id || isProcessingRef.current || processedTicketsRef.current.has(ticket.id)) {
+                return;
             }
-            setNewComment('');
-        }, [
-            ticket, summaryPrompt, solutionPrompt, triggerSummaryGeneration,
-            triggerSolutionGeneration, handleSaveSummary, handleSaveSolution,
-            resetSummaryHookState, resetSolutionHookState
-        ]);
 
-         // Effect to show toast messages based on fetcher result and trigger revalidation
-         useEffect(() => {
-            // Check if fetcher.data is not null/undefined and has the 'success' property
-            if (fetcher.state === 'idle' && fetcher.data && typeof fetcher.data === 'object' && 'success' in fetcher.data) {
-                const actionData = fetcher.data as ActionData; // Cast to known type
+            // Si le ticket a déjà un résumé et une solution, on le marque comme traité
+            if (ticket.summary && ticket.solution) {
+                processedTicketsRef.current.add(ticket.id);
+                return;
+            }
+
+            // Si une sauvegarde ou une génération est en cours, on sort
+            if (fetcher.state === 'submitting' || isSummaryLoading || isSolutionLoading) {
+                return;
+            }
+
+            isProcessingRef.current = true;
+            setCurrentStatus(getInitialSAPStatus(ticket));
+
+            const needsSummary = !ticket.summary && summaryPrompt;
+            const needsSolution = !ticket.solution && solutionPrompt;
+
+            const processGenerations = async () => {
+                try {
+                    if (needsSummary) {
+                        await triggerSummaryGeneration(ticket, summaryPrompt, handleSaveSummary);
+                    }
+                    if (needsSolution) {
+                        await triggerSolutionGeneration(ticket, solutionPrompt, handleSaveSolution);
+                    }
+                    // Marquer le ticket comme traité une fois les générations terminées
+                    processedTicketsRef.current.add(ticket.id);
+                } finally {
+                    isProcessingRef.current = false;
+                }
+            };
+
+            processGenerations();
+            
+            return () => {
+                isProcessingRef.current = false;
+            };
+        }, [ticket?.id]);
+
+        // Ref pour suivre les mises à jour en cours
+        const updatesInProgressRef = useRef<Set<string>>(new Set());
+
+        // Effect to handle fetcher results
+        useEffect(() => {
+            if (fetcher.state === 'idle' && fetcher.data && 'success' in fetcher.data) {
+                const actionData = fetcher.data as ActionData;
+                const formData = fetcher.formData as FormData | undefined;
+                const intent = formData?.get('intent')?.toString() || '';
+                const ticketId = ticket?.id || '';
+                const updateKey = `${ticketId}-${intent}`;
+
                 if (actionData.success) {
                     const message = hasMessageProperty(actionData) ? actionData.message : 'Mise à jour réussie.';
                     console.log("Action Success:", message);
-                    onTicketUpdated(); // Manually trigger revalidation
+                    
+                    // Ne traiter que si nous avons un ID de ticket valide
+                    if (ticketId && !updatesInProgressRef.current.has(updateKey)) {
+                        updatesInProgressRef.current.add(updateKey);
+                        // Utiliser un timeout pour regrouper les mises à jour
+                        const timeoutId = setTimeout(() => {
+                            onTicketUpdated();
+                            updatesInProgressRef.current.delete(updateKey);
+                        }, 1000);
+
+                        // Nettoyer le timeout si le composant est démonté
+                        return () => clearTimeout(timeoutId);
+                    }
                 } else {
                     const errorMsg = hasErrorProperty(actionData) ? actionData.error : 'Échec de la mise à jour.';
                     console.error("Action Failed:", errorMsg);
+                    updatesInProgressRef.current.delete(updateKey);
                 }
             }
-         }, [fetcher.state, fetcher.data, onTicketUpdated]);
+        }, [fetcher.state, fetcher.data, ticket?.id]);
 
 
         // --- Handlers ---

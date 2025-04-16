@@ -103,8 +103,8 @@ export const createUserProfileSdk = async (
       nom: displayName.split(' ')[0] || displayName, // Extraire le prénom du displayName
       password: '',
       role: initialRole,
-      secteurs: ['nouveau'],
-      sectors: ['HACCP', 'Kezia'],
+      secteurs: [], // Initialiser avec un tableau vide pour que l'utilisateur choisisse ses secteurs
+      sectors: [], // Champ à supprimer, initialisé comme tableau vide
     };
 
     // Add the server timestamp during the set operation

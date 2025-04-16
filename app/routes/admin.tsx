@@ -115,6 +115,16 @@ export default function AdminPanel() {
         <CardBody>
             <p className="text-jdc-gray-300">Connecté en tant que : <span className="font-medium text-white">{profile?.email}</span></p>
             <p className="text-jdc-gray-300">Rôle : <span className="font-medium text-white">{profile?.role}</span></p>
+            
+            <div className="mt-4 border-t border-jdc-gray-700 pt-4">
+              <h3 className="text-md font-medium text-white mb-2">Outils d'administration</h3>
+              <Link 
+                to="/admin/gmail-to-firestore" 
+                className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
+              >
+                Gestion Gmail → Firestore
+              </Link>
+            </div>
         </CardBody>
       </Card>
 
