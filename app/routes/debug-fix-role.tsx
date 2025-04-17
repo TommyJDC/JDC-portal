@@ -25,16 +25,17 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const userId = formData.get("userId") as string;
   const newRole = formData.get("role") as string;
-  
+  const secteurs = formData.getAll("secteurs") as string[];
+
   if (!userId || !newRole) {
     return json({ success: false, error: "ID utilisateur et rôle sont requis" });
   }
-  
+
   try {
-    await updateUserProfileSdk(userId, { role: newRole });
-    return json({ success: true, message: `Rôle mis à jour avec succès pour l'utilisateur ${userId}` });
+    await updateUserProfileSdk(userId, { role: newRole, secteurs });
+    return json({ success: true, message: `Rôle et secteurs mis à jour pour ${userId}` });
   } catch (error: any) {
-    return json({ success: false, error: error.message || "Erreur lors de la mise à jour du rôle" });
+    return json({ success: false, error: error.message || "Erreur lors de la mise à jour du rôle et des secteurs" });
   }
 }
 
@@ -96,26 +97,71 @@ export default function DebugFixRole() {
         </div>
         
         <Form method="post" className="space-y-4">
-          {useCustomId ? (
+          <div className="space-y-4">
             <div>
               <label htmlFor="userId" className="block text-sm font-medium text-jdc-gray-300 mb-1">
-                ID Utilisateur personnalisé
+                ID Utilisateur à modifier
               </label>
               <Input
                 id="userId"
                 name="userId"
-                value={customUserId}
+                value={useCustomId ? customUserId : user?.userId || ''}
                 onChange={(e) => setCustomUserId(e.target.value)}
-                placeholder="Entrez l'ID utilisateur"
-                required
+                placeholder="Laisser vide pour modifier votre propre compte"
+                className={useCustomId ? '' : 'bg-jdc-gray-800/50'}
+                readOnly={!useCustomId}
               />
             </div>
-          ) : (
-            user && (
-              <input type="hidden" name="userId" value={user.userId} />
-            )
-          )}
-          
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={useCustomId}
+                onChange={() => setUseCustomId(!useCustomId)}
+                className="rounded text-blue-500 focus:ring-blue-500"
+                id="customIdCheckbox"
+              />
+              <label htmlFor="customIdCheckbox" className="text-sm text-jdc-gray-300">
+                Modifier un autre utilisateur
+              </label>
+            </div>
+
+            {user?.userId && !useCustomId && (
+              <div className="bg-jdc-gray-800/30 p-4 rounded-lg">
+                <h3 className="text-sm font-medium text-jdc-gray-300 mb-2">Vos informations actuelles</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-jdc-gray-300 text-sm"><strong>ID:</strong> {user.userId}</p>
+                    <p className="text-jdc-gray-300 text-sm"><strong>Email:</strong> {user.email}</p>
+                  </div>
+                  {profile && (
+                    <div>
+                      <p className="text-jdc-gray-300 text-sm"><strong>Rôle:</strong> {profile.role}</p>
+                      <p className="text-jdc-gray-300 text-sm"><strong>Secteurs:</strong> {profile.secteurs?.join(', ') || 'Aucun'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="secteurs" className="block text-sm font-medium text-jdc-gray-300 mb-1">
+              Secteurs
+            </label>
+            <select
+              id="secteurs"
+              name="secteurs"
+              multiple
+              className="w-full bg-jdc-gray-800 border border-jdc-gray-700 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Kezia">Kezia</option>
+              <option value="HACCP">HACCP</option>
+              <option value="CHR">CHR</option>
+              <option value="Tabac">Tabac</option>
+            </select>
+          </div>
+
           <div>
             <label htmlFor="role" className="block text-sm font-medium text-jdc-gray-300 mb-1">
               Nouveau rôle
@@ -132,7 +178,7 @@ export default function DebugFixRole() {
               <option value="Viewer">Viewer</option>
             </select>
           </div>
-          
+
           <div className="pt-2">
             <Button
               type="submit"

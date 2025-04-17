@@ -11,7 +11,9 @@ import type { AppUser, UserProfile } from '~/types/firestore.types';
 import { Card, CardHeader, CardBody } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { EditUserModal } from '~/components/EditUserModal';
+import { DebugAuth } from '~/components/DebugAuth';
 import { useToast } from '~/context/ToastContext';
+import type { UserSession } from '~/services/session.server';
 
 interface OutletContext {
   user: AppUser | null;
@@ -25,7 +27,9 @@ const AVAILABLE_ROLES = ['Admin', 'Technician', 'Viewer'];
 export default function AdminPanel() {
   const { user, profile, loadingAuth } = useOutletContext<OutletContext>();
   const { addToast } = useToast();
-  const { users: initialUsers } = useLoaderData<typeof loader>();
+  // Handle potential null data from loader
+  const loaderData = useLoaderData<typeof loader>();
+  const initialUsers = loaderData?.users; 
   const fetcher = useFetcher();
 
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
@@ -124,6 +128,16 @@ export default function AdminPanel() {
               >
                 Gestion Gmail → Firestore
               </Link>
+              
+              {profile?.role === 'Admin' && (
+                <div className="mt-4">
+                  <DebugAuth 
+                    user={user as unknown as UserSession}
+                    profile={profile}
+                    loadingAuth={loadingAuth}
+                  />
+                </div>
+              )}
             </div>
         </CardBody>
       </Card>

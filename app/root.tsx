@@ -142,10 +142,6 @@ function App({ children }: { children: ReactNode }) {
       />
       <AuthModal isOpen={isAuthModalOpen} onClose={closeAuthModal} />
       <main className={`container mx-auto px-4 py-6 ${isDashboard ? 'mt-0' : 'mt-16 md:mt-20'}`}>
-        {/* DebugAuth might need adjustment if it strictly requires Date objects */}
-        {profileForComponents?.role?.toLowerCase() === 'admin' && (
-          <DebugAuth user={user} profile={profileForComponents} loadingAuth={navigation.state !== 'idle'} />
-        )}
         {/* Pass casted profile to Outlet context */}
         <Outlet context={{ user, profile: profileForComponents }} />
       </main>

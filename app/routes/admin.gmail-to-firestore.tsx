@@ -47,7 +47,9 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Traiter les emails et les envoyer à Firestore
-    await processGmailToFirestore(authClient);
+    console.log("[Admin Gmail-to-Firestore] Début du traitement");
+    const result = await processGmailToFirestore(authClient);
+    console.log("[Admin Gmail-to-Firestore] Résultat:", result);
 
     return json({ success: true, message: "Traitement Gmail vers Firestore terminé avec succès" });
   } catch (error) {
@@ -111,18 +113,22 @@ export default function AdminGmailToFirestore() {
           </button>
         </Form>
 
-        {actionData && (
-          <div className={`mt-4 p-4 rounded-md ${
-            actionData.success 
-              ? "bg-green-100 text-green-800" 
-              : "bg-red-100 text-red-800"
-          }`}>
-            {actionData.success 
-              ? (actionData as { success: true; message: string }).message 
-              : `Erreur: ${(actionData as { success: false; error: string }).error}`
-            }
-          </div>
-        )}
+          {actionData ? (
+            <div className={`mt-4 p-4 rounded-md ${
+              actionData.success 
+                ? "bg-green-100 text-green-800" 
+                : "bg-red-100 text-red-800"
+            }`}>
+              {actionData.success 
+                ? (actionData as { success: true; message: string }).message 
+                : `Erreur: ${(actionData as { success: false; error: string }).error}`
+              }
+            </div>
+          ) : isSubmitting ? (
+            <div className="mt-4 p-4 bg-blue-100 text-blue-800 rounded-md">
+              Traitement en cours... Veuillez patienter
+            </div>
+          ) : null}
       </div>
     </div>
   );

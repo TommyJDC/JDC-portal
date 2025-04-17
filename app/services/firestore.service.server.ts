@@ -103,8 +103,7 @@ export const createUserProfileSdk = async (
       nom: displayName.split(' ')[0] || displayName, // Extraire le prénom du displayName
       password: '',
       role: initialRole,
-      secteurs: [], // Initialiser avec un tableau vide pour que l'utilisateur choisisse ses secteurs
-      sectors: [], // Champ à supprimer, initialisé comme tableau vide
+      secteurs: ['HACCP', 'Kezia'],
     };
 
     // Add the server timestamp during the set operation
@@ -166,9 +165,16 @@ export const updateUserProfileSdk = async (uid: string, data: Partial<Omit<UserP
 export const getAllUserProfilesSdk = async (): Promise<UserProfile[]> => {
   console.log("[FirestoreService Admin] Fetching all user profiles...");
   try {
+    console.log("[FirestoreService Admin] Getting users collection ref..."); // Ajout de log
     const usersCollectionRef = dbAdmin.collection('users');
+    console.log("[FirestoreService Admin] Got users collection ref."); // Ajout de log
+    
+    console.log("[FirestoreService Admin] Ordering users by email..."); // Ajout de log
     const q = usersCollectionRef.orderBy('email');
+    console.log("[FirestoreService Admin] Query built, fetching documents..."); // Ajout de log
     const querySnapshot = await q.get();
+    console.log(`[FirestoreService Admin] Query snapshot received. Size: ${querySnapshot.size}`); // Ajout de log
+
     const profiles = querySnapshot.docs.map((doc) => {
         const data = doc.data() as any;
         const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined;
@@ -186,7 +192,7 @@ export const getAllUserProfilesSdk = async (): Promise<UserProfile[]> => {
     console.log(`[FirestoreService Admin] Fetched ${profiles.length} profiles.`);
     return profiles;
   } catch (error: any) {
-    console.error("[FirestoreService Admin] Error fetching all user profiles:", error);
+    console.error("[FirestoreService Admin] !!! ERROR fetching all user profiles:", error); // Log d'erreur plus visible
     if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
         console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during user profiles fetch.");
         throw new Error("Quota Firestore dépassé lors de la récupération des profils utilisateurs. Veuillez réessayer plus tard.");

@@ -8,7 +8,8 @@ export interface UserProfile {
   email: string;
   role: 'Admin' | 'Technician' | string;
   secteurs: string[]; // Liste des secteurs de l'utilisateur (Kezia, HACCP, CHR, Tabac)
-  sectors?: string[]; // Champ à supprimer progressivement, rendu optionnel
+  faity?: string;
+  secteur?: string;
   displayName: string;
   nom: string;
   password: string;
