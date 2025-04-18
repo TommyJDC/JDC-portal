@@ -83,7 +83,13 @@ export const createUserProfileSdk = async (
   id: string,
   email: string,
   displayName: string,
-  initialRole: string = 'Admin'
+  initialRole: string = 'Admin',
+  gmailConfig?: {
+    googleRefreshToken?: string;
+    gmailAuthorizedScopes?: string[];
+    gmailAuthStatus?: 'active' | 'expired' | 'unauthorized';
+    isGmailProcessor?: boolean;
+  }
 ): Promise<UserProfile> => {
   if (!id || !email || !displayName) {
     throw new Error("ID, email, and display name are required to create a profile.");
@@ -100,10 +106,17 @@ export const createUserProfileSdk = async (
     const newUserProfileDataBase: Omit<UserProfile, 'uid' | 'createdAt' | 'updatedAt'> = {
       email,
       displayName,
-      nom: displayName.split(' ')[0] || displayName, // Extraire le prénom du displayName
+      nom: displayName.split(' ')[0] || displayName,
       password: '',
       role: initialRole,
-      secteurs: ['HACCP', 'Kezia'],
+      secteurs: [],
+      // Ajout des champs Gmail
+      ...(gmailConfig && {
+        googleRefreshToken: gmailConfig.googleRefreshToken,
+        gmailAuthorizedScopes: gmailConfig.gmailAuthorizedScopes,
+        gmailAuthStatus: gmailConfig.gmailAuthStatus || 'unauthorized',
+        isGmailProcessor: gmailConfig.isGmailProcessor || false,
+      }),
     };
 
     // Add the server timestamp during the set operation

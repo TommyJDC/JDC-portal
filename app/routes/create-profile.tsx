@@ -20,14 +20,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   try {
     const userProfile = await getUserProfileSdk(session.userId);
     
-    // Vérifier si le profil existe
-    if (!userProfile) {
-      console.error("Profil utilisateur non trouvé pour l'ID:", session.userId);
-      return redirect("/?error=profile-not-found");
-    }
-    
     // Si l'utilisateur a déjà des secteurs, rediriger vers le dashboard
-    if (userProfile.secteurs && userProfile.secteurs.length > 0) {
+    if (userProfile?.secteurs && userProfile.secteurs.length > 0) {
       return redirect("/dashboard");
     }
     
@@ -58,9 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     // Mettre à jour le profil utilisateur avec les secteurs sélectionnés
     await updateUserProfileSdk(session.userId, { 
-      secteurs: selectedSectors,
-      // Supprimer le champ sectors en le définissant comme un tableau vide
-      sectors: [] 
+      secteurs: selectedSectors
     });
     
     // Rediriger vers le dashboard après la mise à jour

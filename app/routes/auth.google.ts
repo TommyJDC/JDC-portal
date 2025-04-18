@@ -1,25 +1,48 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { redirect } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server"; // Import the authenticator
+import { redirect, createCookieSessionStorage } from "@remix-run/node";
+import { authenticator } from "~/services/auth.server";
 
-// Loader function: Redirects GET requests to the authenticator
+// Session temporaire pour stocker les informations de redirection
+const authSessionStorage = createCookieSessionStorage({
+  cookie: {
+    name: "__auth_redirect",
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax",
+    secrets: [process.env.SESSION_SECRET || import.meta.env.VITE_SESSION_SECRET],
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 5, // 5 minutes
+  },
+});
+
 export async function loader({ request }: LoaderFunctionArgs) {
-  // If the user is already authenticated, redirect them to the dashboard or another appropriate page
-  // This prevents users from hitting the login initiation route if they are already logged in.
-  await authenticator.isAuthenticated(request, {
-    successRedirect: "/dashboard", // Or wherever you want authenticated users to go
-  });
+  const url = new URL(request.url);
+  const returnTo = url.searchParams.get("returnTo");
+  const mode = url.searchParams.get("mode");
 
-  // If not authenticated, proceed with initiating the Google authentication flow
-  return authenticator.authenticate("google", request);
+  // Si c'est une authentification pour Gmail, on ne vérifie pas si l'utilisateur est déjà authentifié
+  if (mode !== "gmail") {
+    await authenticator.isAuthenticated(request, {
+      successRedirect: "/dashboard",
+    });
+  }
+
+  // Stocker returnTo et mode dans une session temporaire
+  const session = await authSessionStorage.getSession();
+  session.set("returnTo", returnTo || "/dashboard");
+  session.set("mode", mode || "default");
+
+  // Stocker le cookie de session temporaire dans les headers
+  const headers = new Headers();
+  headers.set("Set-Cookie", await authSessionStorage.commitSession(session));
+
+  // Laisser l'authenticator gérer la redirection vers Google OAuth
+  return authenticator.authenticate("google", request, {
+    context: { headers },
+    failureRedirect: "/?error=google-auth-failed"
+  });
 }
 
-// Action function: Handles POST requests (e.g., from a login button)
-export async function action({ request }: ActionFunctionArgs) {
-   // If the user is already authenticated, redirect them away
-   await authenticator.isAuthenticated(request, {
-    successRedirect: "/dashboard",
-  });
-  // Initiate the Google authentication flow
-  return authenticator.authenticate("google", request);
+export async function action({ request, params, context }: ActionFunctionArgs) {
+  return loader({ request, params, context });
 }

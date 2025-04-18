@@ -1,6 +1,21 @@
 import { Timestamp, FieldValue } from 'firebase/firestore'; // Import necessary types
 
 /**
+ * Represents a notification in the system
+ */
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  timestamp: Date | Timestamp;
+  read: boolean;
+  link?: string;
+  type?: 'ticket' | 'shipment' | 'system' | string;
+  sourceId?: string; // ID of the related item (ticket, shipment, etc.)
+}
+
+/**
  * Represents the structure of user profile data stored in Firestore.
  */
 export interface UserProfile {
@@ -15,6 +30,21 @@ export interface UserProfile {
   password: string;
   createdAt?: Timestamp | Date;
   updatedAt?: Timestamp | Date;
+  // Gmail processing fields
+  googleRefreshToken?: string;
+  isGmailProcessor?: boolean;
+  gmailAuthorizedScopes?: string[];
+  gmailAuthStatus?: 'active' | 'expired' | 'unauthorized';
+}
+
+/**
+ * Configuration for Gmail processing stored in settings collection
+ */
+export interface GmailProcessingConfig {
+  maxEmailsPerRun: number;
+  targetLabels: string[];
+  processedLabelName: string; // Label to add to processed emails
+  refreshInterval: number; // Délai en minutes entre chaque vérification
 }
 
 /**
@@ -96,14 +126,6 @@ export interface GeocodeCacheEntry {
   timestamp: FieldValue | Timestamp; // Use FieldValue for serverTimestamp on write
 }
 
-// Re-export AppUser from auth.service for convenience if needed elsewhere
-// Or keep imports separate where used.
-// export type { AppUser } from '~/services/auth.service';
-
-// Note: Ensure you have consistent Timestamp handling (either Firebase Timestamps
-// or JS Dates) throughout your application where these types are used.
-// Conversion often happens when fetching/sending data.
-
 /**
  * Represents an Article document from the 'articles' collection in Firestore.
  * Fields based on the search function in firestore.service.ts.
@@ -117,7 +139,6 @@ export interface Article {
   // Add any other relevant fields from your 'articles' documents
   // e.g., prix?: number; stock?: number; fournisseur?: string;
 }
-
 
 // --- Dashboard Specific Types ---
 

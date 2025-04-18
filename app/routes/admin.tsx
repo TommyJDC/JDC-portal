@@ -3,7 +3,9 @@ import {
   useOutletContext, 
   Link,
   useLoaderData,
-  useFetcher
+  useFetcher,
+  Outlet,
+  useLocation
 } from '@remix-run/react';
 import { loader } from './admin.loader';
 import { action } from './admin.action';
@@ -25,6 +27,7 @@ const AVAILABLE_SECTORS = ['CHR', 'HACCP', 'Kezia', 'Tabac'];
 const AVAILABLE_ROLES = ['Admin', 'Technician', 'Viewer'];
 
 export default function AdminPanel() {
+  const location = useLocation();
   const { user, profile, loadingAuth } = useOutletContext<OutletContext>();
   const { addToast } = useToast();
   // Handle potential null data from loader
@@ -112,7 +115,9 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-white mb-6">Panneau d'Administration</h1>
+      {location.pathname === "/admin" ? (
+        <>
+          <h1 className="text-3xl font-bold text-white mb-6">Panneau d'Administration</h1>
 
       <Card>
         <CardHeader><h2 className="text-lg font-medium text-white">Informations Administrateur</h2></CardHeader>
@@ -122,12 +127,26 @@ export default function AdminPanel() {
             
             <div className="mt-4 border-t border-jdc-gray-700 pt-4">
               <h3 className="text-md font-medium text-white mb-2">Outils d'administration</h3>
-              <Link 
-                to="/admin/gmail-to-firestore" 
-                className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
-              >
-                Gestion Gmail → Firestore
-              </Link>
+              <div className="flex gap-4">
+                <Link 
+                  to="gmail-config" 
+                  className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
+                >
+                  Configuration Gmail
+                </Link>
+                <Link 
+                  to="gmail-to-firestore" 
+                  className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
+                >
+                  Traitement Gmail → Firestore
+                </Link>
+                <Link 
+                  to="/debug-index" 
+                  className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
+                >
+                  Diagnostic
+                </Link>
+              </div>
               
               {profile?.role === 'Admin' && (
                 <div className="mt-4">
@@ -187,14 +206,18 @@ export default function AdminPanel() {
         </CardBody>
       </Card>
 
-      <EditUserModal
-        isOpen={isEditModalOpen}
-        onClose={handleCloseEditModal}
-        user={editingUser}
-        onSave={handleSaveUser}
-        availableRoles={AVAILABLE_ROLES}
-        availableSectors={AVAILABLE_SECTORS}
-      />
+          <EditUserModal
+            isOpen={isEditModalOpen}
+            onClose={handleCloseEditModal}
+            user={editingUser}
+            onSave={handleSaveUser}
+            availableRoles={AVAILABLE_ROLES}
+            availableSectors={AVAILABLE_SECTORS}
+          />
+        </>
+      ) : (
+        <Outlet context={{ user, profile, loadingAuth }} />
+      )}
     </div>
   );
 }

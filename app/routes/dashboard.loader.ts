@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-    import { json } from "@remix-run/node";
+    import { json, redirect } from "@remix-run/node";
     import { authenticator } from "~/services/auth.server";
     import { getGoogleAuthClient, getCalendarEvents } from "~/services/google.server";
     import { getWeekDateRangeForAgenda } from "~/utils/dateUtils";
@@ -60,7 +60,13 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
         try {
           // 1. Fetch User Profile (needed for sectors)
           userProfile = await getUserProfileSdk(session.userId); // Use session.userId
-          const userSectors = userProfile?.secteurs ?? [];
+          
+          // Rediriger vers create-profile si l'utilisateur n'a pas de secteurs
+          if (!userProfile?.secteurs || userProfile.secteurs.length === 0) {
+            return redirect("/create-profile");
+          }
+
+          const userSectors = userProfile.secteurs;
           const sectorsForTickets = userSectors;
           const sectorsForShipments = userProfile?.role === 'Admin' ? [] : userSectors; // Empty array for admin means all sectors
 

@@ -2,6 +2,14 @@ import { google } from 'googleapis';
 import type { OAuth2Client } from 'google-auth-library';
 import { dbAdmin } from '~/firebase.admin.config.server';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import type { GmailProcessingConfig } from '~/types/firestore.types';
+
+interface GmailLabel {
+  id: string;
+  name: string;
+  labelListVisibility?: string;
+  messageListVisibility?: string;
+}
 
 /**
  * Interface pour les données extraites des emails
@@ -26,30 +34,38 @@ interface EmailData {
  */
 export async function extractEmailContent(
   authClient: OAuth2Client,
-  labelName: string = 'sap-sap---a-traite',
-  maxResults: number = 5
+  config: GmailProcessingConfig
 ): Promise<EmailData[]> {
   const gmail = google.gmail({ version: 'v1', auth: authClient });
   const emailData: EmailData[] = [];
 
   try {
-    // Récupérer l'ID du label
-    console.log(`[GmailService] Recherche du label: ${labelName}`);
+    // Récupérer les IDs des labels
+    console.log(`[GmailService] Recherche des labels:`, config.targetLabels);
     const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
     const labels = labelsResponse.data.labels || [];
-    const label = labels.find(l => l.name === labelName);
+    const labelIds = config.targetLabels
+      .map(labelName => {
+        const label = labels.find(l => l.name === labelName);
+        if (!label || !label.id) {
+          console.warn(`[GmailService] Label "${labelName}" non trouvé`);
+          return null;
+        }
+        return label.id;
+      })
+      .filter((id): id is string => id !== null);
 
-    if (!label || !label.id) {
-      console.error(`[GmailService] Label "${labelName}" non trouvé`);
+    if (labelIds.length === 0) {
+      console.error(`[GmailService] Aucun label cible trouvé`);
       return [];
     }
 
-    // Rechercher les messages avec ce label
-    console.log(`[GmailService] Recherche des messages avec le label: ${labelName} (ID: ${label.id})`);
+    // Rechercher les messages avec ces labels
+    console.log(`[GmailService] Recherche des messages avec les labels:`, labelIds);
     const messagesResponse = await gmail.users.messages.list({
       userId: 'me',
-      labelIds: [label.id],
-      maxResults: maxResults
+      labelIds: labelIds,
+      maxResults: config.maxEmailsPerRun
     });
 
     const messages = messagesResponse.data.messages || [];
@@ -256,14 +272,63 @@ export async function deleteRowsWithDuplicateSAP(): Promise<void> {
 }
 
 /**
+ * Ajoute le label "Traité" à un email
+ */
+async function addProcessedLabel(
+  gmail: any,
+  messageId: string,
+  processedLabelName: string
+): Promise<void> {
+  try {
+    // Vérifier si le label existe, sinon le créer
+    const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
+    const labels = (labelsResponse.data.labels || []) as GmailLabel[];
+    let processedLabel = labels.find((l: GmailLabel) => l.name === processedLabelName);
+
+    if (!processedLabel) {
+      console.log(`[GmailService] Création du label "${processedLabelName}"`);
+      const createResponse = await gmail.users.labels.create({
+        userId: 'me',
+        requestBody: {
+          name: processedLabelName,
+          labelListVisibility: 'labelShow',
+          messageListVisibility: 'show'
+        }
+      });
+      processedLabel = createResponse.data;
+    }
+
+    if (!processedLabel || !processedLabel.id) {
+      throw new Error(`Label "${processedLabelName}" non trouvé ou invalide`);
+    }
+
+    // Ajouter le label au message
+    await gmail.users.messages.modify({
+      userId: 'me',
+      id: messageId,
+      requestBody: {
+        addLabelIds: [processedLabel.id]
+      }
+    });
+
+    console.log(`[GmailService] Label "${processedLabelName}" ajouté au message ${messageId}`);
+  } catch (error) {
+    console.error(`[GmailService] Erreur lors de l'ajout du label au message ${messageId}:`, error);
+  }
+}
+
+/**
  * Fonction principale qui exécute tout le processus
  */
-export async function processGmailToFirestore(authClient: OAuth2Client): Promise<void> {
+export async function processGmailToFirestore(
+  authClient: OAuth2Client,
+  config: GmailProcessingConfig
+): Promise<void> {
   try {
     console.log('[GmailService] Démarrage du traitement Gmail vers Firestore');
     
     // Extraire les données des emails
-    const data = await extractEmailContent(authClient);
+    const data = await extractEmailContent(authClient, config);
     console.log(`[GmailService] ${data.length} emails extraits`);
     
     // Traiter chaque ligne de données
@@ -279,6 +344,9 @@ export async function processGmailToFirestore(authClient: OAuth2Client): Promise
       const exists = await sapNumberExists(sapNumber);
       if (!exists) {
         await sendDataToFirebase(row, sapNumber);
+        // Ajouter le label "Traité" après le traitement réussi
+        const gmail = google.gmail({ version: 'v1', auth: authClient });
+        await addProcessedLabel(gmail, row.messageId, config.processedLabelName);
       } else {
         console.log(`[GmailService] Numéro SAP déjà existant: ${sapNumber}`);
       }

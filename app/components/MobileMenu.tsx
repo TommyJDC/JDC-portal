@@ -34,9 +34,9 @@ const debugItem = { name: 'Diagnostic', to: '/debug-index', icon: faBug };
  const JDC_LOGO_URL = "https://www.jdc.fr/images/logo_jdc_blanc.svg"; // Re-add logo URL if needed
 
  export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, user, profile, onLoginClick, loadingAuth }) => { // Removed onLogoutClick
-   const linkActiveClass = "text-jdc-yellow bg-jdc-gray-800";
-   const linkInactiveClass = "text-jdc-gray-300 hover:text-white hover:bg-jdc-gray-700";
-  const linkBaseClass = "flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors";
+  const linkActiveClass = "text-jdc-yellow bg-jdc-gray-800/50 border-l-2 border-jdc-yellow";
+  const linkInactiveClass = "text-jdc-gray-300 hover:text-white hover:bg-jdc-gray-700/50 hover:border-l-2 hover:border-jdc-yellow/50";
+  const linkBaseClass = "flex items-center px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ease-in-out";
 
   // Determine if the Admin link should be shown
   const showAdminLink = !loadingAuth && profile?.role?.toLowerCase() === 'admin';
@@ -45,13 +45,13 @@ const debugItem = { name: 'Diagnostic', to: '/debug-index', icon: faBug };
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" // Keep z-index lower than header
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
       onClick={onClose}
       aria-hidden="true"
     >
       <div
-        className="fixed inset-y-0 left-0 w-64 bg-jdc-blue-darker shadow-xl z-50 flex flex-col"
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside menu
+        className="fixed inset-y-0 left-0 w-72 bg-jdc-blue-darker/95 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Menu Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-jdc-gray-800">
@@ -116,21 +116,31 @@ const debugItem = { name: 'Diagnostic', to: '/debug-index', icon: faBug };
         </nav>
 
         {/* User Info / Actions Footer */}
-        <div className="border-t border-jdc-gray-800 p-4">
+        <div className="border-t border-jdc-gray-800 p-4 bg-jdc-blue-dark/50">
           {loadingAuth ? (
-             <div className="h-10 bg-jdc-gray-700 rounded animate-pulse"></div> // Placeholder
+            <div className="h-10 bg-jdc-gray-700 rounded animate-pulse"></div>
           ) : user ? (
             <div className="space-y-3">
-              <div className="flex items-center space-x-2 text-sm text-jdc-gray-300">
+              <div className="flex items-center space-x-3 text-sm text-jdc-gray-300 p-2 rounded-lg bg-jdc-gray-800/30">
                 <FontAwesomeIcon icon={faUserCircle} className="h-6 w-6" />
-                <span className="truncate" title={user.email ?? ''}>
-                   {profile?.displayName || user.displayName || user.email?.split('@')[0]}
-                 </span>
-               </div>
-               {/* Logout button removed, handled by Header form */}
-             </div>
-           ) : (
-             <Button variant="primary" size="sm" onClick={() => { onLoginClick(); onClose(); }} className="w-full" leftIcon={<FontAwesomeIcon icon={faSignInAlt} />}>
+                <div className="flex flex-col">
+                  <span className="font-medium truncate" title={user.email ?? ''}>
+                    {profile?.displayName || user.displayName || user.email?.split('@')[0]}
+                  </span>
+                  <span className="text-xs text-jdc-gray-400 truncate">
+                    {user.email}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Button 
+              variant="primary" 
+              size="sm" 
+              onClick={() => { onLoginClick(); onClose(); }} 
+              className="w-full transition-transform hover:scale-105" 
+              leftIcon={<FontAwesomeIcon icon={faSignInAlt} />}
+            >
               Connexion
             </Button>
           )}

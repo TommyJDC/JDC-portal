@@ -1,7 +1,7 @@
 import { Authenticator } from "remix-auth";
 import { GoogleStrategy } from "remix-auth-google";
 import { sessionStorage, type UserSession } from "./session.server";
-import { getUserProfileSdk, createUserProfileSdk } from "./firestore.service.server";
+import { getUserProfileSdk, createUserProfileSdk, updateUserProfileSdk } from "./firestore.service.server";
 
 // Create an instance of the authenticator
 export const authenticator = new Authenticator<UserSession>(sessionStorage, {
@@ -25,7 +25,16 @@ authenticator.use(
       clientID: googleClientId,
       clientSecret: googleClientSecret,
       callbackURL: `${appBaseUrl}/auth/google/callback`,
-      scope: ["openid", "email", "profile", "https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/calendar"].join(" "),
+      scope: [
+        "openid",
+        "email",
+        "profile",
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/gmail.labels",
+        "https://www.googleapis.com/auth/calendar"
+      ].join(" "),
       accessType: "offline",
       prompt: "consent",
     },
@@ -45,15 +54,12 @@ authenticator.use(
         // D'abord essayer de récupérer le profil existant
         const userProfile = await getUserProfileSdk(profile.id);
 
-        // Vérifier si le profil existe avant d'accéder à ses propriétés
+        // Si le profil existe, on le retourne avec les nouveaux tokens
         if (!userProfile) {
-            // Ceci ne devrait théoriquement pas arriver si getUserProfileSdk lance une erreur "not found"
-            // Mais ajoutons une sécurité.
-            console.error(`[AuthServer] getUserProfileSdk returned null unexpectedly for ID: ${profile.id}`);
-            throw new Error("Impossible de vérifier le profil utilisateur existant.");
+          throw new Error("User profile not found");
         }
 
-        console.log(`[AuthServer] Existing profile found for ID: ${profile.id}`); // <-- Log ajouté
+        console.log(`[AuthServer] Existing profile found for ID: ${profile.id}`);
         return {
           userId: profile.id,
           email: email,
@@ -74,11 +80,15 @@ authenticator.use(
         // Si le profil n'existe pas (basé sur le message d'erreur), le créer automatiquement
         if (errorMessage.includes("not found") || errorMessage.includes("User profile not found")) {
           console.log(`[AuthServer] Error indicates profile not found for ID: ${profile.id}. Attempting creation.`); // <-- Log ajouté
-          const newProfile = await createUserProfileSdk(
-            profile.id,
-            email,
-            profile.displayName || "Utilisateur Google"
-          );
+          const newProfile = await createUserProfileSdk(profile.id, email, profile.displayName || "Utilisateur Google");
+          
+          // Mettre à jour le profil avec les informations Gmail
+          await updateUserProfileSdk(profile.id, {
+            googleRefreshToken: refreshToken,
+            gmailAuthorizedScopes: extraParams.scope?.split(" ") || [],
+            gmailAuthStatus: "active",
+            isGmailProcessor: false
+          });
           console.log(`[AuthServer] Profile created successfully for ID: ${profile.id}`); // <-- Log ajouté
           return {
             userId: profile.id,
@@ -95,3 +105,14 @@ authenticator.use(
     }
   )
 );
+
+// Fonction utilitaire pour vérifier si un utilisateur a les scopes Gmail nécessaires
+export function hasRequiredGmailScopes(scopes: string[] | undefined): boolean {
+  if (!scopes) return false;
+  const requiredScopes = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.labels"
+  ];
+  return requiredScopes.every(scope => scopes.includes(scope));
+}

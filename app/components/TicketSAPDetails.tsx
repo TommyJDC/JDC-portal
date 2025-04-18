@@ -10,6 +10,9 @@
     import { Timestamp } from 'firebase/firestore'; // Import Timestamp
     // Import the date utility functions
     import { parseFrenchDate, formatDateForDisplay } from '~/utils/dateUtils';
+    import { AnimatedTicketSummary } from '~/components/AnimatedTicketSummary';
+    import { AnimatedSolution } from '~/components/AnimatedSolution';
+    import { AnimatedComments } from '~/components/AnimatedComments';
     // Import action type if defined in tickets-sap.action.ts
     // import type { action as ticketsSapAction } from '~/routes/tickets-sap.action';
 
@@ -39,8 +42,8 @@
         }
     };
 
-    // Gemini API Key provided by the user
-    const GEMINI_API_KEY = "AIzaSyAZqeCNWSWu1D4iFthrCW7sx9Ky2jlqoUg"; // Replace with your actual key or env variable
+    // Gemini API Key from environment variables
+    const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
     // Type for the expected structure of fetcher.data from the action
     type ActionData = { success: boolean; message?: string; error?: string };
@@ -126,8 +129,12 @@
                 return;
             }
 
-            // Si le ticket a déjà un résumé et une solution, on le marque comme traité
-            if (ticket.summary && ticket.solution) {
+            // Initialiser le statut
+            setCurrentStatus(getInitialSAPStatus(ticket));
+
+            // Si le ticket a déjà un résumé et une solution dans Firestore, on le marque comme traité
+            if (ticket.summary || ticket.solution) {
+                console.log(`[TicketSAPDetails] Using cached data for ticket ${ticket.id}`);
                 processedTicketsRef.current.add(ticket.id);
                 return;
             }
@@ -138,27 +145,31 @@
             }
 
             isProcessingRef.current = true;
-            setCurrentStatus(getInitialSAPStatus(ticket));
 
             const needsSummary = !ticket.summary && summaryPrompt;
             const needsSolution = !ticket.solution && solutionPrompt;
 
-            const processGenerations = async () => {
-                try {
-                    if (needsSummary) {
-                        await triggerSummaryGeneration(ticket, summaryPrompt, handleSaveSummary);
+            // Ne générer que si nécessaire (pas de données en cache)
+            if (needsSummary || needsSolution) {
+                console.log(`[TicketSAPDetails] Generating new content for ticket ${ticket.id}`);
+                const processGenerations = async () => {
+                    try {
+                        if (needsSummary) {
+                            await triggerSummaryGeneration(ticket, summaryPrompt, handleSaveSummary);
+                        }
+                        if (needsSolution) {
+                            await triggerSolutionGeneration(ticket, solutionPrompt, handleSaveSolution);
+                        }
+                        processedTicketsRef.current.add(ticket.id);
+                    } finally {
+                        isProcessingRef.current = false;
                     }
-                    if (needsSolution) {
-                        await triggerSolutionGeneration(ticket, solutionPrompt, handleSaveSolution);
-                    }
-                    // Marquer le ticket comme traité une fois les générations terminées
-                    processedTicketsRef.current.add(ticket.id);
-                } finally {
-                    isProcessingRef.current = false;
-                }
-            };
+                };
 
-            processGenerations();
+                processGenerations();
+            } else {
+                isProcessingRef.current = false;
+            }
             
             return () => {
                 isProcessingRef.current = false;
@@ -249,97 +260,135 @@
         const fetcherFailedSolutionSave = fetcher.data && !fetcher.data.success && fetcher.formData?.get('intent') === 'save_solution';
 
         const modalContent = (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-70" onClick={handleClose}>
-                <div className="w-11/12 max-w-3xl relative bg-jdc-card text-jdc-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={handleClose} className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 z-10" aria-label="Fermer">✕</button>
-                    <h3 className="font-bold text-xl mb-1">{ticket.raisonSociale || 'Client Inconnu'}</h3>
-                    <p className="text-sm text-gray-400 mb-4">Ticket SAP: {ticket.numeroSAP || 'N/A'}</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 py-4 text-sm border-t border-b border-gray-700">
-                        <p><b>Code Client:</b> {ticket.codeClient || 'N/A'}</p>
-                        <p><b>Téléphone:</b> {ticket.telephone || 'N/A'}</p>
-                        <p className="md:col-span-2"><b>Adresse:</b> {ticket.adresse || 'N/A'}</p>
-                        <p><b>Date Création:</b> {formatDateForDisplay(parseFrenchDate(ticket.date))}</p>
-                        <p><b>Secteur:</b> <span className="badge badge-neutral">{ticket.secteur || 'N/A'}</span></p>
-                        {ticket.deducedSalesperson && (<p><b>Commercial:</b> {ticket.deducedSalesperson}</p>)}
-                    </div>
-                    <div className="my-4">
-                        <label htmlFor="sap-ticket-status-select" className="block text-sm font-medium text-gray-300 mb-1">Statut SAP</label>
-                        <div className="flex items-center gap-2">
-                            <select
-                                id="sap-ticket-status-select"
-                                className="select select-bordered select-sm w-full max-w-xs bg-jdc-gray text-jdc-white"
-                                value={currentStatus}
-                                onChange={(e) => setCurrentStatus(e.target.value)}
-                                disabled={isLoadingAction}
-                            >
-                                <option className="text-black" value="Nouveau">Nouveau</option>
-                                <option className="text-black" value="En cours">En cours</option>
-                                <option className="text-black" value="En attente client">En attente client</option>
-                                <option className="text-black" value="Résolu">Résolu</option>
-                                <option className="text-black" value="Terminé">Terminé</option>
-                                <option className="text-black" value="Annulé">Annulé</option>
-                            </select>
-                            <button
-                                className="btn btn-primary btn-sm"
-                                onClick={handleStatusChange}
-                                disabled={isLoadingAction || currentStatus === ticket?.statutSAP}
-                            >
-                                {isLoadingAction && fetcher.formData?.get('intent') === 'update_status' ? <FaSpinner className="animate-spin" /> : 'Mettre à jour'}
-                            </button>
-                            <span className={`badge ${getSAPStatusBadgeClass(currentStatus)} ml-auto`}>{currentStatus}</span>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={handleClose}>
+                <div className="w-11/12 max-w-4xl relative bg-gradient-to-b from-jdc-card to-jdc-card/95 text-jdc-white rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    {/* Header Section */}
+                    <div className="sticky top-0 z-20 bg-gradient-to-b from-jdc-card via-jdc-card to-transparent pb-6 pt-4 px-6">
+                        <button onClick={handleClose} className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4 hover:rotate-90 transition-transform duration-200" aria-label="Fermer">✕</button>
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <h3 className="font-bold text-2xl mb-1 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-400">
+                                    {ticket.raisonSociale || 'Client Inconnu'}
+                                </h3>
+                                <div className="flex items-center gap-2 text-sm text-gray-400">
+                                    <span className="px-2 py-1 rounded bg-jdc-gray/50 font-mono">SAP #{ticket.numeroSAP || 'N/A'}</span>
+                                    <span className={`badge ${getSAPStatusBadgeClass(currentStatus)}`}>{currentStatus}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <hr className="my-3 border-gray-700"/>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <h4 className="text-md font-semibold mb-1 text-blue-300">Résumé IA {isSummaryCached && <span className="text-xs font-normal text-gray-400">(cache)</span>}</h4>
-                            {isSummaryLoading && <span className="loading loading-dots loading-sm"></span>}
-                            {(summaryError || (fetcherFailedSummarySave && hasErrorProperty(fetcher.data))) && !displaySummary && (
-                                <p className="text-error text-xs">Erreur: {summaryError || (hasErrorProperty(fetcher.data) ? fetcher.data.error : 'Inconnue')}</p>
-                            )}
-                            {displaySummary ? (<div className="prose prose-sm max-w-none text-gray-300"><ReactMarkdown>{displaySummary}</ReactMarkdown></div>)
-                            : !isSummaryLoading && !summaryError && !fetcherFailedSummarySave ? (<p className="text-xs text-gray-500 italic">Aucun résumé.</p>) : null}
+
+                    {/* Content Section */}
+                    <div className="px-6 pb-6">
+                        {/* Client Info Card */}
+                        <div className="mb-6 p-4 bg-jdc-gray/20 rounded-lg border border-gray-700/50 backdrop-blur-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-24 text-gray-400">Code Client</span>
+                                        <span className="font-medium">{ticket.codeClient || 'N/A'}</span>
+                                    </p>
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-24 text-gray-400">Téléphone</span>
+                                        <span className="font-medium">{ticket.telephone || 'N/A'}</span>
+                                    </p>
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-24 text-gray-400">Date</span>
+                                        <span className="font-medium">{formatDateForDisplay(parseFrenchDate(ticket.date))}</span>
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-24 text-gray-400">Secteur</span>
+                                        <span className="badge badge-neutral">{ticket.secteur || 'N/A'}</span>
+                                    </p>
+                                    {ticket.deducedSalesperson && (
+                                        <p className="flex items-center gap-2">
+                                            <span className="w-24 text-gray-400">Commercial</span>
+                                            <span className="font-medium">{ticket.deducedSalesperson}</span>
+                                        </p>
+                                    )}
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-24 text-gray-400">Adresse</span>
+                                        <span className="font-medium">{ticket.adresse || 'N/A'}</span>
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                             <h4 className="text-md font-semibold mb-1 text-green-300">Solution Proposée IA {isSolutionCached && <span className="text-xs font-normal text-gray-400">(cache)</span>}</h4>
-                            {isSolutionLoading && <span className="loading loading-dots loading-sm"></span>}
-                            {(solutionError || (fetcherFailedSolutionSave && hasErrorProperty(fetcher.data))) && !displaySolution && (
-                                <p className="text-error text-xs">Erreur: {solutionError || (hasErrorProperty(fetcher.data) ? fetcher.data.error : 'Inconnue')}</p>
-                            )}
-                            {displaySolution ? (<div className="prose prose-sm max-w-none text-gray-300"><ReactMarkdown>{displaySolution}</ReactMarkdown></div>)
-                            : !isSolutionLoading && !solutionError && !fetcherFailedSolutionSave ? (<p className="text-xs text-gray-500 italic">Aucune solution.</p>) : null}
+                        {/* Status Update Section */}
+                        <div className="mb-6 p-4 bg-jdc-gray/20 rounded-lg border border-gray-700/50">
+                            <label htmlFor="sap-ticket-status-select" className="block text-sm font-medium text-gray-300 mb-2">
+                                Mise à jour du statut
+                            </label>
+                            <div className="flex items-center gap-3">
+                                <select
+                                    id="sap-ticket-status-select"
+                                    className="select select-bordered select-sm flex-1 bg-black text-jdc-white border-gray-700"
+                                    value={currentStatus}
+                                    onChange={(e) => setCurrentStatus(e.target.value)}
+                                    disabled={isLoadingAction}
+                                >
+                                    <option className="text-black" value="Nouveau">Nouveau</option>
+                                    <option className="text-black" value="En cours">En cours</option>
+                                    <option className="text-black" value="En attente client">En attente client</option>
+                                    <option className="text-black" value="Résolu">Résolu</option>
+                                    <option className="text-black" value="Terminé">Terminé</option>
+                                    <option className="text-black" value="Annulé">Annulé</option>
+                                </select>
+                                <button
+                                    className={`btn btn-sm ${currentStatus === ticket?.statutSAP ? 'opacity-50' : 'hover:scale-105'} transition-all duration-200 bg-yellow-400 text-black hover:bg-yellow-500`}
+                                    onClick={handleStatusChange}
+                                    disabled={isLoadingAction || currentStatus === ticket?.statutSAP}
+                                >
+                                    {isLoadingAction && fetcher.formData?.get('intent') === 'update_status' ? (
+                                        <FaSpinner className="animate-spin" />
+                                    ) : (
+                                        'Mettre à jour'
+                                    )}
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    <hr className="my-3 border-gray-700"/>
-                    <details className="mb-3 text-sm">
-                        <summary className="cursor-pointer font-medium text-gray-400 hover:text-jdc-white">Voir la description du problème SAP</summary>
-                        <div className="mt-2 p-3 border border-gray-600 rounded bg-jdc-gray text-xs max-h-32 overflow-y-auto">
-                            <pre className="whitespace-pre-wrap break-words font-mono">{ticket.demandeSAP || ticket.descriptionProbleme || ticket.description || 'N/A'}</pre>
+                        {/* AI Summary and Solution Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <AnimatedTicketSummary 
+                                ticketContent={problemDescriptionForAI}
+                                ticket={ticket}
+                                summary={ticket?.summary || generatedSummary}
+                                isLoading={isSummaryLoading}
+                                error={summaryError}
+                            />
+                            <AnimatedSolution 
+                                ticketContent={problemDescriptionForAI}
+                                ticket={ticket}
+                                solution={ticket?.solution || generatedSolution}
+                                isLoading={isSolutionLoading}
+                                error={solutionError}
+                            />
                         </div>
-                    </details>
-                    <hr className="my-3 border-gray-700"/>
-                    <div>
-                        <h4 className="text-md font-semibold mb-2">Commentaires</h4>
-                        <div className="max-h-40 overflow-y-auto mb-3 border border-gray-600 rounded p-3 bg-jdc-gray text-sm space-y-2">
-                            {ticket.commentaires && ticket.commentaires.length > 0 ? (
-                                ticket.commentaires.map((commentaire: string, index: number) => ( <p key={index} className="border-b border-gray-700 pb-1 mb-1">{commentaire}</p> ))
-                            ) : (<p className="text-sm text-gray-500 italic">Aucun commentaire.</p>)}
+
+                        {/* Problem Description Section */}
+                        <div className="mb-6">
+                            <details className="group">
+                                <summary className="cursor-pointer font-medium text-gray-400 hover:text-jdc-white flex items-center gap-2 select-none">
+                                    <svg className="w-4 h-4 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                    Description du problème SAP
+                                </summary>
+                                <div className="mt-3 p-4 border border-gray-600 rounded-lg bg-jdc-gray/30 text-sm max-h-48 overflow-y-auto">
+                                    <pre className="whitespace-pre-wrap break-words font-mono">{ticket.demandeSAP || ticket.descriptionProbleme || ticket.description || 'N/A'}</pre>
+                                </div>
+                            </details>
                         </div>
-                        <textarea
-                            placeholder="Ajouter un commentaire..."
-                            className="textarea textarea-bordered w-full text-sm bg-jdc-gray"
-                            rows={2}
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            disabled={isLoadingAction}
-                        ></textarea>
-                        <button
-                            className="btn btn-secondary btn-sm mt-2"
-                            onClick={handleAddComment}
-                            disabled={isLoadingAction || !newComment.trim()}
-                        >
-                            {isLoadingAction && fetcher.formData?.get('intent') === 'add_comment' ? <FaSpinner className="animate-spin" /> : 'Ajouter Commentaire'}
-                        </button>
+
+                        {/* Comments Section */}
+                        <div className="rounded-lg overflow-hidden">
+                            <AnimatedComments 
+                                comments={ticket.commentaires || []}
+                                onAddComment={handleAddComment}
+                                isLoading={isLoadingAction && fetcher.formData?.get('intent') === 'add_comment'}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
