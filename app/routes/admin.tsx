@@ -141,6 +141,12 @@ export default function AdminPanel() {
                   Traitement Gmail → Firestore
                 </Link>
                 <Link 
+                  to="notifications" 
+                  className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
+                >
+                  Créer une notification
+                </Link>
+                <Link 
                   to="/debug-index" 
                   className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
                 >
