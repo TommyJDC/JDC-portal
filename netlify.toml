@@ -7,7 +7,7 @@ publish = "build/client" # ✅ pour servir correctement les assets
   framework = "vite"
   external_node_modules = ["firebase-admin"]
 
-  [[functions.function]]
+  [functions.function]
   name = "sap-notifications"
   schedule = "@firestore:tickets-sap:created,@firestore:envois-ctn:created"
 
