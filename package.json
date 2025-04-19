@@ -42,9 +42,10 @@
     "react-map-gl": "^7.1.9",
     "react-markdown": "^10.1.0",
     "react-type-animation": "^3.2.0",
-    "remix-auth": "^3.7.0",
+    "remix-auth": "^3.7.0", 
     "remix-auth-google": "^2.0.0",
-    "vite-env-only": "^3.0.3"
+    "vite-env-only": "^3.0.3",
+    "google-spreadsheet": "^4.1.1"
   },
   "devDependencies": {
     "@netlify/remix-adapter": "^2.6.1",
