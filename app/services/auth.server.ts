@@ -92,7 +92,15 @@ authenticator.use(
         // Si le profil n'existe pas (basé sur le message d'erreur), le créer automatiquement
         if (errorMessage.includes("not found") || errorMessage.includes("User profile not found")) {
           console.log(`[AuthServer] Error indicates profile not found for ID: ${profile.id}. Attempting creation.`); // <-- Log ajouté
-          const newProfile = await createUserProfileSdk(profile.id, email, profile.displayName || "Utilisateur Google");
+          const newProfile = await createUserProfileSdk({
+            uid: profile.id,
+            email: email,
+            displayName: profile.displayName || "Utilisateur Google",
+            role: "User",
+            secteurs: [],
+            nom: profile.displayName || "Utilisateur Google",
+            password: "" // Champ requis mais non utilisé pour l'auth Google
+          });
           
           // Mettre à jour le profil avec les informations Gmail
           // Vérifier si les scopes Gmail sont présents
@@ -109,7 +117,7 @@ authenticator.use(
           return {
             userId: profile.id,
             email: email,
-            displayName: newProfile.displayName,
+            displayName: profile.displayName || "Utilisateur Google",
             googleAccessToken: accessToken,
             googleRefreshToken: refreshToken,
             tokenExpiry: Date.now() + extraParams.expires_in * 1000,

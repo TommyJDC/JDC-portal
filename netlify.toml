@@ -7,19 +7,19 @@ publish = "build/client" # ✅ pour servir correctement les assets
   framework = "vite"
   external_node_modules = ["firebase-admin"]
 
-  [functions.function]
+  [functions.sap_notifications]
   name = "sap-notifications"
   schedule = "*/5 * * * *"
 
-  [functions.function]
+  [functions.gmail_processing]
   name = "scheduled-gmail-processing"
   schedule = "*/60 * * * *"
 
-  [functions.function]
+  [functions.kezia_check]
   name = "check-kezia-installations"
   schedule = "*/15 * * * *"
 
-  [functions.function]
+  [functions.sync_installations]
   name = "sync-installations"
   schedule = "*/60 * * * *"
 

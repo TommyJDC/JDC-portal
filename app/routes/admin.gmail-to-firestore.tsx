@@ -56,10 +56,10 @@ export async function action({ request }: ActionFunctionArgs) {
       processedLabelName: "Traité",
       refreshInterval: 5,
       sectorCollections: {
-        kezia: false,
-        haccp: false,
-        chr: false,
-        tabac: false
+        kezia: { enabled: false, labels: [] },
+        haccp: { enabled: false, labels: [] },
+        chr: { enabled: false, labels: [] },
+        tabac: { enabled: false, labels: [] }
       }
     };
 
