@@ -4,6 +4,8 @@ import { authenticator } from "~/services/auth.server";
 import { getUserProfileSdk } from "~/services/firestore.service.server";
 import { getGoogleAuthClient } from "~/services/google.server";
 import { processGmailToFirestore } from "~/services/gmail.service.server";
+import { dbAdmin } from "~/firebase.admin.config.server";
+import type { GmailProcessingConfig } from "~/types/firestore.types";
 
 /**
  * Loader pour vérifier l'authentification et les autorisations
@@ -46,9 +48,18 @@ export async function action({ request }: ActionFunctionArgs) {
       return json({ success: false, error: "Impossible d'obtenir le client Google authentifié" }, { status: 500 });
     }
 
+    // Récupérer la configuration Gmail
+    const configDoc = await dbAdmin.collection('settings').doc('gmailProcessingConfig').get();
+    const config = configDoc.exists ? configDoc.data() as GmailProcessingConfig : {
+      maxEmailsPerRun: 50,
+      targetLabels: [],
+      processedLabelName: "Traité",
+      refreshInterval: 5
+    };
+
     // Traiter les emails et les envoyer à Firestore
     console.log("[Admin Gmail-to-Firestore] Début du traitement");
-    const result = await processGmailToFirestore(authClient);
+    const result = await processGmailToFirestore(authClient, config);
     console.log("[Admin Gmail-to-Firestore] Résultat:", result);
 
     return json({ success: true, message: "Traitement Gmail vers Firestore terminé avec succès" });

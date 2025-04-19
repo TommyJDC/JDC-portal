@@ -1,7 +1,7 @@
 import React from 'react';
 import { Menu, Transition } from '@headlessui/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faCheck, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { Link } from '@remix-run/react';
 
 import type { Notification as FirestoreNotification } from '~/types/firestore.types';
@@ -15,6 +15,7 @@ interface NotificationsDropdownProps {
   notificationCount: number;
   onMarkAllAsRead: () => void;
   onMarkAsRead: (id: string) => void;
+  onClearAll: () => void;
 }
 
 export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
@@ -22,6 +23,7 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
   notificationCount,
   onMarkAllAsRead,
   onMarkAsRead,
+  onClearAll,
 }) => {
   return (
     <Menu as="div" className="relative inline-block text-left">
@@ -50,15 +52,26 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
           <div className="p-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">Notifications</h3>
-              {notificationCount > 0 && (
-                <button
-                  onClick={onMarkAllAsRead}
-                  className="text-jdc-yellow text-sm hover:text-jdc-yellow-light transition-colors"
-                >
-                  <FontAwesomeIcon icon={faCheck} className="mr-1" />
-                  Tout marquer comme lu
-                </button>
-              )}
+              <div className="flex gap-4">
+                {notificationCount > 0 && (
+                  <>
+                    <button
+                      onClick={onMarkAllAsRead}
+                      className="text-jdc-yellow text-sm hover:text-jdc-yellow-light transition-colors"
+                    >
+                      <FontAwesomeIcon icon={faCheck} className="mr-1" />
+                      Tout marquer comme lu
+                    </button>
+                    <button
+                      onClick={onClearAll}
+                      className="text-red-500 text-sm hover:text-red-400 transition-colors"
+                    >
+                      <FontAwesomeIcon icon={faTrash} className="mr-1" />
+                      Vider la liste
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="space-y-3 max-h-96 overflow-y-auto">

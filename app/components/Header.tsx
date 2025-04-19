@@ -101,6 +101,21 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
     }
   };
 
+  const handleClearAll = async () => {
+    if (!user) return;
+    try {
+      const response = await fetch('/api/notifications/clear', {
+        method: 'POST',
+      });
+      if (response.ok) {
+        setNotifications([]);
+        setNotificationCount(0);
+      }
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
+  };
+
   const handleMarkAllAsRead = async () => {
     if (!user) return;
     try {
@@ -341,6 +356,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                     notificationCount={notificationCount}
                     onMarkAllAsRead={handleMarkAllAsRead}
                     onMarkAsRead={handleMarkAsRead}
+                    onClearAll={handleClearAll}
                   />
                 )}
               </ClientOnly>
