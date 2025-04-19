@@ -7,6 +7,10 @@ publish = "build/client" # ✅ pour servir correctement les assets
   framework = "vite"
   external_node_modules = ["firebase-admin"]
 
+  [[functions.function]]
+  name = "sap-notifications"
+  schedule = "@firestore:tickets-sap:created,@firestore:envois-ctn:created"
+
 [[headers]]
 for = "/assets/*" # ✅ vise bien les fichiers d'assets, pas "/build/*"
 
@@ -23,7 +27,3 @@ status = 200
   GOOGLE_CLIENT_ID = "1079234336489-rkeiomsnsejcfb670qt1riph0gvcpv62.apps.googleusercontent.com"
   GOOGLE_CLIENT_SECRET = "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"
   APP_BASE_URL = "https://jdc-portal-grenoble.netlify.app/"
-
-[[functions]]
-  name = "sap-notifications"
-  schedule = "@firestore:tickets-sap:created,@firestore:envois-ctn:created"
