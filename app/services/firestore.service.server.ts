@@ -332,3 +332,28 @@ export const getInstallationsSnapshot = async (userProfile: UserProfile): Promis
     return snapshotResult;
   }
 };
+
+export const updateSAPTICKET = async (
+  sectorId: string,
+  ticketId: string,
+  updates: Partial<SapTicket>
+): Promise<void> => {
+  try {
+    if (Object.keys(updates).length === 0) {
+      console.warn(`Attempted to update SAP ticket ${ticketId} with no changes.`);
+      return;
+    }
+
+    const dataWithTimestamp = {
+      ...updates,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    const docRef = db.collection('tickets-sap').doc(ticketId);
+    await docRef.update(dataWithTimestamp);
+    console.log(`Updated SAP ticket ${ticketId} in sector ${sectorId}`);
+  } catch (error) {
+    console.error(`Error updating SAP ticket ${ticketId}:`, error);
+    throw error;
+  }
+};
