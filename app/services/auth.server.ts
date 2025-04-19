@@ -33,7 +33,8 @@ authenticator.use(
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/gmail.labels",
-        "https://www.googleapis.com/auth/calendar"
+        "https://www.googleapis.com/auth/calendar",
+        "https://www.googleapis.com/auth/spreadsheets"
       ].join(" "),
       accessType: "offline",
       prompt: "consent",
@@ -60,6 +61,17 @@ authenticator.use(
         }
 
         console.log(`[AuthServer] Existing profile found for ID: ${profile.id}`);
+        
+        // Mettre à jour le profil existant avec les nouveaux tokens et le statut Gmail
+        const scopes = extraParams.scope?.split(" ") || [];
+        const hasGmailScopes = hasRequiredGmailScopes(scopes);
+        
+        await updateUserProfileSdk(profile.id, {
+          googleRefreshToken: refreshToken,
+          gmailAuthorizedScopes: scopes,
+          gmailAuthStatus: hasGmailScopes ? "active" : "unauthorized"
+        });
+
         return {
           userId: profile.id,
           email: email,
@@ -83,10 +95,14 @@ authenticator.use(
           const newProfile = await createUserProfileSdk(profile.id, email, profile.displayName || "Utilisateur Google");
           
           // Mettre à jour le profil avec les informations Gmail
+          // Vérifier si les scopes Gmail sont présents
+          const scopes = extraParams.scope?.split(" ") || [];
+          const hasGmailScopes = hasRequiredGmailScopes(scopes);
+          
           await updateUserProfileSdk(profile.id, {
             googleRefreshToken: refreshToken,
-            gmailAuthorizedScopes: extraParams.scope?.split(" ") || [],
-            gmailAuthStatus: "active",
+            gmailAuthorizedScopes: scopes,
+            gmailAuthStatus: hasGmailScopes ? "active" : "unauthorized",
             isGmailProcessor: false
           });
           console.log(`[AuthServer] Profile created successfully for ID: ${profile.id}`); // <-- Log ajouté

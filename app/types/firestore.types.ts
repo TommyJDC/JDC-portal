@@ -42,9 +42,26 @@ export interface UserProfile {
  */
 export interface GmailProcessingConfig {
   maxEmailsPerRun: number;
-  targetLabels: string[];
   processedLabelName: string; // Label to add to processed emails
   refreshInterval: number; // Délai en minutes entre chaque vérification
+  sectorCollections: {
+    kezia: {
+      enabled: boolean;
+      labels: string[];
+    };
+    haccp: {
+      enabled: boolean;
+      labels: string[];
+    };
+    chr: {
+      enabled: boolean;
+      labels: string[];
+    };
+    tabac: {
+      enabled: boolean;
+      labels: string[];
+    };
+  };
 }
 
 /**
@@ -157,5 +174,44 @@ export interface AppUser {
   uid: string;
   email: string | null; // Make email strictly string or null
   displayName: string | null; // Make displayName strictly string or null
-  // Add other relevant user properties like photoURL, emailVerified, etc.
+// Add other relevant user properties like photoURL, emailVerified, etc.
+}
+
+
+export type InstallationStatus = 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';
+
+/**
+ * Represents an Installation document in Firestore.
+ * Data sourced initially from spreadsheets, then managed via the app.
+ */
+export interface Installation {
+  id: string; // Firestore document ID
+  secteur: 'CHR' | 'HACCP' | 'Tabac' | 'Kezia' | string; // Source sector
+
+  // Fields from spreadsheet/InstallationTile
+  dateCdeMateriel?: string | Timestamp | Date | { seconds: number; nanoseconds: number } | null;
+  ca?: string;
+  codeClient: string; // Likely used as a key identifier
+  nom: string;
+  ville?: string;
+  contact?: string;
+  telephone?: string;
+  commercial?: string;
+  configCaisse?: string;
+  offreTpe?: string;
+  cdc?: string; // Cahier des charges?
+  dossier?: string; // Folder/reference?
+  tech?: string; // Assigned technician
+  dateInstall?: string | Timestamp | Date | { seconds: number; nanoseconds: number } | null;
+  commentaire?: string;
+
+  // New status field
+  status: InstallationStatus;
+
+  // Timestamps
+  createdAt: Timestamp | Date | { seconds: number; nanoseconds: number };
+  updatedAt: Timestamp | Date | { seconds: number; nanoseconds: number };
+
+  // Optional: Link back to spreadsheet row if needed, e.g., using row index or a unique ID from the sheet
+  // spreadsheetRowIndex?: number;
 }

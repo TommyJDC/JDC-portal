@@ -4,9 +4,8 @@ import { useLoaderData, Link, useFetcher } from "@remix-run/react";
 import { authenticator } from "~/services/auth.server";
 import { getGoogleAuthClient, readSheetData, writeSheetData } from "~/services/google.server";
 import { useState, useEffect, useMemo } from "react";
-import InstallationTile from "~/components/InstallationTile";
+import InstallationTabacTile from "~/components/InstallationTabacTile";
 import { getFirestore } from "firebase-admin/firestore";
-import { createNotification } from "~/services/notifications.service.server";
 
 interface ActionData {
   success?: boolean;
@@ -14,21 +13,24 @@ interface ActionData {
 }
 
 interface Installation {
+  dateSignatureCde: string;
   dateCdeMateriel: string;
   ca: string;
   codeClient: string;
   nom: string;
   ville: string;
-  contact: string;
   telephone: string;
   commercial: string;
-  configCaisse: string;
+  materiel: string;
+  balance: string;
   offreTpe: string;
   cdc: string;
-  dossier: string;
+  jdc: string;
   tech: string;
   dateInstall: string;
+  nouvelleInstallRenouvellement: string;
   commentaire: string;
+  etatMateriel: string;
 }
 
 interface CTNData {
@@ -54,31 +56,30 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response>
 
   try {
     const authClient = await getGoogleAuthClient(session);
-    const range = `${KEZIA_SHEET_NAME}!N${rowNumber}:P${rowNumber}`;
-    await writeSheetData(authClient, KEZIA_SPREADSHEET_ID, range, [JSON.parse(values as string)]);
+    const range = `${TABAC_SHEET_NAME}!N${rowNumber}:R${rowNumber}`;
+    await writeSheetData(authClient, TABAC_SPREADSHEET_ID, range, [JSON.parse(values as string)]);
     
     return json({ success: true });
   } catch (error: any) {
-    console.error("[installations.kezia Action] Error:", error);
+    console.error("[installations.tabac Action] Error:", error);
     return json({ error: error.message }, { status: 500 });
   }
 };
 
-// --- Configuration for Kezia Sheet ---
-const KEZIA_SPREADSHEET_ID = "1uzzHN8tzc53mOOpH8WuXJHIUsk9f17eYc0qsod-Yryk";
-const KEZIA_SHEET_NAME = "EN COURS"; // From user input
-const KEZIA_DATA_RANGE = `${KEZIA_SHEET_NAME}!A:P`; // From user input (Columns A to P)
-const EDITABLE_COLUMNS = ['N', 'O', 'P']; // From user input (0-based index: 13, 14, 15)
-const EDITABLE_COL_INDICES = [13, 14, 15]; // N=13, O=14, P=15 (0-based)
-const ID_COLUMN_INDEX = 0; // Utiliser la première colonne (A) comme identifiant unique
+// --- Configuration for Tabac Sheet ---
+const TABAC_SPREADSHEET_ID = "1Ggm5rnwGmn40JjSN7aB6cs7z-hJiEkdAZLUq6QaQvjg";
+const TABAC_SHEET_NAME = "EN COURS";
+const TABAC_DATA_RANGE = `${TABAC_SHEET_NAME}!A:R`;
+const EDITABLE_COLUMNS = ['N', 'O', 'P', 'Q', 'R'];
+const EDITABLE_COL_INDICES = [13, 14, 15, 16, 17];
 // --- End Configuration ---
 
 interface SheetLoaderData {
   headers: string[];
   rows: any[][];
   error?: string;
-  warning?: string; // To display the unique ID warning
-  ctnData?: CTNData[]; // Ajouter ctnData à l'interface
+  warning?: string;
+  ctnData?: CTNData[];
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -88,18 +89,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    // Récupérer les données Kezia
+    // Récupérer les données Tabac
     const authClient = await getGoogleAuthClient(session);
-    const sheetValues = await readSheetData(authClient, KEZIA_SPREADSHEET_ID, KEZIA_DATA_RANGE);
+    const sheetValues = await readSheetData(authClient, TABAC_SPREADSHEET_ID, TABAC_DATA_RANGE);
 
     if (!sheetValues || sheetValues.length === 0) {
       return json<SheetLoaderData>({ headers: [], rows: [], error: "Aucune donnée trouvée dans la feuille." });
     }
 
-    // Récupérer les envois CTN pour le secteur Kezia
+    // Récupérer les envois CTN pour le secteur Tabac
     const db = getFirestore();
     const ctnSnapshot = await db.collection('Envoi')
-      .where('secteur', '==', 'Kezia')
+      .where('secteur', '==', 'Tabac')
       .get();
     
     const ctnData: CTNData[] = ctnSnapshot.docs.map(doc => {
@@ -110,7 +111,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return {
         codeClient: cleanedCodeClient,
         dateCreation: date.toISOString(),
-        secteur: doc.data().secteur || 'Kezia'
+        secteur: doc.data().secteur || 'Tabac'
       };
     });
 
@@ -125,20 +126,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
   } catch (error: any) {
-    console.error("[installations.kezia Loader] Error:", error);
+    console.error("[installations.tabac Loader] Error:", error);
     if (error.message.includes("token") || error.message.includes("authenticate")) {
       return redirect("/auth/google?error=token_error");
     }
     return json<SheetLoaderData>({ 
       headers: [], 
       rows: [], 
-      error: error.message || "Erreur lors du chargement des données Kezia." 
+      error: error.message || "Erreur lors du chargement des données Tabac." 
     }, { status: 500 });
   }
 };
 
 // --- Component ---
-export default function KeziaInstallations() {
+export default function TabacInstallations() {
   const { headers, rows, ctnData, error, warning } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<ActionData>();
 
@@ -146,21 +147,24 @@ export default function KeziaInstallations() {
   const installations = useMemo(() => {
     return rows.map(row => {
       const baseInstallation = {
+        dateSignatureCde: row[0] || '',
         dateCdeMateriel: row[1] || '',
         ca: row[2] || '',
         codeClient: row[3] || '',
         nom: row[4] || '',
         ville: row[5] || '',
-        contact: row[6] || '',
-        telephone: row[7] || '',
-        commercial: row[8] || '',
-        configCaisse: row[9] || '',
+        telephone: row[6] || '',
+        commercial: row[7] || '',
+        materiel: row[8] || '',
+        balance: row[9] || '',
         offreTpe: row[10] || '',
         cdc: row[11] || '',
-        dossier: row[12] || '',
+        jdc: row[12] || '',
         tech: row[13] || '',
         dateInstall: row[14] || '',
-        commentaire: row[15] || ''
+        nouvelleInstallRenouvellement: row[15] || '',
+        commentaire: row[16] || '',
+        etatMateriel: row[17] || ''
       };
 
       // Vérifier si un CTN existe pour cette installation (après nettoyage du code client)
@@ -186,7 +190,13 @@ export default function KeziaInstallations() {
 
   const handleSave = async (rowIndex: number, values: any) => {
     const rowNumber = rowIndex + 2;
-    const updateValues = [values.tech, values.dateInstall, values.commentaire];
+    const updateValues = [
+      values.tech,
+      values.dateInstall,
+      values.nouvelleInstallRenouvellement,
+      values.commentaire,
+      values.etatMateriel
+    ];
 
     fetcher.submit(
       {
@@ -199,7 +209,7 @@ export default function KeziaInstallations() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-white">Installations Kezia (Feuille: {KEZIA_SHEET_NAME})</h1>
+      <h1 className="text-2xl font-semibold text-white">Installations Tabac (Feuille: {TABAC_SHEET_NAME})</h1>
 
       <Link to="/dashboard" className="text-jdc-blue hover:underline">
         &larr; Retour au Tableau de Bord
@@ -222,7 +232,7 @@ export default function KeziaInstallations() {
       {!error && installations.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {installations.map((installation, index) => (
-            <InstallationTile
+            <InstallationTabacTile
               key={index}
               installation={installation}
               hasCTN={hasCTN(installation.codeClient)}

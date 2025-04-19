@@ -1,0 +1,108 @@
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData, Link, useFetcher } from "@remix-run/react";
+import { authenticator } from "~/services/auth.server";
+import { getInstallationsBySector, updateInstallation } from "~/services/firestore.service.server";
+import InstallationTile from "~/components/InstallationTile";
+
+interface ActionData {
+  success?: boolean;
+  error?: string;
+}
+
+interface LoaderData {
+  installations: {
+    id: string;
+    [key: string]: any;
+  }[];
+  error?: string;
+}
+
+export const action = async ({ request }: ActionFunctionArgs): Promise<Response> => {
+  const session = await authenticator.isAuthenticated(request);
+  if (!session) {
+    return json({ error: "Non authentifié" }, { status: 401 });
+  }
+
+  const formData = await request.formData();
+  const id = formData.get("id");
+  const updates = JSON.parse(formData.get("updates") as string);
+
+  if (!id || !updates) {
+    return json({ error: "Données manquantes" }, { status: 400 });
+  }
+
+  try {
+    await updateInstallation(id as string, updates);
+    return json({ success: true });
+  } catch (error: any) {
+    console.error("[installations.tabac Action] Error:", error);
+    return json({ error: error.message }, { status: 500 });
+  }
+};
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const session = await authenticator.isAuthenticated(request);
+  if (!session) {
+    return redirect("/?error=unauthenticated");
+  }
+
+  try {
+    const installations = await getInstallationsBySector('TABAC');
+    return json<LoaderData>({ installations });
+  } catch (error: any) {
+    console.error("[installations.tabac Loader] Error:", error);
+    return json<LoaderData>({ 
+      installations: [],
+      error: error.message || "Erreur lors du chargement des installations Tabac." 
+    }, { status: 500 });
+  }
+};
+
+export default function TabacInstallations() {
+  const { installations, error } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher<ActionData>();
+
+  const handleSave = async (id: string, updates: any) => {
+    fetcher.submit(
+      {
+        id,
+        updates: JSON.stringify(updates)
+      },
+      { method: "post" }
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold text-white">Installations Tabac</h1>
+
+      <Link to="/dashboard" className="text-jdc-blue hover:underline">
+        &larr; Retour au Tableau de Bord
+      </Link>
+
+      {error && (
+        <div className="bg-red-900 bg-opacity-50 text-red-300 p-4 rounded-md">
+          <p className="font-semibold">Erreur :</p>
+          <p>{error}</p>
+        </div>
+      )}
+
+      {!error && installations.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {installations.map((installation) => (
+            <InstallationTile
+              key={installation.id}
+              installation={installation}
+              onSave={(values) => handleSave(installation.id, values)}
+            />
+          ))}
+        </div>
+      )}
+
+      {!error && installations.length === 0 && (
+        <p className="text-jdc-gray-400">Aucune installation Tabac à afficher.</p>
+      )}
+    </div>
+  );
+}

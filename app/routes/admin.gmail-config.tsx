@@ -5,7 +5,6 @@ import { getUserProfileSdk, getAllUserProfilesSdk, updateUserProfileSdk } from "
 import { getGoogleAuthClient } from "~/services/google.server";
 import type { UserProfile, GmailProcessingConfig } from "~/types/firestore.types";
 import { dbAdmin } from "~/firebase.admin.config.server";
-import { hasRequiredGmailScopes } from "~/services/auth.server";
 import type { UserSession } from "~/services/session.server";
 import { google } from 'googleapis';
 
@@ -40,14 +39,31 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const configDoc = await dbAdmin.collection('settings').doc('gmailProcessingConfig').get();
   const config = configDoc.exists ? configDoc.data() as GmailProcessingConfig : {
     maxEmailsPerRun: 50,
-    targetLabels: [],
     processedLabelName: "Traité",
-    refreshInterval: 5
+    refreshInterval: 5,
+    sectorCollections: {
+      kezia: {
+        enabled: false,
+        labels: []
+      },
+      haccp: {
+        enabled: false,
+        labels: []
+      },
+      chr: {
+        enabled: false,
+        labels: []
+      },
+      tabac: {
+        enabled: false,
+        labels: []
+      }
+    }
   };
 
-  // Pour chaque utilisateur avec un refresh token, récupérer leurs labels Gmail
+  // Pour chaque utilisateur connecté, récupérer leurs labels Gmail
   const usersWithLabels = await Promise.all(users.map(async (user) => {
-    if (user.googleRefreshToken && hasRequiredGmailScopes(user.gmailAuthorizedScopes)) {
+    if (user.googleRefreshToken) {
       try {
         const session: UserSession = {
           userId: user.uid,
@@ -99,15 +115,34 @@ export async function action({ request }: ActionFunctionArgs) {
     switch (action) {
       case "updateConfig": {
         const maxEmailsPerRun = parseInt(formData.get("maxEmailsPerRun") as string);
-        const targetLabels = (formData.get("targetLabels") as string).split(",").map(label => label.trim());
         const processedLabelName = formData.get("processedLabelName") as string;
         const refreshInterval = parseInt(formData.get("refreshInterval") as string);
 
+        // Récupérer les labels pour chaque collection
+        const sectorCollections = {
+          kezia: {
+            enabled: formData.get("kezia-enabled") === "true",
+            labels: (formData.get("kezia-labels") as string || "").split(",").map(l => l.trim()).filter(l => l)
+          },
+          haccp: {
+            enabled: formData.get("haccp-enabled") === "true",
+            labels: (formData.get("haccp-labels") as string || "").split(",").map(l => l.trim()).filter(l => l)
+          },
+          chr: {
+            enabled: formData.get("chr-enabled") === "true",
+            labels: (formData.get("chr-labels") as string || "").split(",").map(l => l.trim()).filter(l => l)
+          },
+          tabac: {
+            enabled: formData.get("tabac-enabled") === "true",
+            labels: (formData.get("tabac-labels") as string || "").split(",").map(l => l.trim()).filter(l => l)
+          }
+        };
+
         await dbAdmin.collection('settings').doc('gmailProcessingConfig').set({
           maxEmailsPerRun,
-          targetLabels,
           processedLabelName,
-          refreshInterval
+          refreshInterval,
+          sectorCollections
         });
 
         return json({ success: true, message: "Configuration mise à jour avec succès" });
@@ -122,19 +157,6 @@ export async function action({ request }: ActionFunctionArgs) {
         });
 
         return json({ success: true, message: "Statut du processeur mis à jour avec succès" });
-      }
-
-      case "revokeAccess": {
-        const userId = formData.get("userId") as string;
-
-        await updateUserProfileSdk(userId, {
-          googleRefreshToken: undefined,
-          gmailAuthorizedScopes: [],
-          gmailAuthStatus: "unauthorized",
-          isGmailProcessor: false
-        });
-
-        return json({ success: true, message: "Accès révoqué avec succès" });
       }
 
       default:
@@ -192,18 +214,6 @@ export default function AdminGmailConfig() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Labels à traiter (séparés par des virgules)
-            </label>
-            <input
-              type="text"
-              name="targetLabels"
-              defaultValue={config.targetLabels.join(", ")}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
               Nom du label "Traité"
             </label>
             <input
@@ -226,6 +236,124 @@ export default function AdminGmailConfig() {
               max="60"
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
+          </div>
+
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-gray-700">
+              Configuration des collections
+            </label>
+
+            {/* Kezia */}
+            <div className="border rounded-md p-4">
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id="kezia-enabled"
+                  name="kezia-enabled"
+                  defaultChecked={config.sectorCollections.kezia.enabled}
+                  value="true"
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                />
+                <label htmlFor="kezia-enabled" className="ml-2 text-sm font-medium text-gray-700">
+                  Kezia
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Labels Gmail (séparés par des virgules)
+                </label>
+                <input
+                  type="text"
+                  name="kezia-labels"
+                  defaultValue={config.sectorCollections.kezia.labels.join(", ")}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </div>
+
+            {/* HACCP */}
+            <div className="border rounded-md p-4">
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id="haccp-enabled"
+                  name="haccp-enabled"
+                  defaultChecked={config.sectorCollections.haccp.enabled}
+                  value="true"
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                />
+                <label htmlFor="haccp-enabled" className="ml-2 text-sm font-medium text-gray-700">
+                  HACCP
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Labels Gmail (séparés par des virgules)
+                </label>
+                <input
+                  type="text"
+                  name="haccp-labels"
+                  defaultValue={config.sectorCollections.haccp.labels.join(", ")}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </div>
+
+            {/* CHR */}
+            <div className="border rounded-md p-4">
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id="chr-enabled"
+                  name="chr-enabled"
+                  defaultChecked={config.sectorCollections.chr.enabled}
+                  value="true"
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                />
+                <label htmlFor="chr-enabled" className="ml-2 text-sm font-medium text-gray-700">
+                  CHR
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Labels Gmail (séparés par des virgules)
+                </label>
+                <input
+                  type="text"
+                  name="chr-labels"
+                  defaultValue={config.sectorCollections.chr.labels.join(", ")}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Tabac */}
+            <div className="border rounded-md p-4">
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id="tabac-enabled"
+                  name="tabac-enabled"
+                  defaultChecked={config.sectorCollections.tabac.enabled}
+                  value="true"
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                />
+                <label htmlFor="tabac-enabled" className="ml-2 text-sm font-medium text-gray-700">
+                  Tabac
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Labels Gmail (séparés par des virgules)
+                </label>
+                <input
+                  type="text"
+                  name="tabac-labels"
+                  defaultValue={config.sectorCollections.tabac.labels.join(", ")}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </div>
           </div>
 
           <button
@@ -259,9 +387,6 @@ export default function AdminGmailConfig() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Processeur Actif
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -290,7 +415,7 @@ export default function AdminGmailConfig() {
                       <input type="hidden" name="isProcessor" value={(!user.isGmailProcessor).toString()} />
                       <button
                         type="submit"
-                        disabled={!user.googleRefreshToken || user.gmailAuthStatus !== 'active'}
+                        disabled={!user.googleRefreshToken}
                         className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
                           user.isGmailProcessor ? 'bg-blue-600' : 'bg-gray-200'
                         }`}
@@ -300,27 +425,6 @@ export default function AdminGmailConfig() {
                         }`} />
                       </button>
                     </Form>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {user.googleRefreshToken ? (
-                      <Form method="post" className="inline">
-                        <input type="hidden" name="_action" value="revokeAccess" />
-                        <input type="hidden" name="userId" value={user.uid} />
-                        <button
-                          type="submit"
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Révoquer l'accès
-                        </button>
-                      </Form>
-                    ) : (
-                      <a
-                        href={`/auth/google?returnTo=${encodeURIComponent('/admin/gmail-config')}&mode=gmail`}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Autoriser
-                      </a>
-                    )}
                   </td>
                 </tr>
               ))}

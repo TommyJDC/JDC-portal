@@ -26,27 +26,25 @@ interface EmailData {
 }
 
 /**
- * Extrait le contenu des emails avec le label spécifié
- * @param authClient Client OAuth2 authentifié
- * @param labelName Nom du label Gmail à rechercher
- * @param maxResults Nombre maximum d'emails à traiter
- * @returns Tableau de données extraites des emails
+ * Extrait le contenu des emails avec les labels spécifiés
  */
 export async function extractEmailContent(
   authClient: OAuth2Client,
-  config: GmailProcessingConfig
+  config: GmailProcessingConfig,
+  collection: string,
+  labels: string[]
 ): Promise<EmailData[]> {
   const gmail = google.gmail({ version: 'v1', auth: authClient });
   const emailData: EmailData[] = [];
 
   try {
     // Récupérer les IDs des labels
-    console.log(`[GmailService] Recherche des labels:`, config.targetLabels);
+    console.log(`[GmailService] Recherche des labels pour ${collection}:`, labels);
     const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
-    const labels = labelsResponse.data.labels || [];
-    const labelIds = config.targetLabels
+    const allLabels = labelsResponse.data.labels || [];
+    const labelIds = labels
       .map(labelName => {
-        const label = labels.find(l => l.name === labelName);
+        const label = allLabels.find(l => l.name === labelName);
         if (!label || !label.id) {
           console.warn(`[GmailService] Label "${labelName}" non trouvé`);
           return null;
@@ -56,7 +54,7 @@ export async function extractEmailContent(
       .filter((id): id is string => id !== null);
 
     if (labelIds.length === 0) {
-      console.error(`[GmailService] Aucun label cible trouvé`);
+      console.error(`[GmailService] Aucun label cible trouvé pour ${collection}`);
       return [];
     }
 
@@ -69,7 +67,7 @@ export async function extractEmailContent(
     });
 
     const messages = messagesResponse.data.messages || [];
-    console.log(`[GmailService] ${messages.length} messages trouvés`);
+    console.log(`[GmailService] ${messages.length} messages trouvés pour ${collection}`);
 
     // Traiter chaque message
     for (const message of messages) {
@@ -112,7 +110,7 @@ export async function extractEmailContent(
 
     return emailData;
   } catch (error) {
-    console.error('[GmailService] Erreur lors de l\'extraction des emails:', error);
+    console.error(`[GmailService] Erreur lors de l'extraction des emails pour ${collection}:`, error);
     throw new Error(`Impossible d'extraire les données des emails: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -166,15 +164,15 @@ function normalizeSapNumber(sapNumber: string | null | undefined): string {
 /**
  * Vérifie si un numéro SAP existe déjà dans Firestore
  */
-export async function sapNumberExists(sapNumber: string): Promise<boolean> {
+export async function sapNumberExists(sapNumber: string, collection: string): Promise<boolean> {
   if (!sapNumber) return false;
 
   try {
-    const query = dbAdmin.collection('Kezia').where('numeroSAP', '==', sapNumber).limit(1);
+    const query = dbAdmin.collection(collection).where('numeroSAP', '==', sapNumber).limit(1);
     const snapshot = await query.get();
     return !snapshot.empty;
   } catch (error) {
-    console.error(`[GmailService] Erreur lors de la vérification du numéro SAP ${sapNumber}:`, error);
+    console.error(`[GmailService] Erreur lors de la vérification du numéro SAP ${sapNumber} dans ${collection}:`, error);
     return false;
   }
 }
@@ -182,11 +180,11 @@ export async function sapNumberExists(sapNumber: string): Promise<boolean> {
 /**
  * Envoie les données extraites à Firestore
  */
-export async function sendDataToFirebase(row: EmailData, sapNumber: string): Promise<void> {
+export async function sendDataToFirebase(row: EmailData, sapNumber: string, collection: string): Promise<void> {
   const FIRESTORE_SECRET = "E92N49W43Y29";
   
   try {
-    await dbAdmin.collection('Kezia').add({
+    await dbAdmin.collection(collection).add({
       date: { stringValue: row.date },
       raisonSociale: { stringValue: row.raisonSociale },
       numeroSAP: { stringValue: sapNumber },
@@ -198,9 +196,9 @@ export async function sendDataToFirebase(row: EmailData, sapNumber: string): Pro
       secret: { stringValue: FIRESTORE_SECRET },
       createdAt: FieldValue.serverTimestamp()
     });
-    console.log(`[GmailService] Données envoyées à Firestore pour le numéro SAP: ${sapNumber}`);
+    console.log(`[GmailService] Données envoyées à Firestore (${collection}) pour le numéro SAP: ${sapNumber}`);
   } catch (error) {
-    console.error(`[GmailService] Erreur lors de l'envoi des données à Firestore:`, error);
+    console.error(`[GmailService] Erreur lors de l'envoi des données à Firestore (${collection}):`, error);
     throw new Error(`Impossible d'envoyer les données à Firestore: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -208,15 +206,15 @@ export async function sendDataToFirebase(row: EmailData, sapNumber: string): Pro
 /**
  * Supprime les documents avec "Non trouvé" comme numéro SAP
  */
-export async function deleteRowsWithNonTrouve(): Promise<void> {
+export async function deleteRowsWithNonTrouve(collection: string): Promise<void> {
   const secret = "E92N49W43Y29";
   
   try {
-    const snapshot = await dbAdmin.collection('Kezia')
+    const snapshot = await dbAdmin.collection(collection)
       .where('numeroSAP.stringValue', '==', 'Non trouvé')
       .get();
     
-    console.log(`[GmailService] ${snapshot.size} documents avec "Non trouvé" trouvés`);
+    console.log(`[GmailService] ${snapshot.size} documents avec "Non trouvé" trouvés dans ${collection}`);
     
     const batch = dbAdmin.batch();
     snapshot.docs.forEach(doc => {
@@ -224,18 +222,18 @@ export async function deleteRowsWithNonTrouve(): Promise<void> {
     });
     
     await batch.commit();
-    console.log(`[GmailService] ${snapshot.size} documents avec "Non trouvé" supprimés`);
+    console.log(`[GmailService] ${snapshot.size} documents avec "Non trouvé" supprimés de ${collection}`);
   } catch (error) {
-    console.error('[GmailService] Erreur lors de la suppression des documents "Non trouvé":', error);
+    console.error(`[GmailService] Erreur lors de la suppression des documents "Non trouvé" de ${collection}:`, error);
   }
 }
 
 /**
  * Supprime les documents avec des numéros SAP en double
  */
-export async function deleteRowsWithDuplicateSAP(): Promise<void> {
+export async function deleteRowsWithDuplicateSAP(collection: string): Promise<void> {
   try {
-    const snapshot = await dbAdmin.collection('Kezia').get();
+    const snapshot = await dbAdmin.collection(collection).get();
     const docs = snapshot.docs;
     
     const seenSAP: Record<string, string> = {}; // sapNumber -> docId
@@ -255,19 +253,19 @@ export async function deleteRowsWithDuplicateSAP(): Promise<void> {
       }
     });
     
-    console.log(`[GmailService] ${toDelete.length} documents en double trouvés`);
+    console.log(`[GmailService] ${toDelete.length} documents en double trouvés dans ${collection}`);
     
     if (toDelete.length > 0) {
       const batch = dbAdmin.batch();
       toDelete.forEach(id => {
-        batch.delete(dbAdmin.collection('Kezia').doc(id));
+        batch.delete(dbAdmin.collection(collection).doc(id));
       });
       
       await batch.commit();
-      console.log(`[GmailService] ${toDelete.length} documents en double supprimés`);
+      console.log(`[GmailService] ${toDelete.length} documents en double supprimés de ${collection}`);
     }
   } catch (error) {
-    console.error('[GmailService] Erreur lors de la suppression des doublons:', error);
+    console.error(`[GmailService] Erreur lors de la suppression des doublons de ${collection}:`, error);
   }
 }
 
@@ -327,37 +325,53 @@ export async function processGmailToFirestore(
   try {
     console.log('[GmailService] Démarrage du traitement Gmail vers Firestore');
     
-    // Extraire les données des emails
-    const data = await extractEmailContent(authClient, config);
-    console.log(`[GmailService] ${data.length} emails extraits`);
-    
-    // Traiter chaque ligne de données
-    for (const row of data) {
-      const sapNumber = normalizeSapNumber(row.numeroSAP);
-      
-      if (!sapNumber || sapNumber === "") {
-        console.log("[GmailService] Numéro SAP invalide, saut de l'entrée.");
+    // Traiter chaque collection activée
+    const collections = [
+      { name: 'Kezia', config: config.sectorCollections.kezia },
+      { name: 'HACCP', config: config.sectorCollections.haccp },
+      { name: 'CHR', config: config.sectorCollections.chr },
+      { name: 'Tabac', config: config.sectorCollections.tabac }
+    ];
+
+    for (const { name, config: collectionConfig } of collections) {
+      if (!collectionConfig.enabled || collectionConfig.labels.length === 0) {
+        console.log(`[GmailService] Collection ${name} désactivée ou sans labels, ignorée`);
         continue;
       }
+
+      console.log(`[GmailService] Traitement de la collection ${name}`);
       
-      // Vérifier si le numéro SAP existe déjà
-      const exists = await sapNumberExists(sapNumber);
-      if (!exists) {
-        await sendDataToFirebase(row, sapNumber);
-        // Ajouter le label "Traité" après le traitement réussi
-        const gmail = google.gmail({ version: 'v1', auth: authClient });
-        await addProcessedLabel(gmail, row.messageId, config.processedLabelName);
-      } else {
-        console.log(`[GmailService] Numéro SAP déjà existant: ${sapNumber}`);
+      // Extraire les données des emails pour cette collection
+      const data = await extractEmailContent(authClient, config, name, collectionConfig.labels);
+      console.log(`[GmailService] ${data.length} emails extraits pour ${name}`);
+      
+      // Traiter chaque email
+      for (const row of data) {
+        const sapNumber = normalizeSapNumber(row.numeroSAP);
+        
+        if (!sapNumber || sapNumber === "") {
+          console.log(`[GmailService] Numéro SAP invalide dans ${name}, saut de l'entrée.`);
+          continue;
+        }
+        
+        // Vérifier si le numéro SAP existe déjà dans cette collection
+        const exists = await sapNumberExists(sapNumber, name);
+        if (!exists) {
+          await sendDataToFirebase(row, sapNumber, name);
+          // Ajouter le label "Traité" après le traitement réussi
+          const gmail = google.gmail({ version: 'v1', auth: authClient });
+          await addProcessedLabel(gmail, row.messageId, config.processedLabelName);
+        } else {
+          console.log(`[GmailService] Numéro SAP déjà existant dans ${name}: ${sapNumber}`);
+        }
       }
+      
+      // Nettoyer les documents "Non trouvé" pour cette collection
+      await deleteRowsWithNonTrouve(name);
+      
+      // Nettoyer les doublons SAP pour cette collection
+      await deleteRowsWithDuplicateSAP(name);
     }
-    
-    // Nettoyer les documents "Non trouvé"
-    await deleteRowsWithNonTrouve();
-    
-    // Nettoyer les doublons SAP (deux fois pour être sûr)
-    await deleteRowsWithDuplicateSAP();
-    await deleteRowsWithDuplicateSAP();
     
     console.log('[GmailService] Traitement Gmail vers Firestore terminé avec succès');
   } catch (error) {

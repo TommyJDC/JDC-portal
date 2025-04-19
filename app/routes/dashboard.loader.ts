@@ -1,16 +1,18 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-    import { json, redirect } from "@remix-run/node";
-    import { authenticator } from "~/services/auth.server";
-    import { getGoogleAuthClient, getCalendarEvents } from "~/services/google.server";
-    import { getWeekDateRangeForAgenda } from "~/utils/dateUtils";
-    import {
-      getUserProfileSdk, // Needed to determine sectors
-      getRecentTicketsForSectors,
-      getRecentShipmentsForSectors,
-      getTotalTicketCountSdk,
-      getDistinctClientCountFromEnvoiSdk,
-      getLatestStatsSnapshotsSdk,
-    } from "~/services/firestore.service.server";
+import { json, redirect } from "@remix-run/node";
+import { authenticator } from "~/services/auth.server";
+import { getGoogleAuthClient, getCalendarEvents } from "~/services/google.server";
+import { getWeekDateRangeForAgenda } from "~/utils/dateUtils";
+import {
+  getUserProfileSdk,
+  getRecentTicketsForSectors,
+  getRecentShipmentsForSectors,
+  getTotalTicketCountSdk,
+  getDistinctClientCountFromEnvoiSdk,
+  getLatestStatsSnapshotsSdk,
+  getInstallationsSnapshot,
+  type InstallationsSnapshot
+} from "~/services/firestore.service.server";
     import type { SapTicket, Shipment, StatsSnapshot, UserProfile } from "~/types/firestore.types"; // Removed CalendarEvent import
     import type { UserSession } from "~/services/session.server"; // Ensure UserSession is imported
 
@@ -23,23 +25,24 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
         htmlLink?: string | null;
     }
 
-    // Define loader return type
-    export interface DashboardLoaderData { // Export interface for use in component
-        userProfile: UserProfile | null; // Pass profile fetched on server
-        calendarEvents: CalendarEvent[];
-        calendarError: string | null;
-        stats: {
-            liveTicketCount: number | null;
-            liveDistinctClientCountFromEnvoi: number | null;
-            evolution: {
-                ticketCount: number | null;
-                distinctClientCountFromEnvoi: number | null;
-            };
-        };
-        recentTickets: SapTicket[];
-        recentShipments: Shipment[];
-        clientError: string | null; // Consolidated error reporting
-    }
+// Define loader return type
+export interface DashboardLoaderData {
+  userProfile: UserProfile | null;
+  calendarEvents: CalendarEvent[];
+  calendarError: string | null;
+  stats: {
+    liveTicketCount: number | null;
+    liveDistinctClientCountFromEnvoi: number | null;
+    evolution: {
+      ticketCount: number | null;
+      distinctClientCountFromEnvoi: number | null;
+    };
+  };
+  installationsStats: InstallationsSnapshot | null;
+  recentTickets: SapTicket[];
+  recentShipments: Shipment[];
+  clientError: string | null;
+}
 
     export const loader = async ({ request }: LoaderFunctionArgs): Promise<ReturnType<typeof json<DashboardLoaderData>>> => {
       console.log("Dashboard Loader: Executing...");
@@ -52,6 +55,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
       let stats: DashboardLoaderData['stats'] = { liveTicketCount: null, liveDistinctClientCountFromEnvoi: null, evolution: { ticketCount: null, distinctClientCountFromEnvoi: null } };
       let recentTickets: SapTicket[] = [];
       let recentShipments: Shipment[] = [];
+      let installationsStats: InstallationsSnapshot | null = null;
       let clientError: string | null = null; // Use this for Firestore errors
 
       // Check for session and the userId property
@@ -68,7 +72,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 
           const userSectors = userProfile.secteurs;
           const sectorsForTickets = userSectors;
-          const sectorsForShipments = userProfile?.role === 'Admin' ? [] : userSectors; // Empty array for admin means all sectors
+          const sectorsForShipments = userProfile?.role === 'Admin' ? ['haccp', 'chr', 'tabac', 'kezia'] : userSectors;
 
           // 2. Fetch Calendar Events (concurrently with other data)
           const calendarPromise = (async () => {
@@ -94,15 +98,16 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
             }
           })();
 
-          // 3. Fetch Stats and Recent Items (concurrently)
+          // 3. Fetch Stats, Installations and Recent Items (concurrently)
           const dataPromise = (async () => {
             try {
                 const results = await Promise.allSettled([
                   getLatestStatsSnapshotsSdk(1),
                   getTotalTicketCountSdk(sectorsForTickets),
-                  getDistinctClientCountFromEnvoiSdk(userProfile), // Pass profile
+                  getDistinctClientCountFromEnvoiSdk(userProfile),
                   getRecentTicketsForSectors(sectorsForTickets, 20),
-                  getRecentShipmentsForSectors(sectorsForShipments, 20)
+                  getRecentShipmentsForSectors(sectorsForShipments, 20),
+                  getInstallationsSnapshot(userProfile)
                 ]);
 
                 // Process stats
@@ -136,20 +141,27 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
                  }
 
 
-                // Process recent items
+                // Process recent items and installations
                 const recentTicketsResult = results[3];
                 const recentShipmentsResult = results[4];
+                const installationsResult = results[5];
+                
                 recentTickets = recentTicketsResult.status === 'fulfilled' ? recentTicketsResult.value : [];
                 recentShipments = recentShipmentsResult.status === 'fulfilled' ? recentShipmentsResult.value : [];
+                installationsStats = installationsResult.status === 'fulfilled' ? installationsResult.value : null;
 
-                 if (recentTicketsResult.status === 'rejected') {
-                     console.error("Dashboard Loader: Error fetching recent tickets:", recentTicketsResult.reason);
-                     if (!clientError) clientError = "Erreur chargement tickets récents.";
-                 }
-                  if (recentShipmentsResult.status === 'rejected') {
-                     console.error("Dashboard Loader: Error fetching recent shipments:", recentShipmentsResult.reason);
-                     if (!clientError) clientError = "Erreur chargement envois récents.";
-                 }
+                if (recentTicketsResult.status === 'rejected') {
+                  console.error("Dashboard Loader: Error fetching recent tickets:", recentTicketsResult.reason);
+                  if (!clientError) clientError = "Erreur chargement tickets récents.";
+                }
+                if (recentShipmentsResult.status === 'rejected') {
+                  console.error("Dashboard Loader: Error fetching recent shipments:", recentShipmentsResult.reason);
+                  if (!clientError) clientError = "Erreur chargement envois récents.";
+                }
+                if (installationsResult.status === 'rejected') {
+                  console.error("Dashboard Loader: Error fetching installations stats:", installationsResult.reason);
+                  if (!clientError) clientError = "Erreur chargement statistiques installations.";
+                }
 
             } catch (err: any) {
                  console.error("Dashboard Loader: General error fetching stats/recent items:", err);
@@ -166,7 +178,12 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
           // Handle profile fetch error - maybe redirect to login or show error
            clientError = "Impossible de charger les informations utilisateur.";
            // Reset other data if profile fails
-           userProfile = null; calendarEvents = []; stats = { liveTicketCount: null, liveDistinctClientCountFromEnvoi: null, evolution: { ticketCount: null, distinctClientCountFromEnvoi: null } }; recentTickets = []; recentShipments = [];
+           userProfile = null;
+           calendarEvents = [];
+           stats = { liveTicketCount: null, liveDistinctClientCountFromEnvoi: null, evolution: { ticketCount: null, distinctClientCountFromEnvoi: null } };
+           recentTickets = [];
+           recentShipments = [];
+           installationsStats = null;
         }
       } else {
           console.log("Dashboard Loader: User not authenticated.");
@@ -174,12 +191,13 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
       }
 
       return json<DashboardLoaderData>({
-          userProfile, // Pass profile fetched on server
-          calendarEvents,
-          calendarError,
-          stats,
-          recentTickets,
-          recentShipments,
-          clientError // Pass consolidated Firestore/data error
+        userProfile,
+        calendarEvents,
+        calendarError,
+        stats,
+        installationsStats,
+        recentTickets,
+        recentShipments,
+        clientError
       });
     };

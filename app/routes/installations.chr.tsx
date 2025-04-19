@@ -4,9 +4,8 @@ import { useLoaderData, Link, useFetcher } from "@remix-run/react";
 import { authenticator } from "~/services/auth.server";
 import { getGoogleAuthClient, readSheetData, writeSheetData } from "~/services/google.server";
 import { useState, useEffect, useMemo } from "react";
-import InstallationTile from "~/components/InstallationTile";
+import InstallationCHRTile from "~/components/InstallationCHRTile";
 import { getFirestore } from "firebase-admin/firestore";
-import { createNotification } from "~/services/notifications.service.server";
 
 interface ActionData {
   success?: boolean;
@@ -19,16 +18,22 @@ interface Installation {
   codeClient: string;
   nom: string;
   ville: string;
-  contact: string;
   telephone: string;
   commercial: string;
-  configCaisse: string;
-  offreTpe: string;
+  materiel: string;
   cdc: string;
+  integrationJalia: string;
   dossier: string;
   tech: string;
   dateInstall: string;
-  commentaire: string;
+  heure: string;
+  relanceProg: string;
+  commentaireTech: string;
+  materielLivre: string;
+  commentaireEnvoi: string;
+  bt: string;
+  techSecu: string;
+  techAffecte: string;
 }
 
 interface CTNData {
@@ -54,31 +59,30 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response>
 
   try {
     const authClient = await getGoogleAuthClient(session);
-    const range = `${KEZIA_SHEET_NAME}!N${rowNumber}:P${rowNumber}`;
-    await writeSheetData(authClient, KEZIA_SPREADSHEET_ID, range, [JSON.parse(values as string)]);
+    const range = `${CHR_SHEET_NAME}!M${rowNumber}:U${rowNumber}`;
+    await writeSheetData(authClient, CHR_SPREADSHEET_ID, range, [JSON.parse(values as string)]);
     
     return json({ success: true });
   } catch (error: any) {
-    console.error("[installations.kezia Action] Error:", error);
+    console.error("[installations.chr Action] Error:", error);
     return json({ error: error.message }, { status: 500 });
   }
 };
 
-// --- Configuration for Kezia Sheet ---
-const KEZIA_SPREADSHEET_ID = "1uzzHN8tzc53mOOpH8WuXJHIUsk9f17eYc0qsod-Yryk";
-const KEZIA_SHEET_NAME = "EN COURS"; // From user input
-const KEZIA_DATA_RANGE = `${KEZIA_SHEET_NAME}!A:P`; // From user input (Columns A to P)
-const EDITABLE_COLUMNS = ['N', 'O', 'P']; // From user input (0-based index: 13, 14, 15)
-const EDITABLE_COL_INDICES = [13, 14, 15]; // N=13, O=14, P=15 (0-based)
-const ID_COLUMN_INDEX = 0; // Utiliser la première colonne (A) comme identifiant unique
+// --- Configuration for CHR Sheet ---
+const CHR_SPREADSHEET_ID = "1vnyvpP8uGw0oa9a4j-KI8IUXdc4wW52n_TiQOedw4hk";
+const CHR_SHEET_NAME = "EN COURS";
+const CHR_DATA_RANGE = `${CHR_SHEET_NAME}!A:U`;
+const EDITABLE_COLUMNS = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U'];
+const EDITABLE_COL_INDICES = [12, 13, 14, 15, 16, 17, 18, 19, 20];
 // --- End Configuration ---
 
 interface SheetLoaderData {
   headers: string[];
   rows: any[][];
   error?: string;
-  warning?: string; // To display the unique ID warning
-  ctnData?: CTNData[]; // Ajouter ctnData à l'interface
+  warning?: string;
+  ctnData?: CTNData[];
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -88,18 +92,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    // Récupérer les données Kezia
+    // Récupérer les données CHR
     const authClient = await getGoogleAuthClient(session);
-    const sheetValues = await readSheetData(authClient, KEZIA_SPREADSHEET_ID, KEZIA_DATA_RANGE);
+    const sheetValues = await readSheetData(authClient, CHR_SPREADSHEET_ID, CHR_DATA_RANGE);
 
     if (!sheetValues || sheetValues.length === 0) {
       return json<SheetLoaderData>({ headers: [], rows: [], error: "Aucune donnée trouvée dans la feuille." });
     }
 
-    // Récupérer les envois CTN pour le secteur Kezia
+    // Récupérer les envois CTN pour le secteur CHR
     const db = getFirestore();
     const ctnSnapshot = await db.collection('Envoi')
-      .where('secteur', '==', 'Kezia')
+      .where('secteur', '==', 'CHR')
       .get();
     
     const ctnData: CTNData[] = ctnSnapshot.docs.map(doc => {
@@ -110,7 +114,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return {
         codeClient: cleanedCodeClient,
         dateCreation: date.toISOString(),
-        secteur: doc.data().secteur || 'Kezia'
+        secteur: doc.data().secteur || 'CHR'
       };
     });
 
@@ -125,20 +129,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
   } catch (error: any) {
-    console.error("[installations.kezia Loader] Error:", error);
+    console.error("[installations.chr Loader] Error:", error);
     if (error.message.includes("token") || error.message.includes("authenticate")) {
       return redirect("/auth/google?error=token_error");
     }
     return json<SheetLoaderData>({ 
       headers: [], 
       rows: [], 
-      error: error.message || "Erreur lors du chargement des données Kezia." 
+      error: error.message || "Erreur lors du chargement des données CHR." 
     }, { status: 500 });
   }
 };
 
 // --- Component ---
-export default function KeziaInstallations() {
+export default function CHRInstallations() {
   const { headers, rows, ctnData, error, warning } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<ActionData>();
 
@@ -151,16 +155,22 @@ export default function KeziaInstallations() {
         codeClient: row[3] || '',
         nom: row[4] || '',
         ville: row[5] || '',
-        contact: row[6] || '',
-        telephone: row[7] || '',
-        commercial: row[8] || '',
-        configCaisse: row[9] || '',
-        offreTpe: row[10] || '',
-        cdc: row[11] || '',
-        dossier: row[12] || '',
-        tech: row[13] || '',
-        dateInstall: row[14] || '',
-        commentaire: row[15] || ''
+        telephone: row[6] || '',
+        commercial: row[7] || '',
+        materiel: row[8] || '',
+        cdc: row[9] || '',
+        integrationJalia: row[10] || '',
+        dossier: row[11] || '',
+        tech: row[12] || '',
+        dateInstall: row[13] || '',
+        heure: row[14] || '',
+        relanceProg: row[15] || '',
+        commentaireTech: row[16] || '',
+        materielLivre: row[17] || '',
+        commentaireEnvoi: row[18] || '',
+        bt: row[19] || '',
+        techSecu: row[20] || '',
+        techAffecte: row[21] || ''
       };
 
       // Vérifier si un CTN existe pour cette installation (après nettoyage du code client)
@@ -168,9 +178,9 @@ export default function KeziaInstallations() {
       const hasCTN = ctnData?.some(ctn => ctn.codeClient === cleanedInstallationCode);
       
       // Si pas de CTN, ajouter une note dans le commentaire
-      if (!hasCTN && !baseInstallation.commentaire.includes('CTN non envoyé')) {
-        baseInstallation.commentaire = baseInstallation.commentaire
-          ? `${baseInstallation.commentaire} | CTN non envoyé`
+      if (!hasCTN && !baseInstallation.commentaireEnvoi.includes('CTN non envoyé')) {
+        baseInstallation.commentaireEnvoi = baseInstallation.commentaireEnvoi
+          ? `${baseInstallation.commentaireEnvoi} | CTN non envoyé`
           : 'CTN non envoyé';
       }
 
@@ -186,7 +196,18 @@ export default function KeziaInstallations() {
 
   const handleSave = async (rowIndex: number, values: any) => {
     const rowNumber = rowIndex + 2;
-    const updateValues = [values.tech, values.dateInstall, values.commentaire];
+    const updateValues = [
+      values.tech,
+      values.dateInstall,
+      values.heure,
+      values.relanceProg,
+      values.commentaireTech,
+      values.materielLivre,
+      values.commentaireEnvoi,
+      values.bt,
+      values.techSecu,
+      values.techAffecte
+    ];
 
     fetcher.submit(
       {
@@ -199,7 +220,7 @@ export default function KeziaInstallations() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-white">Installations Kezia (Feuille: {KEZIA_SHEET_NAME})</h1>
+      <h1 className="text-2xl font-semibold text-white">Installations CHR (Feuille: {CHR_SHEET_NAME})</h1>
 
       <Link to="/dashboard" className="text-jdc-blue hover:underline">
         &larr; Retour au Tableau de Bord
@@ -222,7 +243,7 @@ export default function KeziaInstallations() {
       {!error && installations.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {installations.map((installation, index) => (
-            <InstallationTile
+            <InstallationCHRTile
               key={index}
               installation={installation}
               hasCTN={hasCTN(installation.codeClient)}

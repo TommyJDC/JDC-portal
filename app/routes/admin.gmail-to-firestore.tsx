@@ -54,7 +54,13 @@ export async function action({ request }: ActionFunctionArgs) {
       maxEmailsPerRun: 50,
       targetLabels: [],
       processedLabelName: "Traité",
-      refreshInterval: 5
+      refreshInterval: 5,
+      sectorCollections: {
+        kezia: false,
+        haccp: false,
+        chr: false,
+        tabac: false
+      }
     };
 
     // Traiter les emails et les envoyer à Firestore
@@ -91,17 +97,18 @@ export default function AdminGmailToFirestore() {
         <h2 className="text-xl font-semibold mb-4">À propos de cette fonctionnalité</h2>
         <p className="mb-4">
           Cette page vous permet de déclencher manuellement le processus qui extrait les données des emails Gmail 
-          avec le label <strong>sap-sap---a-traite</strong> et les envoie à la collection Firestore <strong>Kezia</strong>.
+          et les envoie aux collections Firestore configurées (Kezia, HACCP, CHR, Tabac) selon les paramètres définis 
+          dans la page de configuration Gmail.
         </p>
         <p className="mb-4">
           Le processus effectue les opérations suivantes :
         </p>
         <ol className="list-decimal list-inside mb-4 space-y-2">
-          <li>Extraction des données des emails avec le label spécifié</li>
+          <li>Extraction des données des emails avec les labels configurés</li>
           <li>Normalisation des numéros SAP</li>
-          <li>Vérification des doublons (les numéros SAP déjà existants ne sont pas réimportés)</li>
-          <li>Envoi des nouvelles données à Firestore</li>
-          <li>Nettoyage des entrées "Non trouvé" et des doublons</li>
+          <li>Vérification des doublons par collection</li>
+          <li>Envoi des nouvelles données vers les collections Firestore sélectionnées</li>
+          <li>Application du label "Traité" aux emails traités</li>
         </ol>
         <p className="text-sm text-gray-600">
           Note : Ce processus utilise votre compte Google authentifié pour accéder à Gmail.

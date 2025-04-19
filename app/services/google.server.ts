@@ -109,8 +109,44 @@ export async function readSheetData(
     }
 }
 
-// TODO: Add function writeSheetData(authClient, spreadsheetId, range, values)
-// This will be needed later for editing, but requires unique row identifier logic.
+/**
+ * Updates values in a specific range of a Google Sheet.
+ * @param authClient - Authenticated OAuth2 client
+ * @param spreadsheetId - The ID of the spreadsheet
+ * @param range - The A1 notation of the range to update (e.g., 'Sheet1!N2:P2')
+ * @param values - The values to write to the range
+ * @returns A promise resolving to the update response
+ */
+export async function writeSheetData(
+    authClient: any,
+    spreadsheetId: string,
+    range: string,
+    values: any[][]
+): Promise<any> {
+    const sheets = google.sheets({ version: 'v4', auth: authClient });
+    console.log(`[GoogleSheets] Writing data to spreadsheetId: ${spreadsheetId}, range: ${range}`);
+    try {
+        const response = await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+                values: values
+            }
+        });
+        console.log(`[GoogleSheets] Successfully updated data for range: ${range}`);
+        return response.data;
+    } catch (error: any) {
+        console.error(`[GoogleSheets] Error writing sheet data (ID: ${spreadsheetId}, Range: ${range}):`, error.response?.data || error.message);
+        if (error.response?.status === 403) {
+            throw new Error(`Permission denied for spreadsheet ${spreadsheetId}. Ensure the user has write access to the sheet.`);
+        }
+        if (error.response?.status === 404) {
+            throw new Error(`Spreadsheet or sheet/range not found (ID: ${spreadsheetId}, Range: ${range}).`);
+        }
+        throw new Error(`Failed to write Google Sheet data: ${error.message}`);
+    }
+}
 
 
 // --- Google Calendar Functions ---

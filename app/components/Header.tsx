@@ -32,10 +32,11 @@ const navItems = [
 // Technique menu items
 const techniqueItems = [
   { name: 'Tickets SAP', to: '/tickets-sap', icon: faTicketAlt },
-  { name: 'Kezia', to: '/installations/kezia', icon: faSheetPlastic },
-  { name: 'CHR', to: '#', disabled: true, icon: faSheetPlastic },
-  { name: 'HACCP', to: '#', disabled: true, icon: faSheetPlastic },
-  { name: 'Tabac', to: '#', disabled: true, icon: faSheetPlastic },
+  // Note: Kezia is also under Installations now, consider removing from Technique? For now, keep both.
+  { name: 'Kezia', to: '/installations/kezia', icon: faSheetPlastic }, 
+  { name: 'CHR', to: '/installations/chr', icon: faSheetPlastic }, // Enabled
+  { name: 'HACCP', to: '/installations/haccp', icon: faSheetPlastic }, // Enabled
+  { name: 'Tabac', to: '/installations/tabac', icon: faSheetPlastic }, // Enabled
 ];
 
 // Logistique menu items
@@ -46,6 +47,14 @@ const logistiqueItems = [
 
 // Commercial menu items (vide pour le moment)
 const commercialItems: { name: string; to: string; icon: any; disabled?: boolean }[] = [];
+
+// Installation menu items
+const installationItems = [
+  { name: 'Kezia', to: '/installations/kezia', icon: faSheetPlastic },
+  { name: 'CHR', to: '/installations/chr', icon: faSheetPlastic },
+  { name: 'HACCP', to: '/installations/haccp', icon: faSheetPlastic },
+  { name: 'Tabac', to: '/installations/tabac', icon: faSheetPlastic },
+];
 
 // Define Admin item separately
 const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
@@ -201,21 +210,19 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                   <Menu.Items className="absolute left-0 mt-2 w-48 origin-top-left divide-y divide-jdc-gray-700 rounded-md bg-jdc-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                     <div className="px-1 py-1">
                       {techniqueItems.map((item) => (
-                        <Menu.Item key={item.name} disabled={item.disabled}>
-                          {({ active, disabled }) => (
+                        <Menu.Item key={item.name}> 
+                          {({ active }) => ( // Only destructure active, removed disabled
                             <NavLink
                               to={item.to}
                               className={`${menuItemBaseClass} ${
                                 active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
-                              } ${
-                                disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-jdc-gray-700 hover:text-white'
-                              }`}
-                              onClick={(e) => { if (disabled) e.preventDefault(); }}
-                              aria-disabled={disabled}
+                              } hover:bg-jdc-gray-700 hover:text-white`} // Removed disabled class logic
+                              // onClick={(e) => { if (disabled) e.preventDefault(); }} // Removed
+                              // aria-disabled={disabled}
                             >
                               <FontAwesomeIcon icon={item.icon} className="mr-2 h-5 w-5" aria-hidden="true" />
                               {item.name}
-                              {disabled && <span className="text-xs ml-1 opacity-75">(Bientôt)</span>}
+                              {/* Removed disabled text */}
                             </NavLink>
                           )}
                         </Menu.Item>
@@ -245,6 +252,45 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                   <Menu.Items className="absolute left-0 mt-2 w-48 origin-top-left divide-y divide-jdc-gray-700 rounded-md bg-jdc-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                     <div className="px-1 py-1">
                       {logistiqueItems.map((item) => (
+                        <Menu.Item key={item.name}>
+                          {({ active }) => (
+                            <NavLink
+                              to={item.to}
+                              className={`${menuItemBaseClass} ${
+                                active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
+                              } hover:bg-jdc-gray-700 hover:text-white`}
+                            >
+                              <FontAwesomeIcon icon={item.icon} className="mr-2 h-5 w-5" aria-hidden="true" />
+                              {item.name}
+                            </NavLink>
+                          )}
+                        </Menu.Item>
+                      ))}
+                    </div>
+                  </Menu.Items>
+                </Transition>
+              </Menu>
+
+              {/* Installations Menu */}
+              <Menu as="div" className="relative inline-block text-left">
+                <div>
+                  <Menu.Button className={menuButtonClass}>
+                    <span>Installations</span>
+                    <FontAwesomeIcon icon={faChevronDown} className="ml-1.5 h-4 w-4" aria-hidden="true" />
+                  </Menu.Button>
+                </div>
+                <Transition
+                  as={Fragment}
+                  enter="transition ease-out duration-100"
+                  enterFrom="transform opacity-0 scale-95"
+                  enterTo="transform opacity-100 scale-100"
+                  leave="transition ease-in duration-75"
+                  leaveFrom="transform opacity-100 scale-100"
+                  leaveTo="transform opacity-0 scale-95"
+                >
+                  <Menu.Items className="absolute left-0 mt-2 w-48 origin-top-left divide-y divide-jdc-gray-700 rounded-md bg-jdc-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                    <div className="px-1 py-1">
+                      {installationItems.map((item) => (
                         <Menu.Item key={item.name}>
                           {({ active }) => (
                             <NavLink

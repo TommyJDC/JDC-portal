@@ -1,810 +1,334 @@
-// Import Timestamp and FieldValue directly if needed, but dbAdmin comes from config
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
-// Import types remain the same
-import type { UserProfile, SapTicket, Shipment, GeocodeCacheEntry, StatsSnapshot, Article } from '~/types/firestore.types';
-import { parseFrenchDate } from '~/utils/dateUtils';
-// Import the initialized admin db instance
-import { dbAdmin } from '~/firebase.admin.config.server'; // Import the configured instance
-import type * as admin from 'firebase-admin'; // Import admin types if needed elsewhere
+import { dbAdmin as db } from "~/firebase.admin.config.server";
+import type { UserProfile, SapTicket, Shipment, StatsSnapshot, Installation, InstallationStatus } from "~/types/firestore.types"; // Added Installation, InstallationStatus
+import type * as admin from 'firebase-admin'; // Importer les types admin
+import { FieldValue } from 'firebase-admin/firestore'; // Added FieldValue
 
-// --- Helper for Status Correction (remains the same, uses data object) ---
-const correctTicketStatus = (ticketData: admin.firestore.DocumentData): { correctedStatus: string | null, needsUpdate: boolean } => {
-  let currentStatus = ticketData.statut;
-  const demandeSAPLower = ticketData.demandeSAP?.toLowerCase() ?? '';
-  const needsRmaStatus = demandeSAPLower.includes('demande de rma');
-  const isNotRmaStatus = currentStatus !== 'Demande de RMA';
+// Collection Reference for Installations
+const installationsCollection = db.collection('installations');
 
-  let correctedStatus: string | null = currentStatus;
-  let needsUpdate = false;
-
-  if (needsRmaStatus && isNotRmaStatus) {
-    correctedStatus = 'Demande de RMA';
-    needsUpdate = true;
-  } else if (!currentStatus && !needsRmaStatus) {
-    correctedStatus = 'Nouveau';
-    needsUpdate = true;
-  }
-
-  return { correctedStatus: correctedStatus ?? null, needsUpdate };
-};
-
-
-// --- User Profile Functions (Using Admin SDK) ---
-
-/**
- * Gets a user profile using the Admin SDK.
- * Assumes the passed `id` is the document ID in the 'users' collection
- * (could be Firebase UID or Google ID depending on how it's called).
- */
-export const getUserProfileSdk = async (id: string): Promise<UserProfile | null> => {
-  if (!id) return null;
-  console.log(`[FirestoreService Admin] Getting profile for ID: ${id}`);
+// Fonctions de gestion des utilisateurs
+export const getUserProfileSdk = async (userId: string): Promise<UserProfile | null> => {
   try {
-    const userDocRef = dbAdmin.collection('users').doc(id);
-    const userDocSnap = await userDocRef.get();
-    if (userDocSnap.exists) {
-      const data = userDocSnap.data() as any; // Cast to any temporarily
-      // Convert Timestamps to Dates before returning
-      const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined;
-      const updatedAt = data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined;
-      return {
-          uid: id,
-          email: data.email,
-          displayName: data.displayName,
-          role: data.role,
-          secteurs: data.secteurs,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
-       } as UserProfile;
-    } else {
-      console.log(`[FirestoreService Admin] No profile found for ID: ${id}`);
-      throw new Error(`User profile not found for ID: ${id}`);
-    }
-  } catch (error: any) {
-    console.error(`[FirestoreService Admin] Error fetching user profile for ID ${id}:`, error);
-    // Vérifier explicitement le code d'erreur Firestore pour NOT_FOUND (5)
-    // OU vérifier le message comme fallback (au cas où le code ne serait pas présent)
-    if (error.code === 5 || error.message?.includes("not found") || error.message?.includes("User profile not found")) {
-        console.log(`[FirestoreService Admin] Profile confirmed not found for ID ${id} (Error code: ${error.code}). Throwing specific 'not found' error.`);
-        // Relancer une erreur spécifique que auth.server.ts peut attraper de manière fiable
-        throw new Error(`User profile not found for ID: ${id}`);
-    }
-    // Pour toutes les autres erreurs, lancer une erreur générique mais informative
-    console.error(`[FirestoreService Admin] Unhandled error fetching profile for ID ${id}. Code: ${error.code}, Message: ${error.message}`);
-    throw new Error(`Impossible de récupérer le profil utilisateur (ID: ${id}). Cause: ${error.message || 'Erreur inconnue'}`);
-  }
-};
-
-/**
- * Creates a user profile using the Admin SDK.
- * Uses the passed `id` (Firebase UID or Google ID) as the document ID.
- */
-export const createUserProfileSdk = async (
-  id: string,
-  email: string,
-  displayName: string,
-  initialRole: string = 'Admin',
-  gmailConfig?: {
-    googleRefreshToken?: string;
-    gmailAuthorizedScopes?: string[];
-    gmailAuthStatus?: 'active' | 'expired' | 'unauthorized';
-    isGmailProcessor?: boolean;
-  }
-): Promise<UserProfile> => {
-  if (!id || !email || !displayName) {
-    throw new Error("ID, email, and display name are required to create a profile.");
-  }
-  console.log(`[FirestoreService Admin] Creating profile for ID: ${id}, Email: ${email}`);
-  try {
-    const userDocRef = dbAdmin.collection('users').doc(id);
-    const docSnap = await userDocRef.get();
-    if (docSnap.exists) {
-        console.warn(`[FirestoreService Admin] Profile already exists for ID: ${id}. Overwriting.`);
-    }
-
-    // Define the data to set, excluding fields handled by FieldValue or the uid itself
-    const newUserProfileDataBase: Omit<UserProfile, 'uid' | 'createdAt' | 'updatedAt'> = {
-      email,
-      displayName,
-      nom: displayName.split(' ')[0] || displayName,
-      password: '',
-      role: initialRole,
-      secteurs: [],
-      // Ajout des champs Gmail
-      ...(gmailConfig && {
-        googleRefreshToken: gmailConfig.googleRefreshToken,
-        gmailAuthorizedScopes: gmailConfig.gmailAuthorizedScopes,
-        gmailAuthStatus: gmailConfig.gmailAuthStatus || 'unauthorized',
-        isGmailProcessor: gmailConfig.isGmailProcessor || false,
-      }),
-    };
-
-    // Add the server timestamp during the set operation
-    await userDocRef.set({
-        ...newUserProfileDataBase,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(), // Also set updatedAt on creation
-    });
-    console.log(`[FirestoreService Admin] User profile created/updated successfully for ID: ${id}`);
-
-    // Return the known data immediately. Timestamps will be populated on next read.
-    // Cast to UserProfile, acknowledging timestamps might be FieldValue initially server-side.
-    return { uid: id, ...newUserProfileDataBase } as UserProfile;
-
-  } catch (error: any) {
-    console.error(`[FirestoreService Admin] Error creating user profile for ID ${id}:`, error);
-    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore permission denied during profile creation. Check service account permissions and Firestore rules.");
-        throw new Error("Permission refusée par Firestore lors de la création du profil.");
-    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded. Consider optimizing queries or increasing quota.");
-        throw new Error("Quota Firestore dépassé. Veuillez réessayer plus tard.");
-    }
-    throw new Error(`Impossible de créer le profil utilisateur (ID: ${id}). Cause: ${error.message || error}`);
-  }
-};
-
-/**
- * Updates a user profile using the Admin SDK.
- */
-export const updateUserProfileSdk = async (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'createdAt' | 'updatedAt'>>): Promise<void> => {
-  if (!uid || !data || Object.keys(data).length === 0) {
-    console.warn("[FirestoreService Admin] Update user profile called with invalid UID or empty data.");
-    return;
-  }
-  console.log(`[FirestoreService Admin] Updating profile for UID: ${uid}`);
-  try {
-    const userDocRef = dbAdmin.collection('users').doc(uid);
-    // Add updatedAt timestamp
-    const updateData = { ...data, updatedAt: FieldValue.serverTimestamp() };
-    await userDocRef.update(updateData);
-    console.log(`[FirestoreService Admin] User profile updated successfully for UID: ${uid}`);
-  } catch (error: any) {
-    console.error(`[FirestoreService Admin] Error updating user profile for UID ${uid}:`, error);
-    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore permission denied during profile update.");
-        throw new Error("Permission refusée par Firestore lors de la mise à jour du profil.");
-    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during update. Consider optimizing queries or increasing quota.");
-        throw new Error("Quota Firestore dépassé lors de la mise à jour. Veuillez réessayer plus tard.");
-    }
-    throw new Error(`Impossible de mettre à jour le profil utilisateur (UID: ${uid}). Cause: ${error.message || error}`);
-  }
-};
-
-/**
- * Gets all user profiles using the Admin SDK.
- */
-export const getAllUserProfilesSdk = async (): Promise<UserProfile[]> => {
-  console.log("[FirestoreService Admin] Fetching all user profiles...");
-  try {
-    console.log("[FirestoreService Admin] Getting users collection ref..."); // Ajout de log
-    const usersCollectionRef = dbAdmin.collection('users');
-    console.log("[FirestoreService Admin] Got users collection ref."); // Ajout de log
-    
-    console.log("[FirestoreService Admin] Ordering users by email..."); // Ajout de log
-    const q = usersCollectionRef.orderBy('email');
-    console.log("[FirestoreService Admin] Query built, fetching documents..."); // Ajout de log
-    const querySnapshot = await q.get();
-    console.log(`[FirestoreService Admin] Query snapshot received. Size: ${querySnapshot.size}`); // Ajout de log
-
-    const profiles = querySnapshot.docs.map((doc) => {
-        const data = doc.data() as any;
-        const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined;
-        const updatedAt = data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined;
-        return {
-            uid: doc.id,
-            email: data.email,
-            displayName: data.displayName,
-            role: data.role,
-            secteurs: data.secteurs,
-            createdAt: createdAt,
-            updatedAt: updatedAt,
-        } as UserProfile
-    });
-    console.log(`[FirestoreService Admin] Fetched ${profiles.length} profiles.`);
-    return profiles;
-  } catch (error: any) {
-    console.error("[FirestoreService Admin] !!! ERROR fetching all user profiles:", error); // Log d'erreur plus visible
-    if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during user profiles fetch.");
-        throw new Error("Quota Firestore dépassé lors de la récupération des profils utilisateurs. Veuillez réessayer plus tard.");
-    }
-    throw new Error(`Impossible de récupérer la liste des utilisateurs. Cause: ${error.message || error}`);
-  }
-};
-
-
-// --- Article Image Functions (Using Admin SDK) ---
-
-export const addArticleImageUrl = async (articleId: string, imageUrl: string): Promise<void> => {
-  if (!articleId || !imageUrl) {
-    throw new Error("Article ID and image URL are required.");
-  }
-  console.log(`[FirestoreService Admin] Adding image URL to article ${articleId}...`);
-  try {
-    const articleDocRef = dbAdmin.collection('articles').doc(articleId);
-    await articleDocRef.update({
-      imageUrls: FieldValue.arrayUnion(imageUrl)
-    });
-    console.log(`[FirestoreService Admin] Image URL successfully added to article ${articleId}.`);
-  } catch (error: any) {
-    console.error(`[FirestoreService Admin] Error adding image URL to article ${articleId}:`, error);
-    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
-        throw new Error("Permission refusée pour mettre à jour l'article.");
-    } else if (error.code === 5 || error.code === 'NOT_FOUND') {
-        throw new Error(`L'article avec l'ID ${articleId} n'a pas été trouvé.`);
-    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during article image update.");
-        throw new Error("Quota Firestore dépassé lors de la mise à jour de l'image. Veuillez réessayer plus tard.");
-    }
-    throw new Error(`Impossible d'ajouter l'URL de l'image à l'article : ${error.message || error.code}`);
-  }
-};
-
-export const deleteArticleImageUrl = async (articleId: string, imageUrl: string): Promise<void> => {
-  if (!articleId || !imageUrl) {
-    throw new Error("Article ID and image URL are required for deletion.");
-  }
-  console.log(`[FirestoreService Admin] Removing image URL from article ${articleId}...`);
-  try {
-    const articleDocRef = dbAdmin.collection('articles').doc(articleId);
-    await articleDocRef.update({
-      imageUrls: FieldValue.arrayRemove(imageUrl)
-    });
-    console.log(`[FirestoreService Admin] Image URL successfully removed from article ${articleId}.`);
-  } catch (error: any) {
-    console.error(`[FirestoreService Admin] Error removing image URL from article ${articleId}:`, error);
-    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
-        throw new Error("Permission refusée pour mettre à jour l'article.");
-    } else if (error.code === 5 || error.code === 'NOT_FOUND') {
-        throw new Error(`L'article avec l'ID ${articleId} n'a pas été trouvé.`);
-    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during article image deletion.");
-        throw new Error("Quota Firestore dépassé lors de la suppression de l'image. Veuillez réessayer plus tard.");
-    }
-    throw new Error(`Impossible de supprimer l'URL de l'image de l'article : ${error.message || error.code}`);
-  }
-};
-
-
-// --- Article Search Functions (Using Admin SDK) ---
-
-export const searchArticles = async (criteria: { code?: string; nom?: string }): Promise<Article[]> => {
-  const { code, nom } = criteria;
-  const trimmedCode = code?.trim();
-  const trimmedNom = nom?.trim();
-  const nomUppercase = trimmedNom?.toUpperCase();
-
-  console.log(`[FirestoreService Admin] Searching articles with criteria:`, { code: trimmedCode, nom: trimmedNom });
-
-  if (!trimmedCode && !trimmedNom) {
-    console.log("[FirestoreService Admin] No search criteria provided for articles.");
-    return [];
-  }
-
-  const articlesCollection = dbAdmin.collection('articles');
-  const resultsMap = new Map<string, Article>();
-
-  try {
-    if (trimmedCode) {
-      const codeQuery = articlesCollection.where("Code", "==", trimmedCode);
-      console.log(`[FirestoreService Admin] Executing Code exact match query for: "${trimmedCode}"`);
-      const codeSnapshot = await codeQuery.get();
-      console.log(`[FirestoreService Admin] Code query found ${codeSnapshot.docs.length} matches.`);
-      codeSnapshot.docs.forEach(docSnap => {
-        const data = docSnap.data();
-        if (data.Code && data.Désignation) {
-          resultsMap.set(docSnap.id, { id: docSnap.id, ...data } as Article);
-        } else {
-           console.warn(`[FirestoreService Admin] Document ${docSnap.id} matched by Code is missing 'Code' or 'Désignation'.`);
-        }
-      });
-    }
-
-    if (nomUppercase) {
-      const endTerm = nomUppercase + '\uf8ff';
-      const designationQuery = articlesCollection
-        .orderBy("Désignation")
-        .startAt(nomUppercase)
-        .endAt(endTerm);
-
-      console.log(`[FirestoreService Admin] Executing Désignation prefix query (uppercase) for: "${nomUppercase}"`);
-      const designationSnapshot = await designationQuery.get();
-      console.log(`[FirestoreService Admin] Désignation query found ${designationSnapshot.docs.length} potential matches.`);
-
-      designationSnapshot.docs.forEach(docSnap => {
-        const data = docSnap.data();
-        if (data.Code && data.Désignation) {
-          resultsMap.set(docSnap.id, { id: docSnap.id, ...data } as Article);
-        } else {
-          console.warn(`[FirestoreService Admin] Document ${docSnap.id} matched by Désignation is missing 'Code' or 'Désignation'.`);
-        }
-      });
-    }
-
-    const combinedResults = Array.from(resultsMap.values());
-    console.log(`[FirestoreService Admin] Article search completed. Found ${combinedResults.length} unique articles.`);
-    return combinedResults;
-
-  } catch (error: any) {
-    console.error("[FirestoreService Admin] Error executing article search:", error);
-    if (error.code === 9 || error.code === 'FAILED_PRECONDITION') {
-        console.error("[FirestoreService Admin] Firestore Error: Likely missing a composite index. Check the Firestore console error message for a link to create it. You'll likely need an index on 'Désignation' (ascending).");
-        throw new Error("Erreur Firestore: Index manquant requis pour la recherche par nom (sur 'Désignation'). Vérifiez la console Firebase.");
-    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during article search.");
-        throw new Error("Quota Firestore dépassé lors de la recherche d'articles. Veuillez réessayer plus tard.");
-    }
-    throw new Error(`Échec de la recherche d'articles. Cause: ${error.message || error}`);
-  }
-};
-
-
-// --- SAP Ticket Functions (Using Admin SDK) ---
-
-export const updateSAPTICKET = async (sectorId: string, ticketId: string, data: Partial<Omit<SapTicket, 'id' | 'secteur' | 'date'>>): Promise<void> => {
-  if (!sectorId || !ticketId || !data || Object.keys(data).length === 0) {
-    console.warn("[FirestoreService Admin] updateSAPTICKET called with invalid sectorId, ticketId, or empty data.");
-    throw new Error("Identifiants de secteur/ticket ou données de mise à jour manquants.");
-  }
-  console.log(`[FirestoreService Admin] Attempting to update ticket ${ticketId} in sector ${sectorId} with data:`, data);
-  try {
-    const ticketDocRef = dbAdmin.collection(sectorId).doc(ticketId);
-    // Ensure date is not accidentally overwritten with undefined if not provided
-    const updateData = { ...data };
-    if ('date' in updateData) delete (updateData as any).date;
-
-    await ticketDocRef.update(updateData);
-    console.log(`[FirestoreService Admin] Successfully updated ticket ${ticketId} in sector ${sectorId}.`);
-  } catch (error: any) {
-    console.error(`[FirestoreService Admin] Error updating ticket ${ticketId} in sector ${sectorId}:`, error);
-    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
-      console.error(`[FirestoreService Admin] CRITICAL: Firestore permission denied for update operation on collection '${sectorId}'. Check service account permissions and Firestore rules.`);
-      throw new Error(`Permission refusée par Firestore pour la mise à jour dans le secteur ${sectorId}.`);
-    } else if (error.code === 5 || error.code === 'NOT_FOUND') {
-        console.error(`[FirestoreService Admin] Error: Document ${ticketId} not found in collection ${sectorId}.`);
-        throw new Error(`Le ticket ${ticketId} n'a pas été trouvé dans le secteur ${sectorId}.`);
-    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during ticket update.");
-        throw new Error("Quota Firestore dépassé lors de la mise à jour du ticket. Veuillez réessayer plus tard.");
-    }
-    throw new Error(`Impossible de mettre à jour le ticket SAP ${ticketId}. Cause: ${error.message || error}`);
-  }
-};
-
-export const getRecentTicketsForSectors = async (sectors: string[], count: number = 5): Promise<SapTicket[]> => {
-  if (!sectors || sectors.length === 0) return [];
-  console.log(`[FirestoreService Admin] Fetching recent tickets for sectors: ${sectors.join(', ')}`);
-
-  const ticketPromises = sectors.map(async (sector) => {
-    try {
-      const sectorCollectionRef = dbAdmin.collection(sector);
-      const q = sectorCollectionRef.orderBy('date', 'desc').limit(count);
-      const querySnapshot = await q.get();
-       return querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          const parsedDate = parseFrenchDate(data.date);
-          const { correctedStatus } = correctTicketStatus(data);
-          return {
-           id: doc.id,
-           ...data,
-            statut: correctedStatus ?? data.statut,
-            secteur: sector,
-            date: parsedDate
-          } as SapTicket;
-       });
-    } catch (error: any) {
-      console.error(`[FirestoreService Admin] Error fetching tickets for sector ${sector}:`, error);
-       if (error.code === 9 || error.code === 'FAILED_PRECONDITION') {
-         console.error(`[FirestoreService Admin] Index missing for ticket query in sector ${sector} (likely on 'date' desc).`);
-       }
-      return [];
-    }
-  });
-
-  try {
-     const resultsBySector = await Promise.all(ticketPromises);
-     const allTickets = resultsBySector.flat();
-     allTickets.sort((a, b) => {
-         if (!(b.date instanceof Date)) return -1;
-         if (!(a.date instanceof Date)) return 1;
-         return b.date.getTime() - a.date.getTime();
-     });
-     console.log(`[FirestoreService Admin] Found ${allTickets.length} tickets across sectors, returning top ${count}`);
-    return allTickets.slice(0, count);
+    const doc = await db.collection('users').doc(userId).get();
+    return doc.exists ? (doc.data() as UserProfile) : null;
   } catch (error) {
-    console.error("[FirestoreService Admin] Error merging ticket results:", error);
-    throw new Error("Impossible de récupérer les tickets récents.");
-  }
-};
-
-export const getAllTicketsForSectorsSdk = async (sectors: string[]): Promise<SapTicket[]> => {
-  if (!sectors || sectors.length === 0) {
-    console.log("[FirestoreService Admin] getAllTicketsForSectorsSdk: No sectors provided, returning [].");
-    return [];
-  }
-  console.log(`[FirestoreService Admin] Fetching ALL tickets (one-time) for sectors: ${sectors.join(', ')}`);
-
-  const ticketPromises = sectors.map(async (sector) => {
-    try {
-      const sectorCollectionRef = dbAdmin.collection(sector);
-      const q = sectorCollectionRef.orderBy('date', 'desc');
-      const querySnapshot = await q.get();
-      console.log(`[FirestoreService Admin] Fetched ${querySnapshot.size} tickets for sector ${sector}.`);
-       return querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          const parsedDate = parseFrenchDate(data.date);
-          const { correctedStatus } = correctTicketStatus(data);
-          return {
-           id: doc.id,
-           ...data,
-            statut: correctedStatus ?? data.statut,
-            secteur: sector,
-            date: parsedDate
-          } as SapTicket;
-       });
-    } catch (error: any) {
-      console.error(`[FirestoreService Admin] Error fetching ALL tickets for sector ${sector}:`, error);
-       if (error.code === 9 || error.code === 'FAILED_PRECONDITION') {
-         console.error(`[FirestoreService Admin] Index missing for ticket query in sector ${sector} (likely on 'date' desc).`);
-       }
-      return [];
-    }
-  });
-
-  try {
-     const resultsBySector = await Promise.all(ticketPromises);
-     const allTickets = resultsBySector.flat();
-     allTickets.sort((a, b) => {
-         if (!(b.date instanceof Date)) return -1;
-         if (!(a.date instanceof Date)) return 1;
-         return b.date.getTime() - a.date.getTime();
-     });
-     console.log(`[FirestoreService Admin] Fetched a total of ${allTickets.length} tickets across all specified sectors.`);
-    return allTickets;
-  } catch (error) {
-    console.error("[FirestoreService Admin] Error merging ALL ticket results:", error);
-    throw new Error("Impossible de récupérer tous les tickets SAP pour les secteurs spécifiés.");
-  }
-};
-
-export const getTotalTicketCountSdk = async (sectors: string[]): Promise<number> => {
-  if (!sectors || sectors.length === 0) {
-      console.log("[FirestoreService Admin] getTotalTicketCountSdk: No sectors provided, returning 0.");
-      return 0;
-  }
-  console.log(`[FirestoreService Admin] Counting total tickets via aggregate for sectors: ${sectors.join(', ')}`);
-
-  const countPromises = sectors.map(async (sector) => {
-    try {
-      const sectorCollectionRef = dbAdmin.collection(sector);
-      const snapshot = await sectorCollectionRef.count().get();
-      const count = snapshot.data().count;
-      console.log(`[FirestoreService Admin] Counted ${count} docs for sector ${sector}.`);
-      return count;
-    } catch (error) {
-      console.error(`[FirestoreService Admin] Error counting tickets via aggregate for sector ${sector}:`, error);
-      return 0;
-    }
-  });
-
-  try {
-    const counts = await Promise.all(countPromises);
-    const totalCount = counts.reduce((sum, count) => sum + count, 0);
-    console.log(`[FirestoreService Admin] Total ticket count via aggregate across sectors: ${totalCount}`);
-    return totalCount;
-  } catch (error) {
-    console.error("[FirestoreService Admin] Error summing ticket counts from aggregate:", error);
-    throw new Error("Impossible de calculer le nombre total de tickets.");
-  }
-};
-
-
-// --- Shipment Functions (Using Admin SDK) ---
-
-export const getAllShipments = async (userProfile: UserProfile | null): Promise<Shipment[]> => {
-  if (!userProfile) {
-    console.log("[FirestoreService Admin][getAllShipments] Cannot fetch shipments, user profile is null.");
-    return [];
-  }
-
-  console.log(`[FirestoreService Admin][getAllShipments] Fetching shipments for user: ${userProfile.uid}, Role: ${userProfile.role}`);
-  const shipmentsCollectionRef = dbAdmin.collection('Envoi');
-  let q: admin.firestore.Query<admin.firestore.DocumentData>;
-
-  try {
-    const userSectors = userProfile.secteurs ?? [];
-
-    if (userProfile.role === 'Admin') {
-        console.log("[FirestoreService Admin][getAllShipments] Admin user. Fetching ALL shipments.");
-        q = shipmentsCollectionRef.orderBy('nomClient');
-    } else {
-      if (userSectors.length === 0) {
-        console.log(`[FirestoreService Admin][getAllShipments] Non-admin user ${userProfile.uid} has no assigned sectors. Returning empty list.`);
-        return [];
-      }
-      console.log(`[FirestoreService Admin][getAllShipments] Non-admin user. Querying sectors: ${userSectors.join(', ')}`);
-      q = shipmentsCollectionRef
-        .where('secteur', 'in', userSectors)
-        .orderBy('nomClient');
-    }
-
-    console.log("[FirestoreService Admin][getAllShipments] Executing query...");
-    const querySnapshot = await q.get();
-    console.log(`[FirestoreService Admin][getAllShipments] Query successful. Fetched ${querySnapshot.size} documents.`);
-
-    const shipments = querySnapshot.docs.map((doc) => {
-        const data = doc.data();
-        const dateCreation = data.dateCreation instanceof Timestamp ? data.dateCreation.toDate() : undefined;
-        return { id: doc.id, ...data, dateCreation } as Shipment;
-    });
-    return shipments;
-
-  } catch (error: any) {
-    console.error("[FirestoreService Admin][getAllShipments] Error fetching shipments:", error);
-    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
-         console.error("[FirestoreService Admin][getAllShipments] CRITICAL: Firestore permission denied. Check service account permissions and Firestore rules.");
-         throw new Error("Permission refusée par Firestore. Vérifiez les règles de sécurité.");
-     } else if (error.code === 9 || error.code === 'FAILED_PRECONDITION') {
-         console.error("[FirestoreService Admin][getAllShipments] CRITICAL: Firestore query requires an index. Check Firestore console.");
-         throw new Error("Index Firestore manquant. Vérifiez la console Firestore.");
-     } else {
-         throw new Error(`Impossible de récupérer la liste des envois. Cause: ${error.message || error}`);
-     }
-  }
-};
-
-export const getRecentShipmentsForSectors = async (sectors: string[], count: number = 5): Promise<Shipment[]> => {
-  const fetchAllSectors = !sectors || sectors.length === 0;
-
-  if (fetchAllSectors) {
-    console.log(`[FirestoreService Admin] Fetching ${count} recent shipments across ALL sectors (Admin view).`);
-  } else {
-    console.log(`[FirestoreService Admin] Fetching ${count} recent shipments for sectors: ${sectors.join(', ')}`);
-  }
-
-  try {
-    const shipmentsCollectionRef = dbAdmin.collection('Envoi');
-    let q: admin.firestore.Query<admin.firestore.DocumentData>;
-
-    const baseQuery = shipmentsCollectionRef.orderBy('dateCreation', 'desc').limit(count);
-
-    if (fetchAllSectors) {
-      q = baseQuery;
-    } else {
-      if (sectors.length > 0) {
-          q = baseQuery.where('secteur', 'in', sectors);
-      } else {
-          console.warn("[FirestoreService Admin] getRecentShipmentsForSectors: Non-admin called with empty sectors array unexpectedly. Returning [].");
-          return [];
-      }
-    }
-
-    const querySnapshot = await q.get();
-    const shipments = querySnapshot.docs.map((doc) => {
-        const data = doc.data();
-        const dateCreation = data.dateCreation instanceof Timestamp ? data.dateCreation.toDate() : undefined;
-        return {
-            id: doc.id,
-            ...data,
-            dateCreation: dateCreation
-        } as Shipment;
-    });
-
-    console.log(`[FirestoreService Admin] Fetched ${shipments.length} recent shipments matching criteria.`);
-    return shipments;
-  } catch (error: any) {
-    console.error("[FirestoreService Admin] Error fetching recent shipments:", error);
-     if (error.code === 9 || error.code === 'FAILED_PRECONDITION') {
-         console.error("[FirestoreService Admin] CRITICAL: Firestore query requires an index (likely on dateCreation desc). Check Firestore console.");
-         throw new Error("Index Firestore manquant (probablement sur dateCreation). Vérifiez la console Firestore.");
-     }
-    throw new Error(`Impossible de récupérer les envois récents. Cause: ${error.message || error}`);
-  }
-};
-
-const getAllShipmentsForSectors = async (sectors: string[], isAdmin: boolean): Promise<Shipment[]> => {
-  console.log(`[FirestoreService Admin] getAllShipmentsForSectors: Fetching ALL shipments. Admin: ${isAdmin}, Sectors: ${sectors.join(', ')}`);
-
-  try {
-    const shipmentsCollectionRef = dbAdmin.collection('Envoi');
-    let q: admin.firestore.Query<admin.firestore.DocumentData>;
-
-    if (isAdmin) {
-        console.log("[FirestoreService Admin] getAllShipmentsForSectors: Admin detected, fetching all documents.");
-        q = shipmentsCollectionRef;
-    } else {
-        if (!sectors || sectors.length === 0) {
-            console.log("[FirestoreService Admin] getAllShipmentsForSectors: Non-admin with no sectors, returning [].");
-            return [];
-        }
-        console.log(`[FirestoreService Admin] getAllShipmentsForSectors: Non-admin, fetching for sectors: ${sectors.join(', ')}`);
-        q = shipmentsCollectionRef.where('secteur', 'in', sectors);
-    }
-
-    const querySnapshot = await q.get();
-    const shipments = querySnapshot.docs.map((doc) => {
-        const data = doc.data();
-        const dateCreation = data.dateCreation instanceof Timestamp ? data.dateCreation.toDate() : undefined;
-        return { id: doc.id, ...data, dateCreation } as Shipment;
-    });
-    console.log(`[FirestoreService Admin] getAllShipmentsForSectors: Fetched ${shipments.length} total shipments.`);
-    return shipments;
-  } catch (error: any) {
-    console.error("[FirestoreService Admin] Error fetching all shipments for sectors:", error);
-     if (error.code === 9 || error.code === 'FAILED_PRECONDITION') {
-         console.error("[FirestoreService Admin] CRITICAL: Firestore query requires an index. Check Firestore console.");
-         throw new Error("Index Firestore manquant. Vérifiez la console Firestore.");
-     }
-    throw new Error(`Impossible de récupérer tous les envois pour les secteurs. Cause: ${error.message || error}`);
-  }
-};
-
-export const getDistinctClientCountFromEnvoiSdk = async (userProfile: UserProfile | null): Promise<number> => {
-   if (!userProfile) {
-     console.log("[FirestoreService Admin] getDistinctClientCountFromEnvoiSdk: No user profile provided, returning 0.");
-     return 0;
-   }
-
-   const isAdmin = userProfile.role === 'Admin';
-   const userSectors = userProfile.secteurs ?? [];
-
-   console.warn(`[FirestoreService Admin] Calculating distinct client count from 'Envoi' documents. Admin: ${isAdmin}, Sectors: ${userSectors.join(', ')}. This can be inefficient.`);
-
-   try {
-     const accessibleShipments = await getAllShipmentsForSectors(userSectors, isAdmin);
-     console.log(`[FirestoreService Admin] getDistinctClientCountFromEnvoiSdk: Fetched ${accessibleShipments.length} accessible shipments.`);
-
-     if (accessibleShipments.length === 0) {
-         console.log("[FirestoreService Admin] getDistinctClientCountFromEnvoiSdk: No accessible shipments found, returning 0 distinct clients.");
-         return 0;
-     }
-
-     const uniqueClientIdentifiers = new Set<string>();
-     accessibleShipments.forEach((shipment) => {
-       let clientIdentifier: string | null = null;
-       if (shipment.codeClient && String(shipment.codeClient).trim() !== '') {
-         clientIdentifier = String(shipment.codeClient).trim();
-       } else if (shipment.nomClient && String(shipment.nomClient).trim() !== '') {
-          clientIdentifier = String(shipment.nomClient).trim();
-       }
-       if (clientIdentifier) {
-         uniqueClientIdentifiers.add(clientIdentifier);
-       }
-     });
-
-     const count = uniqueClientIdentifiers.size;
-     console.log(`[FirestoreService Admin] getDistinctClientCountFromEnvoiSdk: Found ${count} distinct clients from accessible 'Envoi' documents.`);
-     return count;
-   } catch (error) {
-     console.error("[FirestoreService Admin] getDistinctClientCountFromEnvoiSdk: Error calculating distinct client count:", error);
-     throw new Error("Impossible de compter les clients distincts depuis les envois.");
-   }
- };
-
-export const deleteShipmentSdk = async (shipmentId: string): Promise<void> => {
-  if (!shipmentId) {
-    throw new Error("Shipment ID is required to delete.");
-  }
-  console.log(`[FirestoreService Admin] Attempting to delete shipment with ID: ${shipmentId}`);
-  try {
-    const shipmentDocRef = dbAdmin.collection('Envoi').doc(shipmentId);
-    await shipmentDocRef.delete();
-    console.log(`[FirestoreService Admin] Successfully deleted shipment: ${shipmentId}`);
-  } catch (error: any) {
-    console.error(`[FirestoreService Admin] Error deleting shipment ${shipmentId}:`, error);
-    if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
-      console.error("[FirestoreService Admin] CRITICAL: Firestore permission denied for delete operation.");
-      throw new Error("Permission refusée par Firestore pour la suppression.");
-    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during shipment deletion.");
-        throw new Error("Quota Firestore dépassé lors de la suppression de l'envoi. Veuillez réessayer plus tard.");
-    }
-    throw new Error(`Impossible de supprimer l'envoi. Cause: ${error.message || error}`);
-  }
-};
-
-
-// --- Stats Snapshot Functions (Using Admin SDK) ---
-
-export const getLatestStatsSnapshotsSdk = async (count: number = 1): Promise<StatsSnapshot[]> => {
-  console.log(`[FirestoreService Admin] Fetching latest ${count} stats snapshot(s) from 'dailyStatsSnapshots'...`);
-  try {
-    const snapshotsCollectionRef = dbAdmin.collection('dailyStatsSnapshots');
-    const q = snapshotsCollectionRef
-      .orderBy('timestamp', 'desc')
-      .limit(count);
-    const querySnapshot = await q.get();
-    const snapshots = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        const timestamp = data.timestamp instanceof Timestamp ? data.timestamp.toDate() : (data.timestamp ? new Date(data.timestamp) : new Date(0));
-        return {
-            id: doc.id,
-            timestamp: timestamp,
-            totalTickets: data.totalTickets ?? 0,
-            activeShipments: data.activeShipments ?? 0,
-            activeClients: data.activeClients ?? 0,
-        } as StatsSnapshot;
-    });
-    console.log(`[FirestoreService Admin] Fetched ${snapshots.length} snapshot(s).`);
-    return snapshots;
-  } catch (error: any) {
-    console.error("[FirestoreService Admin] Error fetching latest stats snapshots:", error);
-     if (error.code === 9 || error.code === 'FAILED_PRECONDITION') {
-         console.error("[FirestoreService Admin] CRITICAL: Firestore query requires an index (likely on timestamp desc). Check Firestore console.");
-         throw new Error("Index Firestore manquant (probablement sur timestamp). Vérifiez la console Firestore.");
-     } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-         console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during stats snapshot fetch.");
-         throw new Error("Quota Firestore dépassé lors de la récupération des statistiques. Veuillez réessayer plus tard.");
-     }
-    throw new Error(`Impossible de récupérer le dernier snapshot de statistiques. Cause: ${error.message || error}`);
-  }
-};
-
-
-// --- Geocode Cache (Using Admin SDK) ---
-const GEOCODE_COLLECTION_NAME = 'geocodes';
-
-export const getGeocodeFromCache = async (address: string): Promise<{ latitude: number; longitude: number } | null> => {
-  console.log(`[FirestoreService Admin] Getting geocode cache for address: ${address}`);
-  try {
-    const cacheDocRef = dbAdmin.collection(GEOCODE_COLLECTION_NAME).doc(address);
-    const docSnap = await cacheDocRef.get();
-
-    if (docSnap.exists) {
-      const data = docSnap.data() as GeocodeCacheEntry;
-      console.log(`[FirestoreService Admin] Geocode cache hit for address: ${address}`);
-      return { latitude: data.latitude, longitude: data.longitude };
-    } else {
-      console.log(`[FirestoreService Admin] Geocode cache miss for address: ${address}`);
-      return null;
-    }
-  } catch (error) {
-    console.error("[FirestoreService Admin] Error getting geocode from cache:", error);
+    console.error("Error fetching user profile:", error);
     return null;
   }
 };
 
-export const getArticles = async (): Promise<Article[]> => {
-  console.log("[FirestoreService Admin] Fetching all articles...");
+export const getAllUserProfilesSdk = async (): Promise<UserProfile[]> => {
   try {
-    const articlesCollectionRef = dbAdmin.collection('articles');
-    const querySnapshot = await articlesCollectionRef.get();
-    const articles = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }) as Article);
-    console.log(`[FirestoreService Admin] Fetched ${articles.length} articles.`);
-    return articles;
-  } catch (error: any) {
-    console.error("[FirestoreService Admin] Error fetching articles:", error);
-    if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during articles fetch.");
-        throw new Error("Quota Firestore dépassé lors de la récupération des articles. Veuillez réessayer plus tard.");
-    }
-    throw new Error(`Impossible de récupérer les articles. Cause: ${error.message || error}`);
+    const snapshot = await db.collection('users').get();
+    return snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
+  } catch (error) {
+    console.error("Error fetching all user profiles:", error);
+    return [];
   }
 };
 
-export const saveGeocodeToCache = async (address: string, latitude: number, longitude: number): Promise<void> => {
-   console.log(`[FirestoreService Admin] Saving geocode cache for address: ${address}`);
+export const updateUserProfileSdk = async (userId: string, updates: Partial<UserProfile>): Promise<void> => {
   try {
-    const cacheDocRef = dbAdmin.collection(GEOCODE_COLLECTION_NAME).doc(address);
-    // Use admin.firestore.FieldValue for server timestamp with Admin SDK
-    const cacheEntry: Omit<GeocodeCacheEntry, 'timestamp'> & { timestamp: admin.firestore.FieldValue } = {
-      latitude,
-      longitude,
-      timestamp: FieldValue.serverTimestamp(),
-    };
-    await cacheDocRef.set(cacheEntry);
-    console.log(`[FirestoreService Admin] Geocode saved to cache for address: ${address}`);
-  } catch (error: any) {
-    console.error("[FirestoreService Admin] Error saving geocode to cache:", error);
-     if (error.code === 7 || error.code === 'PERMISSION_DENIED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore permission denied saving geocode cache.");
-    } else if (error.code === 8 || error.code === 'RESOURCE_EXHAUSTED') {
-        console.error("[FirestoreService Admin] CRITICAL: Firestore quota exceeded during geocode cache save.");
+    await db.collection('users').doc(userId).update(updates);
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    throw error;
+  }
+};
+
+export const createUserProfileSdk = async (profile: UserProfile): Promise<void> => {
+  try {
+    await db.collection('users').doc(profile.uid).set(profile);
+  } catch (error) {
+    console.error("Error creating user profile:", error);
+    throw error;
+  }
+};
+
+// Fonctions de gestion des tickets et envois
+export const getRecentTicketsForSectors = async (sectors: string[], limit: number): Promise<SapTicket[]> => {
+  try {
+    const query = db.collection('tickets')
+      .where('sector', 'in', sectors)
+      .orderBy('date', 'desc')
+      .limit(limit);
+    const snapshot = await query.get();
+    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SapTicket));
+  } catch (error) {
+    console.error("Error fetching recent tickets:", error);
+    return [];
+  }
+};
+
+export const getRecentShipmentsForSectors = async (sectors: string[], limit: number): Promise<Shipment[]> => {
+  try {
+    // Handle empty sectors array case
+    if (!sectors || sectors.length === 0) {
+      console.warn("No sectors provided to getRecentShipmentsForSectors");
+      return [];
     }
+
+    const query = db.collection('shipments')
+      .where('sector', 'in', sectors)
+      .orderBy('dateCreation', 'desc')
+      .limit(limit);
+    const snapshot = await query.get();
+    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Shipment));
+  } catch (error) {
+    console.error("Error fetching recent shipments:", error);
+    return [];
+  }
+};
+
+export const getTotalTicketCountSdk = async (sectors: string[]): Promise<number> => {
+  try {
+    const snapshot = await db.collection('tickets')
+      .where('sector', 'in', sectors)
+      .count()
+      .get();
+    return snapshot.data().count;
+  } catch (error) {
+    console.error("Error getting total ticket count:", error);
+    return 0;
+  }
+};
+
+export const getDistinctClientCountFromEnvoiSdk = async (userProfile: UserProfile): Promise<number> => {
+  try {
+    const snapshot = await db.collection('shipments')
+      .where('sector', 'in', userProfile.secteurs)
+      .get();
+    const uniqueClients = new Set(snapshot.docs.map(doc => doc.data().clientId));
+    return uniqueClients.size;
+  } catch (error) {
+    console.error("Error getting distinct client count:", error);
+    return 0;
+  }
+};
+
+export const getLatestStatsSnapshotsSdk = async (limit: number): Promise<StatsSnapshot[]> => {
+  try {
+    const snapshot = await db.collection('statsSnapshots')
+      .orderBy('timestamp', 'desc')
+      .limit(limit)
+      .get();
+    return snapshot.docs.map(doc => doc.data() as StatsSnapshot);
+  } catch (error) {
+    console.error("Error getting latest stats snapshots:", error);
+    return [];
+  }
+};
+
+
+// --- Installation Functions ---
+
+/**
+ * Get installations for a specific sector, optionally filtered by user's allowed sectors.
+ */
+export const getInstallationsBySector = async (
+  sector: string,
+  userSectors?: string[],
+  isAdmin?: boolean
+): Promise<Installation[]> => {
+  try {
+    let query: admin.firestore.Query = installationsCollection.where('secteur', '==', sector);
+
+    const snapshot = await query.orderBy('nom', 'asc').get();
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        // Convertir explicitement les dates
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : 
+                 data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000) : 
+                 new Date(),
+        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : 
+                 data.updatedAt?.seconds ? new Date(data.updatedAt.seconds * 1000) : 
+                 new Date(),
+        dateCdeMateriel: data.dateCdeMateriel?.toDate ? data.dateCdeMateriel.toDate() : 
+                       data.dateCdeMateriel?.seconds ? new Date(data.dateCdeMateriel.seconds * 1000) : 
+                       data.dateCdeMateriel,
+        dateInstall: data.dateInstall?.toDate ? data.dateInstall.toDate() : 
+                    data.dateInstall?.seconds ? new Date(data.dateInstall.seconds * 1000) : 
+                    data.dateInstall
+      } as Installation;
+    });
+  } catch (error) {
+    console.error(`Error fetching installations for sector ${sector}:`, error);
+    return [];
+  }
+};
+
+
+/**
+ * Add a new installation document to Firestore.
+ * Expects data conforming to Installation type, excluding auto-generated fields.
+ */
+export const addInstallation = async (
+  installationData: Omit<Installation, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<admin.firestore.DocumentReference> => {
+  try {
+    const dataWithTimestamps = {
+      ...installationData,
+      // Ensure required fields have defaults if not provided
+      status: installationData.status || 'rendez-vous à prendre', // Default status
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    const docRef = await installationsCollection.add(dataWithTimestamps);
+    console.log(`Added installation with ID: ${docRef.id}`);
+    return docRef;
+  } catch (error) {
+    console.error("Error adding installation:", error);
+    throw error; // Re-throw to handle upstream
+  }
+};
+
+/**
+ * Update an existing installation document.
+ */
+export const updateInstallation = async (
+  id: string,
+  updates: Partial<Omit<Installation, 'id' | 'createdAt'>> // Exclude non-updatable fields
+): Promise<void> => {
+  try {
+    if (Object.keys(updates).length === 0) {
+      console.warn(`Attempted to update installation ${id} with no changes.`);
+      return;
+    }
+    const dataWithTimestamp = {
+      ...updates,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    await installationsCollection.doc(id).update(dataWithTimestamp);
+    console.log(`Updated installation ${id}`);
+  } catch (error) {
+    console.error(`Error updating installation ${id}:`, error);
+    throw error; // Re-throw to handle upstream
+  }
+};
+
+/**
+ * Get a specific installation by its Firestore document ID.
+ */
+export const getInstallationById = async (id: string): Promise<Installation | null> => {
+  try {
+    const doc = await installationsCollection.doc(id).get();
+    if (!doc.exists) {
+      console.log(`Installation with ID ${id} not found.`);
+      return null;
+    }
+    return { id: doc.id, ...doc.data() } as Installation;
+  } catch (error) {
+    console.error(`Error fetching installation ${id}:`, error);
+    return null; // Return null on error
+  }
+};
+
+
+// --- Refactored Snapshot Function ---
+
+export interface InstallationStats {
+  total: number;
+  enAttente: number;
+  planifiees: number;
+  terminees: number;
+}
+
+export interface InstallationsSnapshot {
+  haccp: InstallationStats;
+  chr: InstallationStats;
+  tabac: InstallationStats;
+  kezia: InstallationStats;
+}
+
+export const getInstallationsSnapshot = async (userProfile: UserProfile): Promise<InstallationsSnapshot> => {
+  const defaultStats: InstallationStats = {
+    total: 0,
+    enAttente: 0, // Corresponds to 'rendez-vous à prendre'
+    planifiees: 0, // Corresponds to 'rendez-vous pris'
+    terminees: 0   // Corresponds to 'installation terminée'
+  };
+
+  // Initialize snapshot with all potential sectors
+  const snapshotResult: InstallationsSnapshot = {
+    haccp: { ...defaultStats },
+    chr: { ...defaultStats },
+    tabac: { ...defaultStats },
+    kezia: { ...defaultStats }
+  };
+
+  try {
+    const userSectors = userProfile?.secteurs || [];
+    const isAdmin = userProfile?.role === 'Admin';
+    // Determine which sectors to query based on user role
+    const sectorsToQuery = isAdmin ? ['haccp', 'chr', 'tabac', 'kezia'] : userSectors;
+
+    if (sectorsToQuery.length === 0 && !isAdmin) {
+      console.log("No sectors assigned to non-admin user:", userProfile.uid);
+      return snapshotResult; // Return default if user has no sectors and is not admin
+    }
+
+    // Build the query on the single 'installations' collection
+    let query: admin.firestore.Query = installationsCollection;
+
+    // Filter by relevant sectors for non-admins
+    // Handle Firestore 'in' query limitation (max 30 values currently)
+    if (!isAdmin) {
+        if (sectorsToQuery.length > 30) {
+            console.warn(`Firestore 'in' query limited to 30 sectors. User ${userProfile.uid} has ${sectorsToQuery.length}. Querying first 30.`);
+            query = query.where('secteur', 'in', sectorsToQuery.slice(0, 30));
+        } else {
+            query = query.where('secteur', 'in', sectorsToQuery);
+        }
+    }
+     // For admins, no 'secteur' filter is applied, querying all documents across all sectors.
+
+    const docsSnapshot = await query.get();
+    console.log(`Installations Snapshot Query: Found ${docsSnapshot.size} documents for sectors [${sectorsToQuery.join(', ')}] (or all for admin).`);
+
+    // Process the results
+    docsSnapshot.forEach(doc => {
+      // Use 'as Installation' carefully, ensure data structure matches
+      const data = doc.data() as Partial<Installation>; // Use Partial for safety
+      const secteur = data.secteur as keyof InstallationsSnapshot | undefined; // Get the sector, could be undefined
+      const status = data.status as InstallationStatus | undefined; // Get the status, could be undefined
+
+      // Ensure the sector exists in our snapshot structure and is valid
+      if (secteur && snapshotResult[secteur]) {
+        snapshotResult[secteur].total++;
+
+        // Increment based on the status field
+        switch (status) {
+          case 'rendez-vous à prendre':
+            snapshotResult[secteur].enAttente++;
+            break;
+          case 'rendez-vous pris':
+            snapshotResult[secteur].planifiees++;
+            break;
+          case 'installation terminée':
+            snapshotResult[secteur].terminees++;
+            break;
+          default:
+            // Log unexpected status for debugging
+            console.warn(`Unexpected or missing installation status found: '${status}' for doc ${doc.id} in sector ${secteur}`);
+            // Optionally count as 'enAttente' or a separate 'unknown' category if needed
+            // snapshotResult[secteur].enAttente++; // Example: Treat unknown as 'enAttente'
+            break;
+        }
+      } else {
+         // Log documents with missing or unexpected sectors
+         console.warn(`Document ${doc.id} has an unexpected or missing sector: '${secteur}'`);
+      }
+    });
+
+    console.log("Installations Snapshot Result:", JSON.stringify(snapshotResult, null, 2));
+    return snapshotResult;
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération du snapshot des installations:", error);
+    // Return the partially filled or default snapshot in case of error
+    return snapshotResult;
   }
 };

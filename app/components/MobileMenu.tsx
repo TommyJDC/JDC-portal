@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, NavLink } from '@remix-run/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
- import { faTimes, faUserCircle, faSignOutAlt, faSignInAlt, faTachometerAlt, faTicketAlt, faTruck, faCog, faBug, faSearch } from '@fortawesome/free-solid-svg-icons'; // Added faCog and faBug
+ import { faTimes, faUserCircle, faSignOutAlt, faSignInAlt, faTachometerAlt, faTicketAlt, faTruck, faCog, faBug, faSearch, faSheetPlastic } from '@fortawesome/free-solid-svg-icons'; // Added faCog, faBug, faSheetPlastic
  import { Button } from './ui/Button';
  // Use UserSession from server loader instead of AppUser from client-side auth
  // import type { AppUser } from '~/services/auth.service';
@@ -23,6 +23,14 @@ const navItems = [
   { name: 'Tickets SAP', to: '/tickets-sap', icon: faTicketAlt },
   { name: 'Envois CTN', to: '/envois-ctn', icon: faTruck },
   { name: 'Recherche Articles', to: '/articles', icon: faSearch },
+];
+
+// Installation menu items
+const installationItems = [
+  { name: 'Kezia', to: '/installations/kezia', icon: faSheetPlastic },
+  { name: 'CHR', to: '/installations/chr', icon: faSheetPlastic },
+  { name: 'HACCP', to: '/installations/haccp', icon: faSheetPlastic },
+  { name: 'Tabac', to: '/installations/tabac', icon: faSheetPlastic },
 ];
 
 // Define Admin item separately
@@ -85,6 +93,24 @@ const debugItem = { name: 'Diagnostic', to: '/debug-index', icon: faBug };
                   {item.name}
                 </NavLink>
               ))}
+
+              {/* Installation Links */}
+              <div className="pt-2 mt-2 border-t border-jdc-gray-700/50">
+                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Installations</span>
+                {installationItems.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={onClose}
+                    className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
+                    prefetch="intent"
+                  >
+                    <FontAwesomeIcon icon={item.icon} className="mr-3 h-5 w-5" />
+                    {item.name}
+                  </NavLink>
+                ))}
+              </div>
+
               {/* Conditionally render Admin link */}
               {showAdminLink && (
                 <NavLink

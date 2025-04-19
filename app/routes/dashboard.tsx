@@ -12,6 +12,7 @@ import { RecentTickets } from "~/components/RecentTickets";
 import { RecentShipments } from "~/components/RecentShipments";
 import { ClientOnly } from "~/components/ClientOnly";
 import { WeeklyAgenda } from '~/components/WeeklyAgenda';
+import { InstallationsSnapshot } from "~/components/InstallationsSnapshot";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
   faTicket, 
@@ -108,6 +109,7 @@ export default function Dashboard() {
     stats,
     recentTickets: serializedTickets,
     recentShipments: serializedShipments,
+    installationsStats,
     clientError
   } = useLoaderData<typeof loader>();
 
@@ -150,17 +152,32 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {statsData.map((stat) => (
-          <StatsCard
-            key={stat.title}
-            title={stat.title}
-            value={formatStatValue(stat.valueState)}
-            icon={stat.icon}
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {statsData.map((stat) => (
+            <StatsCard
+              key={stat.title}
+              title={stat.title}
+              value={formatStatValue(stat.valueState)}
+              icon={stat.icon}
+              isLoading={false}
+              evolutionValue={stats.evolution[stat.evolutionKey as keyof typeof stats.evolution]}
+            />
+          ))}
+        </div>
+
+        <div>
+          <h2 className="text-xl font-semibold text-white mb-4">Installations par Secteur</h2>
+          <InstallationsSnapshot
+            stats={installationsStats || {
+              haccp: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
+              chr: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
+              tabac: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
+              kezia: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 }
+            }}
             isLoading={false}
-            evolutionValue={stats.evolution[stat.evolutionKey as keyof typeof stats.evolution]}
           />
-        ))}
+        </div>
       </div>
 
       <ClientOnly fallback={<WeeklyAgendaFallback />}>

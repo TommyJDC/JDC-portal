@@ -11,6 +11,18 @@ publish = "build/client" # ✅ pour servir correctement les assets
   name = "sap-notifications"
   schedule = "*/5 * * * *"
 
+  [functions.function]
+  name = "scheduled-gmail-processing"
+  schedule = "*/60 * * * *"
+
+  [functions.function]
+  name = "check-kezia-installations"
+  schedule = "*/15 * * * *"
+
+  [functions.function]
+  name = "sync-installations"
+  schedule = "*/60 * * * *"
+
 [[headers]]
 for = "/assets/*" # ✅ vise bien les fichiers d'assets, pas "/build/*"
 
