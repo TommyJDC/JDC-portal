@@ -9,7 +9,7 @@ publish = "build/client" # ✅ pour servir correctement les assets
 
   [functions.function]
   name = "sap-notifications"
-  schedule = "@firestore:tickets-sap:created,@firestore:envois-ctn:created"
+  schedule = "*/5 * * * *"
 
 [[headers]]
 for = "/assets/*" # ✅ vise bien les fichiers d'assets, pas "/build/*"
