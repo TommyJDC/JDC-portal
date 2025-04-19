@@ -2,7 +2,12 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, Link, useFetcher } from "@remix-run/react";
 import { authenticator } from "~/services/auth.server";
-import { getInstallationsBySector, updateInstallation } from "~/services/firestore.service.server";
+import { 
+  getInstallationsBySector, 
+  updateInstallation,
+  deleteInstallation,
+  bulkUpdateInstallations
+} from "~/services/firestore.service.server";
 import InstallationTile from "~/components/InstallationTile";
 
 interface ActionData {

@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
     import { json } from "@remix-run/node";
-    import { getGeocodeFromCache, saveGeocodeToCache } from "~/services/firestore.service.server";
+    import { getGeocodeFromCache, setGeocodeToCache } from "~/services/firestore.service.server";
 
     // Consider moving API key to environment variables for security
     const OPENCAGE_API_KEY = "b93a76ecb4b0439dbfe9e64c3c6aff07"; // Replace with process.env.OPENCAGE_API_KEY
@@ -40,7 +40,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
         const cachedData = await getGeocodeFromCache(normalizedAddr);
         if (cachedData) {
           console.log(`API Route: Cache hit for "${normalizedAddr}"`);
-          return json({ lat: cachedData.latitude, lng: cachedData.longitude });
+          return json({ lat: cachedData.lat, lng: cachedData.lng });
         }
 
         // 2. Cache miss - Call OpenCageData API
@@ -67,7 +67,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
           const { lat, lng } = data.results[0].geometry;
           console.log(`API Route: Geocoded "${address}" to:`, { lat, lng });
           // 3. Store result in Firestore Cache (fire and forget)
-          saveGeocodeToCache(normalizedAddr, lat, lng).catch(cacheErr => {
+          setGeocodeToCache(normalizedAddr, { lat, lng }).catch((cacheErr: Error) => {
             console.error(`API Route: Error storing geocode cache for "${normalizedAddr}":`, cacheErr);
           });
           return json({ lat, lng });

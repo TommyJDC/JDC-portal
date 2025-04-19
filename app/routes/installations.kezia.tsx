@@ -146,6 +146,7 @@ export default function KeziaInstallations() {
   const installations = useMemo(() => {
     return rows.map(row => {
       const baseInstallation = {
+        id: row[ID_COLUMN_INDEX] || `row-${row[3]}`, // Using codeClient as part of the ID fallback
         dateCdeMateriel: row[1] || '',
         ca: row[2] || '',
         codeClient: row[3] || '',

@@ -180,6 +180,19 @@ export interface AppUser {
 
 export type InstallationStatus = 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';
 
+export interface InstallationFilters {
+  status?: InstallationStatus;
+  secteur?: string;
+  dateRange?: {
+    start: Date | Timestamp;
+    end: Date | Timestamp;
+  };
+  commercial?: string;
+  technicien?: string;
+  ville?: string;
+  searchTerm?: string;
+}
+
 /**
  * Represents an Installation document in Firestore.
  * Data sourced initially from spreadsheets, then managed via the app.

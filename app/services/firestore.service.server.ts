@@ -1,5 +1,13 @@
 import { dbAdmin as db } from "~/firebase.admin.config.server";
-import type { UserProfile, SapTicket, Shipment, StatsSnapshot, Installation, InstallationStatus } from "~/types/firestore.types"; // Added Installation, InstallationStatus
+import type { 
+  UserProfile, 
+  SapTicket, 
+  Shipment, 
+  StatsSnapshot, 
+  Installation, 
+  InstallationStatus,
+  InstallationFilters 
+} from "~/types/firestore.types";
 import type * as admin from 'firebase-admin'; // Importer les types admin
 import { FieldValue } from 'firebase-admin/firestore'; // Added FieldValue
 
@@ -128,10 +136,26 @@ export const getLatestStatsSnapshotsSdk = async (limit: number): Promise<StatsSn
 export const getInstallationsBySector = async (
   sector: string,
   userSectors?: string[],
-  isAdmin?: boolean
+  isAdmin?: boolean,
+  filters?: InstallationFilters
 ): Promise<Installation[]> => {
   try {
     let query: admin.firestore.Query = installationsCollection.where('secteur', '==', sector);
+
+    // Appliquer les filtres supplémentaires
+    if (filters?.status) {
+      query = query.where('status', '==', filters.status);
+    }
+    if (filters?.commercial) {
+      query = query.where('commercial', '==', filters.commercial);
+    }
+    if (filters?.ville) {
+      query = query.where('ville', '>=', filters.ville).where('ville', '<=', filters.ville + '\uf8ff');
+    }
+    if (filters?.dateRange) {
+      query = query.where('createdAt', '>=', filters.dateRange.start)
+                   .where('createdAt', '<=', filters.dateRange.end);
+    }
 
     const snapshot = await query.orderBy('nom', 'asc').get();
     return snapshot.docs.map(doc => {
@@ -355,5 +379,177 @@ export const updateSAPTICKET = async (
   } catch (error) {
     console.error(`Error updating SAP ticket ${ticketId}:`, error);
     throw error;
+  }
+};
+
+// Fonctions de recherche d'articles
+export const searchArticles = async (searchTerm: string, tags?: string[]): Promise<any[]> => {
+  try {
+    let query = db.collection('articles')
+      .where('title', '>=', searchTerm)
+      .where('title', '<=', searchTerm + '\uf8ff');
+
+    if (tags?.length) {
+      query = query.where('tags', 'array-contains', tags[0]);
+    }
+
+    const snapshot = await query.limit(25).get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error("Erreur lors de la recherche d'articles :", error);
+    return [];
+  }
+};
+
+// Fonctions de cache géographique
+export const getGeocodeFromCache = async (address: string): Promise<{ lat: number, lng: number } | null> => {
+  try {
+    const doc = await db.collection('geocodes').doc(address).get();
+    return doc.exists ? doc.data()?.coordinates : null;
+  } catch (error) {
+    console.error("Erreur de récupération du cache géo:", error);
+    return null;
+  }
+};
+
+export const setGeocodeToCache = async (address: string, coordinates: { lat: number, lng: number }): Promise<void> => {
+  try {
+    await db.collection('geocodes').doc(address).set({
+      coordinates,
+      timestamp: FieldValue.serverTimestamp()
+    });
+  } catch (error) {
+    console.error("Erreur de mise en cache géo:", error);
+  }
+};
+
+// Ajout de la fonction pour stocker les URLs d'images d'articles
+export const addArticleImageUrl = async (
+  articleId: string,
+  imageUrl: string
+): Promise<void> => {
+  try {
+    await db.collection('articles').doc(articleId).update({
+      imageUrls: FieldValue.arrayUnion(imageUrl),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+  } catch (error) {
+    console.error(`Erreur lors de l'ajout de l'URL d'image à l'article ${articleId}:`, error);
+    throw error;
+  }
+};
+
+export const deleteArticleImageUrl = async (
+  articleId: string,
+  imageUrl: string
+): Promise<void> => {
+  try {
+    await db.collection('articles').doc(articleId).update({
+      imageUrls: FieldValue.arrayRemove(imageUrl),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+  } catch (error) {
+    console.error(`Erreur lors de la suppression de l'URL d'image de l'article ${articleId}:`, error);
+    throw error;
+  }
+};
+
+// Function to get all tickets for multiple sectors without limit
+export const getAllTicketsForSectorsSdk = async (sectors: string[]): Promise<SapTicket[]> => {
+  try {
+    if (!sectors || sectors.length === 0) {
+      console.warn("No sectors provided to getAllTicketsForSectorsSdk");
+      return [];
+    }
+
+    const query = db.collection('tickets-sap')
+      .where('secteur', 'in', sectors)
+      .orderBy('date', 'desc');
+
+    const snapshot = await query.get();
+    return snapshot.docs.map(doc => ({ 
+      ...doc.data(), 
+      id: doc.id,
+      // Ensure dates are properly handled
+      date: doc.data().date?.toDate?.() || doc.data().date
+    } as SapTicket));
+  } catch (error) {
+    console.error("Error fetching all tickets:", error);
+    return [];
+  }
+};
+
+/**
+ * Delete a shipment document from Firestore
+ * @param shipmentId The ID of the shipment to delete
+ */
+export const deleteShipmentSdk = async (shipmentId: string): Promise<void> => {
+  try {
+    await db.collection('shipments').doc(shipmentId).delete();
+    console.log(`Deleted shipment ${shipmentId}`);
+  } catch (error) {
+    console.error(`Error deleting shipment ${shipmentId}:`, error);
+    throw error;
+  }
+};
+
+export const deleteInstallation = async (installationId: string): Promise<void> => {
+  try {
+    await installationsCollection.doc(installationId).delete();
+    console.log(`Deleted installation ${installationId}`);
+  } catch (error) {
+    console.error(`Error deleting installation ${installationId}:`, error);
+    throw new Error(`Échec de la suppression : ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+  }
+};
+
+export const bulkUpdateInstallations = async (
+  ids: string[], 
+  updates: Partial<Installation>
+): Promise<void> => {
+  try {
+    const batch = db.batch();
+    
+    ids.forEach(id => {
+      const docRef = installationsCollection.doc(id);
+      batch.update(docRef, {
+        ...updates,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    });
+
+    await batch.commit();
+    console.log(`Mise à jour batch réussie pour ${ids.length} installations`);
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour batch:', error);
+    throw new Error(`Échec de la mise à jour multiple : ${error instanceof Error ? error.message : 'Erreur système'}`);
+  }
+};
+
+/**
+ * Get all shipments for multiple sectors without limit
+ * @param sectors Array of sector IDs to get shipments for
+ */
+export const getAllShipments = async (sectors: string[]): Promise<Shipment[]> => {
+  try {
+    if (!sectors || sectors.length === 0) {
+      console.warn("No sectors provided to getAllShipments");
+      return [];
+    }
+
+    const query = db.collection('shipments')
+      .where('sector', 'in', sectors)
+      .orderBy('dateCreation', 'desc');
+
+    const snapshot = await query.get();
+    return snapshot.docs.map(doc => ({ 
+      ...doc.data(), 
+      id: doc.id,
+      // Ensure dates are properly handled
+      dateCreation: doc.data().dateCreation?.toDate?.() || doc.data().dateCreation
+    } as Shipment));
+  } catch (error) {
+    console.error("Error fetching all shipments:", error);
+    return [];
   }
 };
