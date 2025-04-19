@@ -17,7 +17,7 @@ export const DebugAuth: React.FC<DebugAuthProps> = ({ user, profile, loadingAuth
 
   return (
     <div className="bg-blue-900 p-4 rounded-md mb-4">
-      <h2 className="text-white font-bold">Débogage Auth</h2>
+      <h2 className="text-jdc-yellow font-bold">Débogage Auth</h2>
       <div className="mt-2 text-white">
         <p><strong>Loading Auth:</strong> {loadingAuth ? 'Oui' : 'Non'}</p>
         <p><strong>User ID:</strong> {user.userId}</p>

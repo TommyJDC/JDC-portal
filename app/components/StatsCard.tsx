@@ -41,7 +41,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, isLoad
         <p className="text-sm text-jdc-gray-400">{title}</p>
 
         {/* Main Value */}
-        <p className={`text-2xl font-semibold text-white mt-1 ${isLoading ? 'animate-pulse' : ''}`}>
+        <p className={`text-2xl font-semibold text-jdc-yellow mt-1 ${isLoading ? 'animate-pulse' : ''}`}>
           {isLoading ? <FontAwesomeIcon icon={faSpinner} spin /> : value}
         </p>
 
@@ -50,6 +50,12 @@ export const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, isLoad
           <p className={`text-xs font-medium ${evolutionColor} mt-1`}>
             évolution {statType} (24h) : {evolutionArrow} {isPositive ? '+' : ''}{evolutionValue}
           </p>
+        )}
+        {evolutionValue && evolutionValue > 0 && (
+          <span className="text-jdc-yellow flex items-center text-sm">
+            <span className="mr-1">↑</span>
+            {Math.abs(evolutionValue)}%
+          </span>
         )}
          {/* Placeholder for alignment when evolution is not shown */}
          {!isLoading && !showEvolution && (

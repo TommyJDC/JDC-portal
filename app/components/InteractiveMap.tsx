@@ -20,7 +20,7 @@ interface InteractiveMapProps {
 
 // Zone colors mapping (adjust structure for Mapbox layer paint properties)
 const zoneColorMap: { [key: string]: { color: string; opacity: number } } = {
-  'Baptiste': { color: '#FFEA00', opacity: 0.3 }, // Yellow
+  'Baptiste': { color: '#FFEB3B', opacity: 0.3 }, // Yellow
   'julien Isère': { color: '#000000', opacity: 0.3 }, // Black
   'Julien': { color: '#097138', opacity: 0.3 }, // Green
   'Florian': { color: '#E65100', opacity: 0.3 }, // Orange
@@ -87,7 +87,7 @@ const zoneLinePaint: mapboxgl.LinePaint = {
 const getMarkerColor = (status?: string): string => {
     if (!status) return '#808080'; // Grey as default
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('en cours')) return '#FFA500'; // Orange
+    if (statusLower.includes('en cours')) return '#FFEB3B'; // Yellow
     if (statusLower.includes('fermé')) return '#4CAF50'; // Green
     if (statusLower.includes('annulé')) return '#F44336'; // Red
     if (statusLower.includes('demande de rma')) return '#9C27B0'; // Purple

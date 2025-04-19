@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import useGeminiSummary from '~/hooks/useGeminiSummary';
 import { ClientOnly } from './ClientOnly';
 import type { SapTicket } from '~/types/firestore.types';
+import { FaBrain } from 'react-icons/fa';
 
 interface AnimatedTicketSummaryProps {
   ticketContent: string;
@@ -13,7 +14,7 @@ interface AnimatedTicketSummaryProps {
   error: string | null;
 }
 
-export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoading: loading, error }: AnimatedTicketSummaryProps) {
+export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoading, error }: AnimatedTicketSummaryProps) {
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -32,7 +33,7 @@ export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoadin
     visible: { opacity: 1, x: 0 }
   };
 
-  if (loading || !summary) {
+  if (isLoading || !summary) {
     return (
       <motion.div
         className="p-4 bg-jdc-gray/20 rounded-lg border border-gray-700/50 backdrop-blur-sm"
@@ -67,41 +68,43 @@ export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoadin
         initial="hidden"
         animate="visible"
       >
-        <motion.h3 
-          className="text-lg font-semibold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-400"
-          variants={itemVariants}
-        >
-          Résumé IA
-        </motion.h3>
+        <div className="relative">
+          <div className="flex items-center text-jdc-yellow mb-2">
+            <FaBrain className="mr-2" />
+            <h3 className="font-semibold">Résumé IA</h3>
+            {ticket?.summary && (
+              <span className="ml-auto text-xs text-jdc-yellow/50">(Sauvegardé)</span>
+            )}
+          </div>
+          <motion.div 
+            className="prose prose-invert"
+            variants={itemVariants}
+          >
+            <TypeAnimation
+              sequence={[ticket?.summary || summary || '']}
+              wrapper="p"
+              speed={50}
+              className="text-gray-300 leading-relaxed"
+            />
+          </motion.div>
 
-        <motion.div 
-          className="prose prose-invert"
-          variants={itemVariants}
-        >
-          <TypeAnimation
-            sequence={[ticket?.summary || summary || '']}
-            wrapper="p"
-            speed={50}
-            className="text-gray-300 leading-relaxed"
-          />
-        </motion.div>
-
-        <motion.div 
-          className="mt-4 flex flex-wrap gap-2"
-          variants={itemVariants}
-        >
-          {(ticket?.summary || summary)?.split(' ').slice(0, 5).map((word: string, index: number) => (
-            <motion.span
-              key={index}
-              className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-sm rounded-full border border-yellow-500/30"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              {word}
-            </motion.span>
-          ))}
-        </motion.div>
+          <motion.div 
+            className="mt-4 flex flex-wrap gap-2"
+            variants={itemVariants}
+          >
+            {(ticket?.summary || summary)?.split(' ').slice(0, 5).map((word: string, index: number) => (
+              <motion.span
+                key={index}
+                className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-sm rounded-full border border-yellow-500/30"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                {word}
+              </motion.span>
+            ))}
+          </motion.div>
+        </div>
       </motion.div>
     </ClientOnly>
   );

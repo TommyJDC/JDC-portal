@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { TypeAnimation } from 'react-type-animation';
 import type { SapTicket } from '~/types/firestore.types';
 import { ClientOnly } from './ClientOnly';
+import { FaLightbulb } from 'react-icons/fa';
 
 interface AnimatedSolutionProps {
   ticketContent: string;
@@ -11,7 +12,7 @@ interface AnimatedSolutionProps {
   error: string | null;
 }
 
-export function AnimatedSolution({ ticketContent, ticket, solution, isLoading: loading, error }: AnimatedSolutionProps) {
+export function AnimatedSolution({ ticketContent, ticket, solution, isLoading, error }: AnimatedSolutionProps) {
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -29,7 +30,7 @@ export function AnimatedSolution({ ticketContent, ticket, solution, isLoading: l
     visible: { opacity: 1, x: 0 }
   };
 
-  if (loading || !solution) {
+  if (isLoading || !solution) {
     return (
       <motion.div
         className="p-4 bg-jdc-gray/20 rounded-lg border border-gray-700/50 backdrop-blur-sm"
@@ -64,41 +65,50 @@ export function AnimatedSolution({ ticketContent, ticket, solution, isLoading: l
         initial="hidden"
         animate="visible"
       >
-        <motion.h3 
-          className="text-lg font-semibold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-400"
-          variants={itemVariants}
-        >
-          Solution IA
-        </motion.h3>
+        <div className="relative">
+          <div className="flex items-center text-jdc-yellow mb-2">
+            <FaLightbulb className="mr-2" />
+            <h3 className="font-semibold">Solution proposée</h3>
+            {ticket?.solution && (
+              <span className="ml-auto text-xs text-jdc-yellow/50">(Sauvegardé)</span>
+            )}
+          </div>
+          <motion.h3 
+            className="text-lg font-semibold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-400"
+            variants={itemVariants}
+          >
+            Solution IA
+          </motion.h3>
 
-        <motion.div 
-          className="prose prose-invert"
-          variants={itemVariants}
-        >
-          <TypeAnimation
-            sequence={[ticket?.solution || solution || '']}
-            wrapper="p"
-            speed={50}
-            className="text-gray-300 leading-relaxed"
-          />
-        </motion.div>
+          <motion.div 
+            className="prose prose-invert"
+            variants={itemVariants}
+          >
+            <TypeAnimation
+              sequence={[ticket?.solution || solution || '']}
+              wrapper="p"
+              speed={50}
+              className="text-gray-300 leading-relaxed"
+            />
+          </motion.div>
 
-        <motion.div 
-          className="mt-4 flex flex-wrap gap-2"
-          variants={itemVariants}
-        >
-          {(ticket?.solution || solution)?.split(' ').slice(0, 5).map((word: string, index: number) => (
-            <motion.span
-              key={index}
-              className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-sm rounded-full border border-yellow-500/30"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              {word}
-            </motion.span>
-          ))}
-        </motion.div>
+          <motion.div 
+            className="mt-4 flex flex-wrap gap-2"
+            variants={itemVariants}
+          >
+            {(ticket?.solution || solution)?.split(' ').slice(0, 5).map((word: string, index: number) => (
+              <motion.span
+                key={index}
+                className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-sm rounded-full border border-yellow-500/30"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                {word}
+              </motion.span>
+            ))}
+          </motion.div>
+        </div>
       </motion.div>
     </ClientOnly>
   );

@@ -57,7 +57,7 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
                   <>
                     <button
                       onClick={onMarkAllAsRead}
-                      className="text-jdc-yellow text-sm hover:text-jdc-yellow-light transition-colors"
+                      className="text-jdc-yellow text-sm hover:text-yellow-300 transition-colors"
                     >
                       <FontAwesomeIcon icon={faCheck} className="mr-1" />
                       Tout marquer comme lu

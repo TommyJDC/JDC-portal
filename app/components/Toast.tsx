@@ -1,12 +1,11 @@
 import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCheckCircle,
-  faExclamationCircle,
-  faInfoCircle,
-  faExclamationTriangle,
-  faTimes,
-} from '@fortawesome/free-solid-svg-icons';
+import { 
+  FaCheckCircle,
+  FaExclamationCircle,
+  FaInfoCircle,
+  FaExclamationTriangle,
+  FaTimes
+} from 'react-icons/fa';
 import {
   useToast as useAppToast,
   type ToastMessageData,
@@ -15,35 +14,35 @@ import {
 
 // Configuration for styling based on toast type
 const toastConfig: Record<ToastType, {
-  icon: any;
+    icon: React.ComponentType<{className?: string}>;
   bgClass: string;
   iconColor: string;
   textColor: string;
   progressClass: string;
 }> = {
   success: {
-    icon: faCheckCircle,
+    icon: FaCheckCircle,
     bgClass: 'bg-green-600',
     iconColor: 'text-green-100',
     textColor: 'text-green-50',
     progressClass: 'bg-green-200',
   },
   error: {
-    icon: faExclamationCircle,
+    icon: FaExclamationCircle,
     bgClass: 'bg-red-600',
     iconColor: 'text-red-100',
     textColor: 'text-red-50',
     progressClass: 'bg-red-200',
   },
   info: {
-    icon: faInfoCircle,
+    icon: FaInfoCircle,
     bgClass: 'bg-blue-600',
     iconColor: 'text-blue-100',
     textColor: 'text-blue-50',
     progressClass: 'bg-blue-200',
   },
   warning: {
-    icon: faExclamationTriangle,
+    icon: FaExclamationTriangle,
     bgClass: 'bg-yellow-500',
     iconColor: 'text-yellow-100',
     textColor: 'text-yellow-50',
@@ -70,7 +69,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
       <div className="p-4">
         <div className="flex items-start">
           <div className="flex-shrink-0">
-            <FontAwesomeIcon icon={config.icon} className={`h-6 w-6 ${config.iconColor}`} aria-hidden="true" />
+            <config.icon className={`h-6 w-6 ${config.iconColor}`} aria-hidden="true" />
           </div>
           <div className="ml-3 w-0 flex-1 pt-0.5">
             <p className={`text-sm font-medium ${config.textColor}`}>{toast.title}</p>
@@ -82,7 +81,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
               className={`inline-flex rounded-md ${config.bgClass} ${config.textColor} opacity-80 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-${toast.type}-600 focus:ring-white`}
             >
               <span className="sr-only">Fermer</span>
-              <FontAwesomeIcon icon={faTimes} className="h-5 w-5" aria-hidden="true" />
+              <FaTimes className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
         </div>

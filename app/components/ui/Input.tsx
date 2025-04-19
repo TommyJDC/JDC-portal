@@ -12,8 +12,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || name; // Use name as fallback for id if not provided
     const hasIcon = !!icon;
 
-    const baseInputStyle = "block w-full rounded-md bg-jdc-gray-800 border-transparent focus:border-jdc-yellow focus:ring focus:ring-jdc-yellow focus:ring-opacity-50 placeholder-jdc-gray-400 text-white disabled:opacity-50 disabled:cursor-not-allowed"; // Added disabled styles
-    const iconPadding = hasIcon ? "pl-10" : "pl-3"; // Adjust padding based on icon presence
+    const baseInputStyle = "block w-full rounded-md bg-jdc-gray-800 border-transparent focus:border-jdc-yellow focus:ring focus:ring-jdc-yellow focus:ring-opacity-50 placeholder-jdc-gray-400 text-white disabled:opacity-50 disabled:cursor-not-allowed"; 
+    const iconPadding = hasIcon ? "pl-10" : "pl-3";
     const errorStyle = error ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-transparent";
 
     return (

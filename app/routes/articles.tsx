@@ -173,7 +173,7 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                   id="code"
                   value={codeSearch}
                   onChange={(e) => setCodeSearch(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-jdc-gray-800 text-gray-100 placeholder-gray-400"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-jdc-yellow focus:border-jdc-yellow bg-jdc-gray-800 text-gray-100 placeholder-gray-400"
                   placeholder="Code exact"
                 />
               </div>
@@ -187,14 +187,14 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                   id="nom"
                   value={nomSearch}
                   onChange={(e) => setNomSearch(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-jdc-gray-800 text-gray-100 placeholder-gray-400"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-jdc-yellow focus:border-jdc-yellow bg-jdc-gray-800 text-gray-100 placeholder-gray-400"
                   placeholder="Nom partiel ou complet"
                 />
               </div>
               <div className="md:pt-6">
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline transition duration-150 ease-in-out"
+                  className="w-full bg-jdc-yellow text-black hover:bg-yellow-300 font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-jdc-yellow focus:ring-opacity-50 transition duration-150 ease-in-out"
                   disabled={isLoadingData}
                 >
                   {isLoadingData ? 'Recherche...' : 'Rechercher'}

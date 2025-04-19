@@ -160,7 +160,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                     size="sm"
                     onClick={() => handleSectorToggle(sector)}
                     disabled={isSaving}
-                    className={`transition-colors duration-150 ${isSelected ? '' : 'opacity-70 hover:opacity-100'}`} // Add visual feedback
+                    className={`transition-colors duration-150 ${
+                      isSelected 
+                        ? 'bg-jdc-yellow text-black hover:bg-yellow-300' 
+                        : 'bg-jdc-gray-800 text-jdc-gray-300 hover:bg-jdc-gray-700'
+                    } px-3 py-1.5 rounded-md text-sm font-medium ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     {sector}
                   </Button>
@@ -175,9 +179,13 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
               Annuler
             </Button>
-            <Button type="submit" variant="primary" isLoading={isSaving} disabled={isSaving}>
-              Enregistrer
-            </Button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="w-full px-4 py-2 text-sm font-medium text-black bg-jdc-yellow rounded-md hover:bg-yellow-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75"
+            >
+              Sauvegarder les modifications
+            </button>
           </div>
         </form>
       </div>

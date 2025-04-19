@@ -1,9 +1,12 @@
 import React from 'react';
 import type { SapTicket } from '~/types/firestore.types';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTicket, faSpinner, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
-// Use the new date utility functions
-import { parseFrenchDate, formatDateForDisplay } from '~/utils/dateUtils';
+import { 
+  FaTicketAlt as TicketIcon,
+  FaSpinner as SpinnerIcon,
+  FaExclamationTriangle as ErrorIcon
+} from 'react-icons/fa';
+import { formatFirestoreDate } from '~/utils/dateUtils';
+
 interface RecentTicketsProps {
   tickets: SapTicket[];
   isLoading?: boolean;
@@ -21,40 +24,38 @@ export const RecentTickets: React.FC<RecentTicketsProps> = ({ tickets, isLoading
     return summary.length > 40 ? summary.substring(0, 40) + '...' : summary;
   };
 
-  // Function to determine status classes with updated colors
   const getStatusClasses = (status?: string): string => {
     switch (status) {
       case 'Nouveau':
-        return 'bg-green-600 text-white'; // Vert pour Nouveau
-      case 'Demande de RMA': // Assuming this is the exact string
-        return 'bg-blue-600 text-white'; // Bleu pour Demande de RMA
+        return 'bg-jdc-yellow text-black';
+      case 'Demande de RMA':
+        return 'bg-blue-600 text-white';
       case 'Ouvert':
-        return 'bg-red-600 text-white'; // Rouge pour Ouvert
+        return 'bg-red-600 text-white';
       case 'En cours':
-        return 'bg-yellow-500 text-black'; // Jaune pour En cours
+        return 'bg-jdc-yellow text-black';
       case 'Fermé':
-        return 'bg-gray-600 text-white'; // Gris pour Fermé
+        return 'bg-gray-600 text-white';
       default:
-        return 'bg-gray-500 text-white'; // Gris par défaut
+        return 'bg-gray-500 text-white';
     }
   };
 
   return (
     <div className="bg-jdc-card p-4 rounded-lg shadow-lg">
       <h2 className="text-xl font-semibold text-white mb-3 flex items-center">
-        {/* Use color prop for FontAwesomeIcon */}
-        <FontAwesomeIcon icon={faTicket} className="mr-2 text-jdc-yellow" />
+        <TicketIcon className="mr-2 text-jdc-yellow" />
         Tickets SAP Récents
       </h2>
       {isLoading && (
         <div className="flex items-center justify-center text-jdc-gray-300 py-4">
-          <FontAwesomeIcon icon={faSpinner} spin className="mr-2" />
+          <SpinnerIcon className="mr-2 animate-spin" />
           Chargement...
         </div>
       )}
       {error && !isLoading && (
          <div className="flex items-center text-red-400 py-4">
-           <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
+           <ErrorIcon className="mr-2" />
            Erreur: {error}
          </div>
       )}
@@ -71,12 +72,10 @@ export const RecentTickets: React.FC<RecentTicketsProps> = ({ tickets, isLoading
                   {getSummaryDisplay(ticket.summary)} - {ticket.secteur || 'Secteur N/A'}
                  </span>
                  <span className="text-jdc-gray-500 block text-xs italic">
-                  {/* Parse and format the date using the new functions */}
-                  {formatDateForDisplay(parseFrenchDate(ticket.date))}
+                  {formatFirestoreDate(ticket.date)}
                 </span>
               </div>
               <div className="flex-shrink-0 text-right">
-                {/* Apply status classes using the updated helper function */}
                 <span className={`px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${getStatusClasses(ticket.statut)}`}>
                   {ticket.statut || 'N/A'}
                 </span>

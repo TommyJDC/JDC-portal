@@ -6,11 +6,14 @@ import React, {
   ReactNode,
   useRef,
 } from 'react';
-import {
-  type Toast,
-  type ToastMessageData,
-  type ToastType,
-} from '~/components/Toast';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
+
+export interface ToastMessageData {
+  id: string;
+  message: string;
+  type: ToastType;
+  title?: string;
+}
 
 type ToastInput =
   | string
@@ -69,6 +72,21 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
+
+  const getToastTypeClasses = (type: ToastType) => {
+    switch (type) {
+      case 'info':
+        return 'bg-jdc-yellow text-black';
+      case 'success':
+        return 'bg-green-500 text-white';
+      case 'error':
+        return 'bg-red-500 text-white';
+      case 'warning':
+        return 'bg-jdc-yellow text-black';
+      default:
+        return 'bg-jdc-yellow text-black';
+    }
+  };
 
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>

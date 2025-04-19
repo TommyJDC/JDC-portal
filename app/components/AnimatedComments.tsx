@@ -38,16 +38,17 @@ export function AnimatedComments({ comments, onAddComment, isLoading }: Animated
   return (
     <ClientOnly>
       <div className="space-y-4">
-        <motion.h4 
-          className="text-lg font-semibold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-400"
+        <motion.h3 
+          className="flex items-center space-x-2 text-lg font-semibold mb-4 text-jdc-yellow"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          Commentaires
-        </motion.h4>
+          <FaSpinner className="h-4 w-4" />
+          <span>Commentaires</span>
+        </motion.h3>
 
         <motion.div 
-          className="max-h-48 overflow-y-auto mb-4 border border-gray-700/50 rounded-lg p-4 bg-jdc-gray/20 backdrop-blur-sm text-sm space-y-3"
+          className="max-h-48 overflow-y-auto mb-4 border border-jdc-gray-700 rounded-lg p-4 bg-jdc-gray-800 text-sm space-y-3"
           variants={containerVariants}
           initial="hidden"
           animate="visible"

@@ -6,17 +6,16 @@ import { getWeekDateRangeForAgenda } from "~/utils/dateUtils";
 import {
   getUserProfileSdk,
   getRecentTicketsForSectors,
-  getRecentShipmentsForSectors,
+  getAllShipments,
   getTotalTicketCountSdk,
   getDistinctClientCountFromEnvoiSdk,
   getLatestStatsSnapshotsSdk,
   getInstallationsSnapshot,
   type InstallationsSnapshot
 } from "~/services/firestore.service.server";
-    import type { SapTicket, Shipment, StatsSnapshot, UserProfile } from "~/types/firestore.types"; // Removed CalendarEvent import
-    import type { UserSession } from "~/services/session.server"; // Ensure UserSession is imported
+    import type { SapTicket, Shipment, StatsSnapshot, UserProfile } from "~/types/firestore.types";
+    import type { UserSession } from "~/services/session.server";
 
-    // Define CalendarEvent type locally
     interface CalendarEvent {
         id: string;
         summary?: string | null;
@@ -25,7 +24,6 @@ import {
         htmlLink?: string | null;
     }
 
-// Define loader return type
 export interface DashboardLoaderData {
   userProfile: UserProfile | null;
   calendarEvents: CalendarEvent[];
@@ -46,7 +44,6 @@ export interface DashboardLoaderData {
 
     export const loader = async ({ request }: LoaderFunctionArgs): Promise<ReturnType<typeof json<DashboardLoaderData>>> => {
       console.log("Dashboard Loader: Executing...");
-      // Assuming authenticator.isAuthenticated returns UserSession | null
       const session: UserSession | null = await authenticator.isAuthenticated(request);
 
       let userProfile: UserProfile | null = null;
@@ -56,16 +53,13 @@ export interface DashboardLoaderData {
       let recentTickets: SapTicket[] = [];
       let recentShipments: Shipment[] = [];
       let installationsStats: InstallationsSnapshot | null = null;
-      let clientError: string | null = null; // Use this for Firestore errors
+      let clientError: string | null = null;
 
-      // Check for session and the userId property
-      if (session?.userId) { // Use userId instead of id/uid
+      if (session?.userId) {
         console.log(`Dashboard Loader: User authenticated (UserID: ${session.userId}), fetching profile and data...`);
         try {
-          // 1. Fetch User Profile (needed for sectors)
-          userProfile = await getUserProfileSdk(session.userId); // Use session.userId
+          userProfile = await getUserProfileSdk(session.userId);
           
-          // Rediriger vers create-profile si l'utilisateur n'a pas de secteurs
           if (!userProfile?.secteurs || userProfile.secteurs.length === 0) {
             return redirect("/create-profile");
           }
@@ -74,7 +68,6 @@ export interface DashboardLoaderData {
           const sectorsForTickets = userSectors;
           const sectorsForShipments = userProfile?.role === 'Admin' ? ['haccp', 'chr', 'tabac', 'kezia'] : userSectors;
 
-          // 2. Fetch Calendar Events (concurrently with other data)
           const calendarPromise = (async () => {
             try {
               const authClient = await getGoogleAuthClient(session);
@@ -98,7 +91,6 @@ export interface DashboardLoaderData {
             }
           })();
 
-          // 3. Fetch Stats, Installations and Recent Items (concurrently)
           const dataPromise = (async () => {
             try {
                 const results = await Promise.allSettled([
@@ -106,11 +98,10 @@ export interface DashboardLoaderData {
                   getTotalTicketCountSdk(sectorsForTickets),
                   getDistinctClientCountFromEnvoiSdk(userProfile),
                   getRecentTicketsForSectors(sectorsForTickets, 20),
-                  getRecentShipmentsForSectors(sectorsForShipments, 20),
+                  getAllShipments(sectorsForShipments),
                   getInstallationsSnapshot(userProfile)
                 ]);
 
-                // Process stats
                 const snapshotResult = results[0];
                 const ticketCountResult = results[1];
                 const distinctClientCountResult = results[2];
@@ -140,14 +131,12 @@ export interface DashboardLoaderData {
                      if (!clientError) clientError = "Erreur chargement clients distincts.";
                  }
 
-
-                // Process recent items and installations
                 const recentTicketsResult = results[3];
                 const recentShipmentsResult = results[4];
                 const installationsResult = results[5];
                 
                 recentTickets = recentTicketsResult.status === 'fulfilled' ? recentTicketsResult.value : [];
-                recentShipments = recentShipmentsResult.status === 'fulfilled' ? recentShipmentsResult.value : [];
+                recentShipments = recentShipmentsResult.status === 'fulfilled' ? recentShipmentsResult.value.slice(0, 20) : [];
                 installationsStats = installationsResult.status === 'fulfilled' ? installationsResult.value : null;
 
                 if (recentTicketsResult.status === 'rejected') {
@@ -169,25 +158,21 @@ export interface DashboardLoaderData {
             }
           })();
 
-          // Wait for all promises
           await Promise.all([calendarPromise, dataPromise]);
           console.log("Dashboard Loader: All server-side data fetching finished.");
 
         } catch (error: any) {
           console.error("Dashboard Loader: Error fetching user profile:", error);
-          // Handle profile fetch error - maybe redirect to login or show error
-           clientError = "Impossible de charger les informations utilisateur.";
-           // Reset other data if profile fails
-           userProfile = null;
-           calendarEvents = [];
-           stats = { liveTicketCount: null, liveDistinctClientCountFromEnvoi: null, evolution: { ticketCount: null, distinctClientCountFromEnvoi: null } };
-           recentTickets = [];
-           recentShipments = [];
-           installationsStats = null;
+          clientError = "Impossible de charger les informations utilisateur.";
+          userProfile = null;
+          calendarEvents = [];
+          stats = { liveTicketCount: null, liveDistinctClientCountFromEnvoi: null, evolution: { ticketCount: null, distinctClientCountFromEnvoi: null } };
+          recentTickets = [];
+          recentShipments = [];
+          installationsStats = null;
         }
       } else {
           console.log("Dashboard Loader: User not authenticated.");
-          // No need to set calendarError here unless specifically required when logged out
       }
 
       return json<DashboardLoaderData>({

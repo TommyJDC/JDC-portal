@@ -15,24 +15,17 @@ const InstallationTile: React.FC<InstallationTileProps> = ({ installation, hasCT
   const [localInstallation, setLocalInstallation] = useState(installation);
 
   return (
-    <div className="bg-jdc-card p-4 rounded-lg shadow-lg border border-gray-700/50 hover:border-jdc-blue/50 transition-colors">
+    <div className="bg-jdc-card p-4 rounded-lg shadow-lg border border-gray-700/50 hover:border-jdc-yellow/50 transition-colors">
       {/* Header */}
       <div className="flex justify-between items-start mb-3">
         <div>
           <h3 className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-400">
             {installation.nom}
           </h3>
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <span className="px-2 py-1 rounded bg-jdc-gray/50 font-mono">
-              {installation.codeClient}
-            </span>
-            <span className="text-gray-500">•</span>
-            <span>{installation.ville}</span>
+          {/* CTN Status Badge */}
+          <div className={`px-2 py-1 rounded text-xs ${hasCTN ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+            {hasCTN ? 'CTN envoyé' : 'CTN manquant'}
           </div>
-        </div>
-        {/* CTN Status Badge */}
-        <div className={`px-2 py-1 rounded text-xs ${hasCTN ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
-          {hasCTN ? 'CTN envoyé' : 'CTN manquant'}
         </div>
       </div>
 

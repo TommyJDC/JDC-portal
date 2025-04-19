@@ -65,6 +65,8 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
     const handlePrevWeek = () => setCurrentDate(addWeeks(currentDate, -1));
     const handleNextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
 
+    const buttonStyle = "p-2 rounded-full hover:bg-jdc-gray-700 transition-colors text-jdc-yellow";
+
     if (isLoading) {
         return (
             <div className="bg-jdc-card p-4 rounded-lg shadow-lg min-h-[200px] flex items-center justify-center">
@@ -78,32 +80,32 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
         <div className="bg-jdc-card p-4 rounded-lg shadow-lg h-[600px]">
             <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold text-white flex items-center">
-                    <FontAwesomeIcon icon={faCalendarDays} className="mr-2 text-jdc-blue" />
+                    <FontAwesomeIcon icon={faCalendarDays} className="mr-2 text-jdc-yellow" />
                     Agenda de la semaine
                 </h3>
                 
                 <div className="flex items-center space-x-2">
                     <button 
                         onClick={handlePrevWeek}
-                        className="p-2 rounded-full hover:bg-jdc-gray-700 transition-colors"
+                        className={buttonStyle}
                         aria-label="Semaine précédente"
                     >
-                        <FontAwesomeIcon icon={faChevronLeft} className="text-jdc-blue" />
+                        <FontAwesomeIcon icon={faChevronLeft} />
                     </button>
                     
                     <button 
                         onClick={() => setCurrentDate(new Date())}
-                        className="text-sm text-jdc-blue hover:underline"
+                        className="text-sm text-jdc-yellow hover:underline"
                     >
                         Aujourd'hui
                     </button>
                     
                     <button 
                         onClick={handleNextWeek}
-                        className="p-2 rounded-full hover:bg-jdc-gray-700 transition-colors"
+                        className={buttonStyle}
                         aria-label="Semaine suivante"
                     >
-                        <FontAwesomeIcon icon={faChevronRight} className="text-jdc-blue" />
+                        <FontAwesomeIcon icon={faChevronRight} />
                     </button>
                 </div>
             </div>

@@ -1,12 +1,21 @@
 import React, { Fragment } from 'react';
 import { Link, NavLink, Form } from '@remix-run/react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faBars, faUserCircle, faSignOutAlt, faSignInAlt, faCog, 
-  faTachometerAlt, faTicketAlt, faTruck, faSearch, faSheetPlastic, 
-  faChevronDown, faBug, faUser, faMagnifyingGlass
-} from '@fortawesome/free-solid-svg-icons';
-import { faGoogle } from '@fortawesome/free-brands-svg-icons';
+  FaBars,
+  FaUserCircle,
+  FaSignOutAlt,
+  FaSignInAlt,
+  FaCog,
+  FaTachometerAlt,
+  FaTicketAlt,
+  FaTruck,
+  FaSearch,
+  FaFileAlt,
+  FaChevronDown,
+  FaBug,
+  FaUser,
+  FaGoogle
+} from 'react-icons/fa';
 import { Button } from './ui/Button';
 import type { UserSession } from '~/services/session.server';
 import type { UserProfile, Notification } from '~/types/firestore.types';
@@ -26,38 +35,34 @@ interface HeaderProps {
 
 // Main navigation items
 const navItems = [
-  { name: 'Tableau de Bord', to: '/dashboard', icon: faTachometerAlt },
+  { name: 'Tableau de Bord', to: '/dashboard', icon: FaTachometerAlt },
 ];
 
 // Technique menu items
 const techniqueItems = [
-  { name: 'Tickets SAP', to: '/tickets-sap', icon: faTicketAlt },
-  // Note: Kezia is also under Installations now, consider removing from Technique? For now, keep both.
-  { name: 'Kezia', to: '/installations/kezia', icon: faSheetPlastic }, 
-  { name: 'CHR', to: '/installations/chr', icon: faSheetPlastic }, // Enabled
-  { name: 'HACCP', to: '/installations/haccp', icon: faSheetPlastic }, // Enabled
-  { name: 'Tabac', to: '/installations/tabac', icon: faSheetPlastic }, // Enabled
+  { name: 'Tickets SAP', to: '/tickets-sap', icon: FaTicketAlt },
+  { 
+    name: 'Installations',
+    subItems: [
+      { name: 'Kezia', to: '/installations/kezia', icon: FaFileAlt },
+      { name: 'CHR', to: '/installations/chr', icon: FaFileAlt },
+      { name: 'HACCP', to: '/installations/haccp', icon: FaFileAlt },
+      { name: 'Tabac', to: '/installations/tabac', icon: FaFileAlt },
+    ]
+  },
 ];
 
 // Logistique menu items
 const logistiqueItems = [
-  { name: 'Envois CTN', to: '/envois-ctn', icon: faTruck },
-  { name: 'Recherche Articles', to: '/articles', icon: faSearch },
+  { name: 'Envois CTN', to: '/envois-ctn', icon: FaTruck },
+  { name: 'Recherche Articles', to: '/articles', icon: FaSearch },
 ];
 
 // Commercial menu items (vide pour le moment)
 const commercialItems: { name: string; to: string; icon: any; disabled?: boolean }[] = [];
 
-// Installation menu items
-const installationItems = [
-  { name: 'Kezia', to: '/installations/kezia', icon: faSheetPlastic },
-  { name: 'CHR', to: '/installations/chr', icon: faSheetPlastic },
-  { name: 'HACCP', to: '/installations/haccp', icon: faSheetPlastic },
-  { name: 'Tabac', to: '/installations/tabac', icon: faSheetPlastic },
-];
-
 // Define Admin item separately
-const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
+const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
 
 const JDC_LOGO_URL = "https://www.jdc.fr/images/logo_jdc_blanc.svg";
 
@@ -143,7 +148,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
   const linkActiveClass = "text-jdc-yellow relative after:content-[''] after:absolute after:bottom-[-0.5rem] after:left-0 after:w-full after:h-[2px] after:bg-jdc-yellow after:transform after:scale-x-100 after:transition-transform";
   const linkInactiveClass = "text-jdc-gray-300 hover:text-jdc-yellow transition-colors relative after:content-[''] after:absolute after:bottom-[-0.5rem] after:left-0 after:w-full after:h-[2px] after:bg-jdc-yellow after:transform after:scale-x-0 hover:after:scale-x-100 after:transition-transform";
   const menuButtonClass = `${linkInactiveClass} font-medium flex items-center transition-all duration-200 ease-in-out hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75`;
-  const menuItemBaseClass = "group flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors duration-150";
+  const menuItemBaseClass = 'group flex w-full items-center rounded-md px-2 py-2 text-sm';
 
   // Determine if the Admin link should be shown
   const showAdminLink = !loadingAuth && profile?.role?.toLowerCase() === 'admin';
@@ -171,7 +176,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
             aria-expanded="false"
             aria-haspopup="true"
           >
-            <FontAwesomeIcon icon={faBars} size="lg" />
+                  <FaBars className="text-lg" />
           </button>
 
           {/* Desktop Navigation */}
@@ -185,7 +190,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                   className={({ isActive }) => `${isActive ? linkActiveClass : linkInactiveClass} font-medium flex items-center transition-transform duration-200 ease-in-out hover:scale-105`}
                   prefetch="intent"
                 >
-                  <FontAwesomeIcon icon={item.icon} className="mr-1.5" />
+                  <item.icon className="mr-1.5" />
                   {item.name}
                 </NavLink>
               ))}
@@ -195,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                 <div>
                   <Menu.Button className={menuButtonClass}>
                     <span>Technique</span>
-                    <FontAwesomeIcon icon={faChevronDown} className="ml-1.5 h-4 w-4" aria-hidden="true" />
+                    <FaChevronDown className="ml-1.5 h-4 w-4" aria-hidden="true" />
                   </Menu.Button>
                 </div>
                 <Transition
@@ -209,24 +214,44 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                 >
                   <Menu.Items className="absolute left-0 mt-2 w-48 origin-top-left divide-y divide-jdc-gray-700 rounded-md bg-jdc-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                     <div className="px-1 py-1">
-                      {techniqueItems.map((item) => (
-                        <Menu.Item key={item.name}> 
-                          {({ active }) => ( // Only destructure active, removed disabled
-                            <NavLink
-                              to={item.to}
-                              className={`${menuItemBaseClass} ${
-                                active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
-                              } hover:bg-jdc-gray-700 hover:text-white`} // Removed disabled class logic
-                              // onClick={(e) => { if (disabled) e.preventDefault(); }} // Removed
-                              // aria-disabled={disabled}
-                            >
-                              <FontAwesomeIcon icon={item.icon} className="mr-2 h-5 w-5" aria-hidden="true" />
+                      {techniqueItems.map((item) => 
+                        item.subItems ? (
+                          <div key={item.name} className="py-1">
+                            <div className="px-3 py-1 text-xs font-semibold text-jdc-gray-400 uppercase">
                               {item.name}
-                              {/* Removed disabled text */}
-                            </NavLink>
-                          )}
-                        </Menu.Item>
-                      ))}
+                            </div>
+                            {item.subItems.map((subItem) => (
+                              <Menu.Item key={subItem.name}>
+                                {({ active }) => (
+                                  <NavLink
+                                    to={subItem.to}
+                                    className={`${menuItemBaseClass} ${
+                                      active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
+                                    } hover:bg-jdc-gray-700 hover:text-white pl-6`}
+                                  >
+                                    <subItem.icon className="mr-2 h-5 w-5" aria-hidden="true" />
+                                    {subItem.name}
+                                  </NavLink>
+                                )}
+                              </Menu.Item>
+                            ))}
+                          </div>
+                        ) : (
+                          <Menu.Item key={item.name}>
+                            {({ active }) => (
+                              <NavLink
+                                to={item.to}
+                                className={`${menuItemBaseClass} ${
+                                  active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
+                                } hover:bg-jdc-gray-700 hover:text-white`}
+                              >
+                                <item.icon className="mr-2 h-5 w-5" aria-hidden="true" />
+                                {item.name}
+                              </NavLink>
+                            )}
+                          </Menu.Item>
+                        )
+                      )}
                     </div>
                   </Menu.Items>
                 </Transition>
@@ -237,7 +262,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                 <div>
                   <Menu.Button className={menuButtonClass}>
                     <span>Logistique</span>
-                    <FontAwesomeIcon icon={faChevronDown} className="ml-1.5 h-4 w-4" aria-hidden="true" />
+                    <FaChevronDown className="ml-1.5 h-4 w-4" aria-hidden="true" />
                   </Menu.Button>
                 </div>
                 <Transition
@@ -260,46 +285,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                                 active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
                               } hover:bg-jdc-gray-700 hover:text-white`}
                             >
-                              <FontAwesomeIcon icon={item.icon} className="mr-2 h-5 w-5" aria-hidden="true" />
-                              {item.name}
-                            </NavLink>
-                          )}
-                        </Menu.Item>
-                      ))}
-                    </div>
-                  </Menu.Items>
-                </Transition>
-              </Menu>
-
-              {/* Installations Menu */}
-              <Menu as="div" className="relative inline-block text-left">
-                <div>
-                  <Menu.Button className={menuButtonClass}>
-                    <span>Installations</span>
-                    <FontAwesomeIcon icon={faChevronDown} className="ml-1.5 h-4 w-4" aria-hidden="true" />
-                  </Menu.Button>
-                </div>
-                <Transition
-                  as={Fragment}
-                  enter="transition ease-out duration-100"
-                  enterFrom="transform opacity-0 scale-95"
-                  enterTo="transform opacity-100 scale-100"
-                  leave="transition ease-in duration-75"
-                  leaveFrom="transform opacity-100 scale-100"
-                  leaveTo="transform opacity-0 scale-95"
-                >
-                  <Menu.Items className="absolute left-0 mt-2 w-48 origin-top-left divide-y divide-jdc-gray-700 rounded-md bg-jdc-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
-                    <div className="px-1 py-1">
-                      {installationItems.map((item) => (
-                        <Menu.Item key={item.name}>
-                          {({ active }) => (
-                            <NavLink
-                              to={item.to}
-                              className={`${menuItemBaseClass} ${
-                                active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
-                              } hover:bg-jdc-gray-700 hover:text-white`}
-                            >
-                              <FontAwesomeIcon icon={item.icon} className="mr-2 h-5 w-5" aria-hidden="true" />
+                              <item.icon className="mr-2 h-5 w-5" aria-hidden="true" />
                               {item.name}
                             </NavLink>
                           )}
@@ -315,7 +301,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                 <div>
                   <Menu.Button className={`${menuButtonClass} opacity-50 cursor-not-allowed`}>
                     <span>Commercial</span>
-                    <FontAwesomeIcon icon={faChevronDown} className="ml-1.5 h-4 w-4" aria-hidden="true" />
+                    <FaChevronDown className="ml-1.5 h-4 w-4" aria-hidden="true" />
                   </Menu.Button>
                 </div>
                 <Transition
@@ -343,7 +329,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                                   active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
                                 } hover:bg-jdc-gray-700 hover:text-white`}
                               >
-                                <FontAwesomeIcon icon={item.icon} className="mr-2 h-5 w-5" aria-hidden="true" />
+                                <item.icon className="mr-2 h-5 w-5" aria-hidden="true" />
                                 {item.name}
                               </NavLink>
                             )}
@@ -361,7 +347,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                   to={adminItem.to}
                   className={({ isActive }) => `${isActive ? linkActiveClass : linkInactiveClass} font-medium flex items-center transition-transform duration-200 ease-in-out hover:scale-105`}
                 >
-                  <FontAwesomeIcon icon={adminItem.icon} className="mr-1.5" />
+                  <adminItem.icon className="mr-1.5" />
                   {adminItem.name}
                 </NavLink>
               )}
@@ -387,10 +373,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                     role="searchbox"
                     aria-expanded="false"
                   />
-                  <FontAwesomeIcon 
-                    icon={faMagnifyingGlass} 
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-jdc-gray-500"
-                  />
+                  <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-jdc-gray-500" />
                 </div>
               </div>
 
@@ -417,11 +400,11 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                 aria-label="Menu utilisateur"
                 aria-haspopup="true"
               >
-                <FontAwesomeIcon icon={faUserCircle} className="text-xl" />
+                <FaUserCircle className="text-xl" />
                 <span className="hidden sm:inline font-medium">
                   {profile?.displayName || user.displayName || user.email?.split('@')[0] || 'Utilisateur'}
                 </span>
-                <FontAwesomeIcon icon={faChevronDown} className="hidden sm:inline h-4 w-4" />
+                <FaChevronDown className="hidden sm:inline h-4 w-4" />
               </Menu.Button>
               <Transition
                 as={Fragment}
@@ -437,7 +420,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                     <Menu.Item>
                       {({ active }) => (
                         <div className={`${menuItemBaseClass} ${active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'}`}>
-                          <FontAwesomeIcon icon={faUser} className="mr-2" />
+                          <FaUser className="mr-2" />
                           <div className="flex flex-col">
                             <span className="font-medium">{profile?.displayName || user.displayName}</span>
                             <span className="text-xs opacity-75">{user.email}</span>
@@ -456,7 +439,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                               active ? 'bg-red-600 text-white' : 'text-jdc-gray-300'
                             }`}
                           >
-                            <FontAwesomeIcon icon={faSignOutAlt} className="mr-2" />
+                            <FaSignOutAlt className="mr-2" />
                             Déconnexion
                           </button>
                         )}
@@ -469,7 +452,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
           ) : (
             <div className="flex items-center space-x-2">
               <Form method="post" action="/auth/google">
-                <Button type="submit" variant="secondary" size="sm" leftIcon={<FontAwesomeIcon icon={faGoogle} />}>
+                <Button type="submit" variant="secondary" size="sm" leftIcon={<FaGoogle />}>
                   <span className="hidden sm:inline">Google</span>
                 </Button>
               </Form>

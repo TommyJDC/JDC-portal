@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { FcGoogle } from 'react-icons/fc';
 import { Button } from './ui/Button';
 import { signInWithGoogle } from '~/services/auth.service';
@@ -51,37 +49,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       aria-labelledby="auth-modal-title"
     >
       <div
-        className="bg-jdc-card p-6 md:p-8 rounded-lg shadow-xl relative w-full max-w-md"
+        className="bg-jdc-card rounded-lg shadow-xl p-6 w-full max-w-md transform transition-all duration-300 ease-in-out scale-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={handleClose}
-          className="absolute top-3 right-3 text-jdc-gray-400 hover:text-white focus:outline-none"
-          aria-label="Fermer la modal"
-        >
-          <FontAwesomeIcon icon={faTimes} size="lg" />
-        </button>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold text-white">Se connecter</h2>
+          <button onClick={onClose} className="text-jdc-gray-400 hover:text-jdc-yellow">
+            &times;
+          </button>
+        </div>
 
-        <h2 id="auth-modal-title" className="text-2xl font-semibold text-white mb-6 text-center">
-          Connexion
-        </h2>
-
-        {/* Google Sign-In Button - Seule méthode autorisée */}
-        <Button
-            variant="secondary"
-            className="w-full mb-4 flex items-center justify-center gap-2 border border-jdc-gray-600 hover:bg-jdc-gray-700"
+        <div className="space-y-4">
+          <button
             onClick={handleGoogleSignIn}
-            isLoading={isGoogleLoading}
-            disabled={isLoading || isGoogleLoading}
-        >
-            {isGoogleLoading ? (
-                <FontAwesomeIcon icon={faSpinner} spin />
-            ) : (
-                <FcGoogle size={20} />
-            )}
-            <span>Se connecter avec Google</span>
-        </Button>
-
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-black bg-jdc-yellow hover:bg-yellow-300 rounded-md transition-colors duration-150"
+          >
+            <FcGoogle className="text-lg" />
+            Continuer avec Google
+          </button>
+        </div>
       </div>
     </div>
   );

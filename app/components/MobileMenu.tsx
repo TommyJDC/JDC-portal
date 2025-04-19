@@ -25,8 +25,8 @@ const navItems = [
   { name: 'Recherche Articles', to: '/articles', icon: faSearch },
 ];
 
-// Installation menu items
-const installationItems = [
+// Installation items (now part of Technique section)
+const techniqueInstallationItems = [
   { name: 'Kezia', to: '/installations/kezia', icon: faSheetPlastic },
   { name: 'CHR', to: '/installations/chr', icon: faSheetPlastic },
   { name: 'HACCP', to: '/installations/haccp', icon: faSheetPlastic },
@@ -94,15 +94,15 @@ const debugItem = { name: 'Diagnostic', to: '/debug-index', icon: faBug };
                 </NavLink>
               ))}
 
-              {/* Installation Links */}
+              {/* Technique Section with Installations */}
               <div className="pt-2 mt-2 border-t border-jdc-gray-700/50">
-                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Installations</span>
-                {installationItems.map((item) => (
+                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Technique - Installations</span>
+                {techniqueInstallationItems.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     onClick={onClose}
-                    className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
+                    className={({ isActive }) => `${linkBaseClass} pl-6 ${isActive ? linkActiveClass : linkInactiveClass}`}
                     prefetch="intent"
                   >
                     <FontAwesomeIcon icon={item.icon} className="mr-3 h-5 w-5" />

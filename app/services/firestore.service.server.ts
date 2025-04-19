@@ -56,32 +56,50 @@ export const createUserProfileSdk = async (profile: UserProfile): Promise<void> 
 // Fonctions de gestion des tickets et envois
 export const getRecentTicketsForSectors = async (sectors: string[], limit: number): Promise<SapTicket[]> => {
   try {
-    const query = db.collection('tickets')
-      .where('sector', 'in', sectors)
-      .orderBy('date', 'desc')
-      .limit(limit);
-    const snapshot = await query.get();
-    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SapTicket));
-  } catch (error) {
-    console.error("Error fetching recent tickets:", error);
-    return [];
-  }
-};
-
-export const getRecentShipmentsForSectors = async (sectors: string[], limit: number): Promise<Shipment[]> => {
-  try {
-    // Handle empty sectors array case
     if (!sectors || sectors.length === 0) {
-      console.warn("No sectors provided to getRecentShipmentsForSectors");
+      console.warn("No sectors provided to getRecentTicketsForSectors");
       return [];
     }
 
-    const query = db.collection('shipments')
-      .where('sector', 'in', sectors)
-      .orderBy('dateCreation', 'desc')
-      .limit(limit);
-    const snapshot = await query.get();
-    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Shipment));
+    // Normaliser les secteurs en minuscules
+    const normalizedSectors = sectors.map(s => s.toLowerCase());
+    console.log("Secteurs normalisés:", normalizedSectors);
+
+    // Créer une requête pour chaque secteur et fusionner les résultats
+    const queries = normalizedSectors.map(sector => 
+      db.collection(sector)
+        .orderBy('dateCreation', 'desc')
+        .limit(limit)
+        .get()
+    );
+
+    const snapshots = await Promise.all(queries);
+    const allDocs = snapshots.flatMap(snapshot => snapshot.docs);
+    
+    // Trier tous les documents par date
+    allDocs.sort((a, b) => {
+      const dateA = a.data().dateCreation?.toDate?.() || a.data().dateCreation;
+      const dateB = a.data().dateCreation?.toDate?.() || b.data().dateCreation;
+      return dateB - dateA;
+    });
+
+    // Prendre les 'limit' premiers résultats
+    const limitedDocs = allDocs.slice(0, limit);
+
+    // Convertir en SapTicket[]
+    return limitedDocs.map(doc => {
+      const data = doc.data();
+      console.log(`Document ${doc.id} - secteur: ${data.secteur}`);
+      return {
+        id: doc.id,
+        date: data.dateCreation?.toDate?.() || data.dateCreation,
+        client: data.nomClient || '',
+        description: data.description || '',
+        statut: data.statutExpedition || '',
+        secteur: data.secteur || '',
+        ...data
+      } as SapTicket;
+    });
   } catch (error) {
     console.error("Error fetching recent shipments:", error);
     return [];
@@ -103,10 +121,10 @@ export const getTotalTicketCountSdk = async (sectors: string[]): Promise<number>
 
 export const getDistinctClientCountFromEnvoiSdk = async (userProfile: UserProfile): Promise<number> => {
   try {
-    const snapshot = await db.collection('shipments')
-      .where('sector', 'in', userProfile.secteurs)
+    const snapshot = await db.collection('Envoi')
+      .where('secteur', 'in', userProfile.secteurs)
       .get();
-    const uniqueClients = new Set(snapshot.docs.map(doc => doc.data().clientId));
+    const uniqueClients = new Set(snapshot.docs.map(doc => doc.data().codeClient));
     return uniqueClients.size;
   } catch (error) {
     console.error("Error getting distinct client count:", error);
@@ -310,7 +328,6 @@ export const getInstallationsSnapshot = async (userProfile: UserProfile): Promis
      // For admins, no 'secteur' filter is applied, querying all documents across all sectors.
 
     const docsSnapshot = await query.get();
-    console.log(`Installations Snapshot Query: Found ${docsSnapshot.size} documents for sectors [${sectorsToQuery.join(', ')}] (or all for admin).`);
 
     // Process the results
     docsSnapshot.forEach(doc => {
@@ -347,7 +364,6 @@ export const getInstallationsSnapshot = async (userProfile: UserProfile): Promis
       }
     });
 
-    console.log("Installations Snapshot Result:", JSON.stringify(snapshotResult, null, 2));
     return snapshotResult;
 
   } catch (error) {
@@ -358,13 +374,13 @@ export const getInstallationsSnapshot = async (userProfile: UserProfile): Promis
 };
 
 export const updateSAPTICKET = async (
-  sectorId: string,
-  ticketId: string,
+  sector: string,
+  ticketId: string, 
   updates: Partial<SapTicket>
 ): Promise<void> => {
   try {
     if (Object.keys(updates).length === 0) {
-      console.warn(`Attempted to update SAP ticket ${ticketId} with no changes.`);
+      console.warn(`Tentative de mise à jour du ticket SAP ${ticketId} sans modifications`);
       return;
     }
 
@@ -373,9 +389,9 @@ export const updateSAPTICKET = async (
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    const docRef = db.collection('tickets-sap').doc(ticketId);
+    const docRef = db.collection(sector).doc(ticketId);
     await docRef.update(dataWithTimestamp);
-    console.log(`Updated SAP ticket ${ticketId} in sector ${sectorId}`);
+    console.log(`Ticket SAP ${ticketId} mis à jour dans le secteur ${sector}`);
   } catch (error) {
     console.error(`Error updating SAP ticket ${ticketId}:`, error);
     throw error;
@@ -458,24 +474,56 @@ export const deleteArticleImageUrl = async (
 export const getAllTicketsForSectorsSdk = async (sectors: string[]): Promise<SapTicket[]> => {
   try {
     if (!sectors || sectors.length === 0) {
-      console.warn("No sectors provided to getAllTicketsForSectorsSdk");
+      console.warn("Aucun secteur fourni pour getAllTicketsForSectorsSdk");
+      return [];
+    }
+    
+    // Vérifier l'existence des collections
+    const collections = await db.listCollections();
+    const collectionIds = collections.map(col => col.id);
+    
+    // Filtrer les secteurs qui existent comme collections
+    const existingSectors = sectors.filter(sector => collectionIds.includes(sector));
+    
+    if (existingSectors.length === 0) {
+      console.warn("Aucun des secteurs fournis n'existe comme collection dans Firestore");
       return [];
     }
 
-    const query = db.collection('tickets-sap')
-      .where('secteur', 'in', sectors)
-      .orderBy('date', 'desc');
+    // Créer une requête pour chaque secteur existant
+    const queries = existingSectors.map(sector => {
+      return db.collection(sector)
+        .orderBy('date', 'desc')  // Utiliser 'date' au lieu de 'dateCreation'
+        .get();
+    });
 
-    const snapshot = await query.get();
-    return snapshot.docs.map(doc => ({ 
-      ...doc.data(), 
-      id: doc.id,
-      // Ensure dates are properly handled
-      date: doc.data().date?.toDate?.() || doc.data().date
-    } as SapTicket));
+    // Exécuter toutes les requêtes en parallèle
+    const snapshots = await Promise.all(queries);
+    
+    // Fusionner et trier les résultats
+    const allDocs = snapshots.flatMap((snapshot, index) => {
+      const sectorName = existingSectors[index];
+      return snapshot.docs;
+    });
+
+    const tickets = allDocs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        date: data.date?.toDate?.() || data.date,
+        client: data.nomClient || '',
+        raisonSociale: data.raisonSociale || data.nomClient || '',
+        description: data.description || '',
+        statut: data.statutExpedition || '',
+        secteur: data.secteur || doc.ref.parent.id,
+        ...data
+      } as SapTicket;
+    });
+
+    return tickets;
   } catch (error) {
     console.error("Error fetching all tickets:", error);
-    return [];
+    throw error;
   }
 };
 
@@ -485,7 +533,7 @@ export const getAllTicketsForSectorsSdk = async (sectors: string[]): Promise<Sap
  */
 export const deleteShipmentSdk = async (shipmentId: string): Promise<void> => {
   try {
-    await db.collection('shipments').doc(shipmentId).delete();
+    await db.collection('Envoi').doc(shipmentId).delete();
     console.log(`Deleted shipment ${shipmentId}`);
   } catch (error) {
     console.error(`Error deleting shipment ${shipmentId}:`, error);
@@ -537,17 +585,39 @@ export const getAllShipments = async (sectors: string[]): Promise<Shipment[]> =>
       return [];
     }
 
-    const query = db.collection('shipments')
-      .where('sector', 'in', sectors)
-      .orderBy('dateCreation', 'desc');
+    const query = db.collection('Envoi')
+      .where('secteur', 'in', sectors)
+      .orderBy('date', 'desc');
 
     const snapshot = await query.get();
-    return snapshot.docs.map(doc => ({ 
-      ...doc.data(), 
-      id: doc.id,
-      // Ensure dates are properly handled
-      dateCreation: doc.data().dateCreation?.toDate?.() || doc.data().dateCreation
-    } as Shipment));
+    
+    const shipments = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const rawDate = data.date;
+      let dateCreation;
+
+      if (rawDate?.toDate) {
+        dateCreation = rawDate.toDate();
+      } else if (rawDate?.seconds) {
+        dateCreation = new Date(rawDate.seconds * 1000);
+      } else if (typeof rawDate === 'string') {
+        dateCreation = new Date(rawDate);
+      }
+
+      const shipment = { 
+        ...data, 
+        id: doc.id,
+        dateCreation,
+        secteur: data.secteur || 'Non défini',
+        nomClient: data.nomClient || 'Client Inconnu',
+        codeClient: data.codeClient || '',
+        statutExpedition: data.statutExpedition || 'NON',
+      } as Shipment;
+      
+      return shipment;
+    });
+
+    return shipments;
   } catch (error) {
     console.error("Error fetching all shipments:", error);
     return [];
