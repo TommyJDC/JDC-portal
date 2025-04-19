@@ -3,9 +3,6 @@ command = "npm run build"
 publish = "build/client" # ✅ pour servir correctement les assets
 
 [functions]
-directory = "netlify/functions"
-
-[dev]
 command = "npm run dev"
 framework = "vite"
 

@@ -44,6 +44,8 @@ export const links: LinksFunction = () => [
   { rel: "stylesheet", href: nProgressStylesHref },
   { rel: "stylesheet", href: mapboxStylesHref },
   { rel: "stylesheet", href: fontAwesomeStylesHref },
+  { rel: "manifest", href: "/manifest.json" },
+  { rel: "apple-touch-icon", href: "/icons/ios/180.png" },
 ];
 
 // --- Root Loader: Load user session AND profile server-side ---
@@ -157,6 +159,11 @@ export default function Document() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#000000" />
+        <meta name="description" content="Portail de gestion JDC" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
         <Meta />
         <Links />
       </head>
@@ -171,6 +178,23 @@ export default function Document() {
         <div id="modal-root"></div>
         <ScrollRestoration />
         <Scripts />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                      console.log('SW registered:', registration);
+                    })
+                    .catch(error => {
+                      console.log('SW registration failed:', error);
+                    });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
