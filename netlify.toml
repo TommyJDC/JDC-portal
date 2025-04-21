@@ -3,26 +3,25 @@ command = "npm run build"
 publish = "build/client" # ✅ pour servir correctement les assets
 
 [functions]
-  [functions.command]
-    framework = "vite"
-    external_node_modules = ["firebase-admin"]
+  framework = "vite"
+  external_node_modules = ["firebase-admin"]
 
-  [[functions]]
+  [functions.sap_notifications]
     name = "sap-notifications"
     schedule = "*/5 * * * *"  # Exécution toutes les 5 minutes
 
-  [[functions]]
+  [functions.scheduled_gmail_processing]
     name = "scheduled-gmail-processing"
     schedule = "*/60 * * * *"  # Exécution toutes les 60 minutes
 
-  [[functions]]
+  [functions.check_kezia_installations]
     name = "check-kezia-installations"
     schedule = "*/15 * * * *"  # Exécution toutes les 15 minutes
 
-  [[functions]]
+  [functions.sync_installations]
     name = "sync-installations"
     schedule = "*/60 * * * *"  # Exécution toutes les 60 minutes
-    
+
 [[headers]]
 for = "/assets/*" # ✅ vise bien les fichiers d'assets, pas "/build/*"
 
