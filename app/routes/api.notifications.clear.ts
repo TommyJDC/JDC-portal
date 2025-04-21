@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import { dbAdmin } from "~/firebase.admin.config.server";
+import { getDb } from "~/firebase.admin.config.server"; // Import getDb instead of dbAdmin
 import { authenticator } from "~/services/auth.server";
 
 export async function action({ request }: { request: Request }) {
@@ -8,8 +8,9 @@ export async function action({ request }: { request: Request }) {
   });
   
   try {
-    const batch = dbAdmin.batch();
-    const notificationsRef = await dbAdmin.collection('notifications')
+    const db = getDb(); // Call getDb() to get the Firestore instance
+    const batch = db.batch();
+    const notificationsRef = await db.collection('notifications')
       .where('userId', '==', user.userId)
       .get();
 
