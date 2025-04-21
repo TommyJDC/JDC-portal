@@ -112,10 +112,20 @@ export const getRecentTicketsForSectors = async (sectors: string[], limit: numbe
     const normalizedSectors = sectors.map(s => s.toLowerCase());
     console.log("Secteurs normalisés:", normalizedSectors);
 
-    // Créer une requête pour chaque secteur et fusionner les résultats
-    const queries = normalizedSectors.map(sector => 
+    // Vérifier l'existence des collections
+    const collections = await db.listCollections();
+    const collectionIds = collections.map(col => col.id);
+    const existingSectors = normalizedSectors.filter(sector => collectionIds.includes(sector));
+
+    if (existingSectors.length === 0) {
+      console.warn("Aucun des secteurs fournis n'existe comme collection");
+      return [];
+    }
+
+    // Créer une requête pour chaque secteur existant et fusionner les résultats
+    const queries = existingSectors.map(sector => 
       db.collection(sector)
-        .orderBy('dateCreation', 'desc')
+        .orderBy('date', 'desc')
         .limit(limit)
         .get()
     );
@@ -125,9 +135,9 @@ export const getRecentTicketsForSectors = async (sectors: string[], limit: numbe
     
     // Trier tous les documents par date
     allDocs.sort((a, b) => {
-      const dateA = a.data().dateCreation?.toDate?.() || a.data().dateCreation;
-      const dateB = a.data().dateCreation?.toDate?.() || b.data().dateCreation;
-      return dateB - dateA;
+      const dateA = a.data().date?.toDate?.() || a.data().date || a.data().dateCreation?.toDate?.() || a.data().dateCreation;
+      const dateB = b.data().date?.toDate?.() || b.data().date || b.data().dateCreation?.toDate?.() || b.data().dateCreation;
+      return dateB.getTime() - dateA.getTime();
     });
 
     // Prendre les 'limit' premiers résultats
@@ -158,11 +168,28 @@ export const getTotalTicketCountSdk = async (sectors: string[]): Promise<number>
     if (!db) {
       db = await initializeFirebaseAdmin();
     }
-    const snapshot = await db.collection('tickets')
-      .where('sector', 'in', sectors)
-      .count()
-      .get();
-    return snapshot.data().count;
+    if (!sectors || sectors.length === 0) {
+      return 0;
+    }
+
+    // Vérifier l'existence des collections
+    const collections = await db.listCollections();
+    const collectionIds = collections.map(col => col.id);
+    const existingSectors = sectors.filter(sector => collectionIds.includes(sector));
+
+    if (existingSectors.length === 0) {
+      return 0;
+    }
+
+    // Compter les documents dans chaque collection de secteur
+    const countPromises = existingSectors.map(sector => 
+      db.collection(sector).count().get()
+    );
+
+    const snapshots = await Promise.all(countPromises);
+    const total = snapshots.reduce((sum, snap) => sum + snap.data().count, 0);
+    
+    return total;
   } catch (error) {
     console.error("Error getting total ticket count:", error);
     return 0;
@@ -705,39 +732,44 @@ export const getAllShipments = async (sectors: string[]): Promise<Shipment[]> =>
       return [];
     }
 
+    // Normaliser les secteurs
+    const normalizedSectors = sectors.map(s => s.toLowerCase());
+    
     const query = db.collection('Envoi')
-      .where('secteur', 'in', sectors)
+      .where('secteur', 'in', normalizedSectors)
       .orderBy('date', 'desc');
 
     const snapshot = await query.get();
     
     const shipments = snapshot.docs.map(doc => {
       const data = doc.data();
-      const rawDate = data.date;
-      let dateCreation;
-
+      
+      // Gestion robuste des dates
+      let dateCreation: Date | null = null;
+      const rawDate = data.date || data.dateCreation;
+      
       if (rawDate?.toDate) {
         dateCreation = rawDate.toDate();
       } else if (rawDate?.seconds) {
         dateCreation = new Date(rawDate.seconds * 1000);
       } else if (typeof rawDate === 'string') {
         dateCreation = new Date(rawDate);
+      } else if (rawDate instanceof Date) {
+        dateCreation = rawDate;
       }
 
-      const shipment = { 
-        ...data, 
+      return { 
+        ...data,
         id: doc.id,
-        dateCreation,
-        secteur: data.secteur || 'Non défini',
-        nomClient: data.nomClient || 'Client Inconnu',
+        dateCreation: dateCreation || new Date(),
+        secteur: data.secteur || normalizedSectors.find(s => data.secteur?.toLowerCase()?.includes(s)) || 'Non défini',
+        nomClient: data.nomClient || data.client || 'Client Inconnu',
         codeClient: data.codeClient || '',
-        statutExpedition: data.statutExpedition || 'NON',
+        statutExpedition: data.statutExpedition || data.statut || 'NON',
       } as Shipment;
-      
-      return shipment;
     });
 
-    return shipments;
+    return shipments.filter(s => s !== null);
   } catch (error) {
     console.error("Error fetching all shipments:", error);
     return [];
