@@ -1,9 +1,11 @@
 import fetch from 'node-fetch';
 
 export const handler = async (event, context) => {
+  console.log('[scheduled-gmail] Début du traitement planifié');
   const secret = process.env.SCHEDULED_TASK_SECRET;
   
   // Vérification de sécurité
+  console.log('[scheduled-gmail] Vérification du secret d\'autorisation');
   if (event.headers['x-scheduled-secret'] !== secret) {
     return {
       statusCode: 403,
@@ -12,7 +14,10 @@ export const handler = async (event, context) => {
   }
 
   try {
-    const response = await fetch(`${process.env.URL}/api/gmail-to-firestore`, {
+    const apiUrl = `${process.env.URL}/api/gmail-to-firestore`;
+    console.log('[scheduled-gmail] Appel de l\'API:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -20,14 +25,19 @@ export const handler = async (event, context) => {
       }
     });
 
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      console.error('[scheduled-gmail] Erreur API:', response.status, response.statusText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     
-    return {
+    const result = {
       statusCode: 200,
       body: JSON.stringify({ success: true, message: 'Traitement exécuté avec succès' })
     };
+    console.log('[scheduled-gmail] Traitement terminé avec succès');
+    return result;
   } catch (error) {
-    console.error('Erreur du traitement planifié:', error);
+    console.error('[scheduled-gmail] Erreur du traitement planifié:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({ success: false, error: error.message })

@@ -402,7 +402,7 @@ async function syncSector(sector, config, auth) {
 // --- Handler Netlify ---
 // Remarque : Assurez-vous que tous les imports sont également en ESM (avec `import`)
 export const handler = async (event, context) => {
-  console.log("Starting Installations Sync Function...");
+  console.log("[sync-installations] Début de la synchronisation des installations");
 
   // TODO: Sécuriser l'exécution (ex: vérifier un secret, l'origine de l'appel)
 
@@ -421,16 +421,16 @@ export const handler = async (event, context) => {
       await syncSector(sector, config, auth);
     }
 
-    console.log("Installations Sync Function finished successfully.");
+    console.log("[sync-installations] Synchronisation terminée avec succès");
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: "Synchronization finished successfully." }),
+      body: JSON.stringify({ message: "Synchronisation terminée avec succès" }),
     };
   } catch (error) {
-    console.error("Error during synchronization process:", error);
+    console.error("[sync-installations] Erreur lors de la synchronisation:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ message: "Synchronization failed.", error: error.message }),
+      body: JSON.stringify({ message: "Échec de la synchronisation", error: error.message }),
     };
   }
 };

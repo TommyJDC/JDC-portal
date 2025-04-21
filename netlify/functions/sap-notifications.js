@@ -29,19 +29,27 @@ let db;
 
 // Fonction pour obtenir les utilisateurs notifiables
 async function getNotifiableUsers() {
+  console.log('[sap-notifications] Récupération des utilisateurs notifiables');
   const usersRef = db.collection('users');
   const snapshot = await usersRef
     .where('role', 'in', ['Admin', 'Technician'])
     .get();
   
-  return snapshot.docs.map(doc => ({
+  const users = snapshot.docs.map(doc => ({
     ...doc.data(),
     uid: doc.id,
   }));
+  console.log(`[sap-notifications] ${users.length} utilisateurs notifiables trouvés`);
+  return users;
 }
 
 // Créer une notification
 async function createNotification(notification) {
+  console.log('[sap-notifications] Création de notification:', {
+    userId: notification.userId,
+    type: notification.type,
+    sourceId: notification.sourceId
+  });
   try {
     const notificationData = {
       ...notification,
@@ -49,7 +57,8 @@ async function createNotification(notification) {
       read: false
     };
 
-    await db.collection('notifications').add(notificationData);
+    const notificationRef = await db.collection('notifications').add(notificationData);
+    console.log('[sap-notifications] Notification créée avec ID:', notificationRef.id);
     return true;
   } catch (error) {
     console.error('Erreur lors de la création de la notification:', error);
@@ -59,6 +68,11 @@ async function createNotification(notification) {
 
 // Notifier pour un nouveau ticket SAP
 async function notifyNewSapTicket(ticket) {
+  console.log('[sap-notifications] Notification nouveau ticket SAP:', {
+    ticketId: ticket.id,
+    secteur: ticket.secteur,
+    client: ticket.raisonSociale || ticket.client
+  });
   try {
     const users = await getNotifiableUsers();
     
@@ -76,7 +90,8 @@ async function notifyNewSapTicket(ticket) {
       return null;
     });
 
-    await Promise.all(notificationPromises.filter(Boolean));
+    const results = await Promise.all(notificationPromises.filter(Boolean));
+    console.log('[sap-notifications] Notifications SAP envoyées:', results.filter(Boolean).length);
     return true;
   } catch (error) {
     console.error('Erreur lors de la notification du nouveau ticket SAP:', error);
@@ -86,6 +101,11 @@ async function notifyNewSapTicket(ticket) {
 
 // Notifier pour un nouvel envoi CTN
 async function notifyNewCTN(shipment) {
+  console.log('[sap-notifications] Notification nouvel envoi CTN:', {
+    shipmentId: shipment.id,
+    secteur: shipment.secteur,
+    client: shipment.nomClient
+  });
   try {
     const users = await getNotifiableUsers();
     
@@ -103,7 +123,8 @@ async function notifyNewCTN(shipment) {
       return null;
     });
 
-    await Promise.all(notificationPromises.filter(Boolean));
+    const results = await Promise.all(notificationPromises.filter(Boolean));
+    console.log('[sap-notifications] Notifications CTN envoyées:', results.filter(Boolean).length);
     return true;
   } catch (error) {
     console.error('Erreur lors de la notification du nouvel envoi CTN:', error);
@@ -113,6 +134,7 @@ async function notifyNewCTN(shipment) {
 
 // --- Ajout logique notification SAP depuis Firestore installations ---
 async function notifySapFromInstallations() {
+  console.log('[sap-notifications] Début notification depuis installations');
   if (!db) {
     db = await initializeFirebaseAdmin();
   }
@@ -133,10 +155,16 @@ async function notifySapFromInstallations() {
       notified++;
     }
   }
+  console.log(`[sap-notifications] ${notified} notifications SAP envoyées depuis installations`);
   return notified;
 }
 
 export const handler = async (event) => {
+  console.log('[sap-notifications] Handler appelé:', {
+    method: event.httpMethod,
+    path: event.path,
+    query: event.queryStringParameters
+  });
   try {
     if (!db) {
       db = await initializeFirebaseAdmin();

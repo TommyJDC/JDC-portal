@@ -8,16 +8,13 @@ publish = "build/client" # ✅ pour servir correctement les assets
   external_node_modules = ["firebase-admin"]
 
   [functions.sap-notifications]
-  schedule = "*/5 * * * *"
+  schedule = "@hourly"
 
   [functions.scheduled-gmail-processing]
-  schedule = "*/60 * * * *"
-
-  [functions.check-kezia-installations]
-  schedule = "*/15 * * * *"
+  schedule = "@hourly"
 
   [functions.sync-installations]
-  schedule = "*/60 * * * *"
+  schedule = "*@hourly"
 
 [[headers]]
 for = "/assets/*" # ✅ vise bien les fichiers d'assets, pas "/build/*"
