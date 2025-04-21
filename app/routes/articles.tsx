@@ -108,7 +108,7 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
             submitData.append('intent', 'add_image');
             submitData.append('articleId', targetArticleId);
             submitData.append('imageUrl', imageUrl);
-            fetcher.submit(submitData, { method: 'POST', encType: 'multipart/form-data' });
+            fetcher.submit(submitData, { method: 'POST', action: '/articles', encType: 'multipart/form-data' });
 
           } catch (error: any) {
             console.error("Erreur pendant l'upload Cloudinary:", error);
@@ -150,7 +150,7 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
         submitData.append('intent', 'delete_image');
         submitData.append('articleId', articleId);
         submitData.append('imageUrl', imageUrl);
-        fetcher.submit(submitData, { method: 'POST', encType: 'multipart/form-data' });
+        fetcher.submit(submitData, { method: 'POST', action: '/articles', encType: 'multipart/form-data' });
       };
 
 

@@ -20,14 +20,17 @@ const REDIRECT_URI = `${APP_BASE_URL}/auth/google/callback`;
  * Handles token refresh if necessary.
  * @param session - The user session containing Google tokens.
  * @returns An authenticated OAuth2 client instance.
- * @throws Error if session or tokens are missing, or refresh fails.
+ * @throws Error if session is missing, refresh token is missing, server credentials are not configured, or refresh fails.
  */
-export async function getGoogleAuthClient(session: UserSession | null) {
-  if (!session?.googleAccessToken || !session.googleRefreshToken) {
-    throw new Error("User session or Google tokens are missing.");
+// Allow session to be UserSession, null, or an object containing just the refresh token
+export async function getGoogleAuthClient(session: UserSession | null | { googleRefreshToken: string }) {
+  // We absolutely need a refresh token.
+  if (!session?.googleRefreshToken) {
+    throw new Error("User session or Google refresh token is missing.");
   }
+  // Server credentials must be configured.
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      throw new Error("Server Google credentials (ID or Secret) are not configured.");
+    throw new Error("Server Google credentials (ID or Secret) are not configured.");
   }
 
   const oauth2Client = new google.auth.OAuth2(
@@ -37,39 +40,51 @@ export async function getGoogleAuthClient(session: UserSession | null) {
   );
 
   const tokens: Credentials = {
-    access_token: session.googleAccessToken,
-    refresh_token: session.googleRefreshToken,
-    // scope: session.scopes, // Include scopes if stored in session
+    // Try to set initial credentials if access token is available
+    // The 'session' might only contain the refresh token if called from certain contexts
+    access_token: ('googleAccessToken' in session && session.googleAccessToken) ? session.googleAccessToken : undefined,
+    refresh_token: session.googleRefreshToken, // Always present due to check above
     token_type: 'Bearer',
-    expiry_date: session.tokenExpiry,
+    // Set expiry only if it exists in the session object
+    expiry_date: ('tokenExpiry' in session && session.tokenExpiry) ? session.tokenExpiry : undefined,
   };
 
-  oauth2Client.setCredentials(tokens);
+  oauth2Client.setCredentials(tokens); // Set whatever we have initially
 
-  // Optional: Check if the token is expired and refresh if needed.
-  // googleapis library might handle this automatically in some cases,
-  // but explicit check can be more robust.
-  if (session.tokenExpiry && session.tokenExpiry < Date.now() + 60000) { // Refresh if expires in next 60s
-    console.log("[GoogleAuthClient] Access token expired or expiring soon. Refreshing...");
+  // Determine if we need to refresh:
+  // 1. Access token is missing.
+  // 2. Access token is present but expired or expiring soon.
+  const needsRefresh = !tokens.access_token || (tokens.expiry_date && tokens.expiry_date < Date.now() + 60000); // 60 seconds buffer
+
+  if (needsRefresh) {
+    console.log(`[GoogleAuthClient] Refresh needed. Reason: ${!tokens.access_token ? 'Access token missing' : 'Token expired or expiring soon'}. Refreshing...`);
     try {
+      // Ensure the refresh token is set for the refresh call,
+      // as the initial setCredentials might have failed if access token was missing.
+      oauth2Client.setCredentials({ refresh_token: session.googleRefreshToken });
       const { credentials } = await oauth2Client.refreshAccessToken();
       console.log("[GoogleAuthClient] Token refreshed successfully.");
-      oauth2Client.setCredentials(credentials);
+      oauth2Client.setCredentials(credentials); // Set the new credentials (includes new access token)
 
-      // IMPORTANT: Update the session with the new tokens!
-      // This requires committing the session back. This function currently
-      // doesn't have access to commitSession. The calling loader/action
-      // will need to handle session updates after calling this function
-      // if a refresh occurred. We can return the new tokens for this purpose.
-      // For now, we just update the client instance.
-      // TODO: Implement session update logic in the caller based on returned new tokens.
+      // IMPORTANT: The caller needs to handle updating the session/user profile
+      // with the potentially new refresh token and expiry date if they are returned.
+      // This function currently doesn't have access to commitSession or update user profiles.
+      // TODO: Consider returning the new credentials from this function so the caller can update storage.
+      // For now, we just update the client instance for immediate use.
 
-    } catch (error) {
+    } catch (error: any) { // Added : any type for error
       console.error("[GoogleAuthClient] Error refreshing access token:", error);
       // Handle refresh error (e.g., user revoked access)
-      // Maybe throw a specific error to trigger re-authentication?
-      throw new Error("Failed to refresh Google access token. Please re-authenticate.");
+      // Check if the error indicates invalid grant (revoked access)
+      if (error.response?.data?.error === 'invalid_grant') {
+         console.error("[GoogleAuthClient] Refresh token is invalid or revoked. User needs to re-authenticate.");
+         // Optionally update user profile status here if possible, or let the caller handle it.
+         throw new Error("Google authentication is invalid or revoked. Please re-authorize the application.");
+      }
+      throw new Error(`Failed to refresh Google access token: ${error.message}`);
     }
+  } else {
+    console.log("[GoogleAuthClient] Existing access token is valid.");
   }
 
   return oauth2Client;

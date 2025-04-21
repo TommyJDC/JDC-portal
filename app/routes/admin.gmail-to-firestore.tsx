@@ -4,7 +4,7 @@ import { authenticator } from "~/services/auth.server";
 import { getUserProfileSdk } from "~/services/firestore.service.server";
 import { getGoogleAuthClient } from "~/services/google.server";
 import { processGmailToFirestore } from "~/services/gmail.service.server";
-import { dbAdmin } from "~/firebase.admin.config.server";
+import { initializeFirebaseAdmin } from "~/firebase.admin.config.server";
 import type { GmailProcessingConfig } from "~/types/firestore.types";
 
 /**
@@ -49,6 +49,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Récupérer la configuration Gmail
+    const dbAdmin = await initializeFirebaseAdmin();
     const configDoc = await dbAdmin.collection('settings').doc('gmailProcessingConfig').get();
     const config = configDoc.exists ? configDoc.data() as GmailProcessingConfig : {
       maxEmailsPerRun: 50,
@@ -56,10 +57,10 @@ export async function action({ request }: ActionFunctionArgs) {
       processedLabelName: "Traité",
       refreshInterval: 5,
       sectorCollections: {
-        kezia: { enabled: false, labels: [] },
-        haccp: { enabled: false, labels: [] },
-        chr: { enabled: false, labels: [] },
-        tabac: { enabled: false, labels: [] }
+        kezia: { enabled: false, labels: [], responsables: [] },
+        haccp: { enabled: false, labels: [], responsables: [] },
+        chr: { enabled: false, labels: [], responsables: [] },
+        tabac: { enabled: false, labels: [], responsables: [] }
       }
     };
 

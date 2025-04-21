@@ -1,4 +1,5 @@
-import { dbAdmin as db } from "~/firebase.admin.config.server";
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import type { 
   UserProfile, 
   SapTicket, 
@@ -6,17 +7,51 @@ import type {
   StatsSnapshot, 
   Installation, 
   InstallationStatus,
-  InstallationFilters 
+  InstallationFilters,
+  Notification,
+  Article
 } from "~/types/firestore.types";
-import type * as admin from 'firebase-admin'; // Importer les types admin
-import { FieldValue } from 'firebase-admin/firestore'; // Added FieldValue
+import type * as admin from 'firebase-admin';
+import fetch from 'node-fetch';
+import FormData from 'form-data';
 
-// Collection Reference for Installations
-const installationsCollection = db.collection('installations');
+let db: FirebaseFirestore.Firestore;
+let installationsCollection: admin.firestore.CollectionReference;
+
+export async function initializeFirebaseAdmin() {
+  try {
+    const app = initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      })
+    });
+    
+    db = getFirestore(app);
+    installationsCollection = db.collection('installations');
+    return db;
+  } catch (error: any) {
+    if (error.code === 'app/duplicate-app') {
+      const apps = getApps();
+      const app = apps.length ? apps[0] : null;
+      if (app) {
+        db = getFirestore(app);
+        installationsCollection = db.collection('installations');
+        return db;
+      }
+    }
+    console.error('Firebase Admin initialization error:', error);
+    throw error;
+  }
+}
 
 // Fonctions de gestion des utilisateurs
 export const getUserProfileSdk = async (userId: string): Promise<UserProfile | null> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const doc = await db.collection('users').doc(userId).get();
     return doc.exists ? (doc.data() as UserProfile) : null;
   } catch (error) {
@@ -27,6 +62,9 @@ export const getUserProfileSdk = async (userId: string): Promise<UserProfile | n
 
 export const getAllUserProfilesSdk = async (): Promise<UserProfile[]> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const snapshot = await db.collection('users').get();
     return snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
   } catch (error) {
@@ -37,6 +75,9 @@ export const getAllUserProfilesSdk = async (): Promise<UserProfile[]> => {
 
 export const updateUserProfileSdk = async (userId: string, updates: Partial<UserProfile>): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     await db.collection('users').doc(userId).update(updates);
   } catch (error) {
     console.error("Error updating user profile:", error);
@@ -46,6 +87,9 @@ export const updateUserProfileSdk = async (userId: string, updates: Partial<User
 
 export const createUserProfileSdk = async (profile: UserProfile): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     await db.collection('users').doc(profile.uid).set(profile);
   } catch (error) {
     console.error("Error creating user profile:", error);
@@ -56,6 +100,9 @@ export const createUserProfileSdk = async (profile: UserProfile): Promise<void> 
 // Fonctions de gestion des tickets et envois
 export const getRecentTicketsForSectors = async (sectors: string[], limit: number): Promise<SapTicket[]> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     if (!sectors || sectors.length === 0) {
       console.warn("No sectors provided to getRecentTicketsForSectors");
       return [];
@@ -108,6 +155,9 @@ export const getRecentTicketsForSectors = async (sectors: string[], limit: numbe
 
 export const getTotalTicketCountSdk = async (sectors: string[]): Promise<number> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const snapshot = await db.collection('tickets')
       .where('sector', 'in', sectors)
       .count()
@@ -121,6 +171,9 @@ export const getTotalTicketCountSdk = async (sectors: string[]): Promise<number>
 
 export const getDistinctClientCountFromEnvoiSdk = async (userProfile: UserProfile): Promise<number> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const snapshot = await db.collection('Envoi')
       .where('secteur', 'in', userProfile.secteurs)
       .get();
@@ -134,6 +187,9 @@ export const getDistinctClientCountFromEnvoiSdk = async (userProfile: UserProfil
 
 export const getLatestStatsSnapshotsSdk = async (limit: number): Promise<StatsSnapshot[]> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const snapshot = await db.collection('statsSnapshots')
       .orderBy('timestamp', 'desc')
       .limit(limit)
@@ -158,6 +214,9 @@ export const getInstallationsBySector = async (
   filters?: InstallationFilters
 ): Promise<Installation[]> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     let query: admin.firestore.Query = installationsCollection.where('secteur', '==', sector);
 
     // Appliquer les filtres supplémentaires
@@ -211,6 +270,9 @@ export const addInstallation = async (
   installationData: Omit<Installation, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<admin.firestore.DocumentReference> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const dataWithTimestamps = {
       ...installationData,
       // Ensure required fields have defaults if not provided
@@ -235,6 +297,9 @@ export const updateInstallation = async (
   updates: Partial<Omit<Installation, 'id' | 'createdAt'>> // Exclude non-updatable fields
 ): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     if (Object.keys(updates).length === 0) {
       console.warn(`Attempted to update installation ${id} with no changes.`);
       return;
@@ -256,6 +321,9 @@ export const updateInstallation = async (
  */
 export const getInstallationById = async (id: string): Promise<Installation | null> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const doc = await installationsCollection.doc(id).get();
     if (!doc.exists) {
       console.log(`Installation with ID ${id} not found.`);
@@ -302,6 +370,9 @@ export const getInstallationsSnapshot = async (userProfile: UserProfile): Promis
   };
 
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const userSectors = userProfile?.secteurs || [];
     const isAdmin = userProfile?.role === 'Admin';
     // Determine which sectors to query based on user role
@@ -379,6 +450,9 @@ export const updateSAPTICKET = async (
   updates: Partial<SapTicket>
 ): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     if (Object.keys(updates).length === 0) {
       console.warn(`Tentative de mise à jour du ticket SAP ${ticketId} sans modifications`);
       return;
@@ -399,18 +473,37 @@ export const updateSAPTICKET = async (
 };
 
 // Fonctions de recherche d'articles
-export const searchArticles = async (searchTerm: string, tags?: string[]): Promise<any[]> => {
+// Nouvelle signature : accepte { code, nom }
+export const searchArticles = async (
+  params: { code?: string; nom?: string },
+  tags?: string[]
+): Promise<Article[]> => {
   try {
-    let query = db.collection('articles')
-      .where('title', '>=', searchTerm)
-      .where('title', '<=', searchTerm + '\uf8ff');
-
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
+    let query: FirebaseFirestore.Query = db.collection('articles');
     if (tags?.length) {
       query = query.where('tags', 'array-contains', tags[0]);
     }
-
-    const snapshot = await query.limit(25).get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const snapshot = await query.limit(1000).get();
+    const articles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Article[];
+    const code = (params.code || '').trim().toLowerCase();
+    const nom = (params.nom || '').trim().toLowerCase();
+    let filtered = articles;
+    if (code) {
+      filtered = filtered.filter(a =>
+        typeof a.Code === 'string' && a.Code.toLowerCase().includes(code)
+      );
+    }
+    if (nom) {
+      filtered = filtered.filter(a =>
+        typeof a.Désignation === 'string' && a.Désignation.toLowerCase().includes(nom)
+      );
+    }
+    console.log('[searchArticles] Articles récupérés:', articles.length, '| code:', code, '| nom:', nom);
+    console.log('[searchArticles] Articles après filtrage:', filtered.length);
+    return filtered;
   } catch (error) {
     console.error("Erreur lors de la recherche d'articles :", error);
     return [];
@@ -420,6 +513,9 @@ export const searchArticles = async (searchTerm: string, tags?: string[]): Promi
 // Fonctions de cache géographique
 export const getGeocodeFromCache = async (address: string): Promise<{ lat: number, lng: number } | null> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const doc = await db.collection('geocodes').doc(address).get();
     return doc.exists ? doc.data()?.coordinates : null;
   } catch (error) {
@@ -430,6 +526,9 @@ export const getGeocodeFromCache = async (address: string): Promise<{ lat: numbe
 
 export const setGeocodeToCache = async (address: string, coordinates: { lat: number, lng: number }): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     await db.collection('geocodes').doc(address).set({
       coordinates,
       timestamp: FieldValue.serverTimestamp()
@@ -445,6 +544,9 @@ export const addArticleImageUrl = async (
   imageUrl: string
 ): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     await db.collection('articles').doc(articleId).update({
       imageUrls: FieldValue.arrayUnion(imageUrl),
       updatedAt: FieldValue.serverTimestamp()
@@ -460,6 +562,9 @@ export const deleteArticleImageUrl = async (
   imageUrl: string
 ): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     await db.collection('articles').doc(articleId).update({
       imageUrls: FieldValue.arrayRemove(imageUrl),
       updatedAt: FieldValue.serverTimestamp()
@@ -473,6 +578,9 @@ export const deleteArticleImageUrl = async (
 // Function to get all tickets for multiple sectors without limit
 export const getAllTicketsForSectorsSdk = async (sectors: string[]): Promise<SapTicket[]> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     if (!sectors || sectors.length === 0) {
       console.warn("Aucun secteur fourni pour getAllTicketsForSectorsSdk");
       return [];
@@ -533,6 +641,9 @@ export const getAllTicketsForSectorsSdk = async (sectors: string[]): Promise<Sap
  */
 export const deleteShipmentSdk = async (shipmentId: string): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     await db.collection('Envoi').doc(shipmentId).delete();
     console.log(`Deleted shipment ${shipmentId}`);
   } catch (error) {
@@ -543,6 +654,9 @@ export const deleteShipmentSdk = async (shipmentId: string): Promise<void> => {
 
 export const deleteInstallation = async (installationId: string): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     await installationsCollection.doc(installationId).delete();
     console.log(`Deleted installation ${installationId}`);
   } catch (error) {
@@ -556,6 +670,9 @@ export const bulkUpdateInstallations = async (
   updates: Partial<Installation>
 ): Promise<void> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const batch = db.batch();
     
     ids.forEach(id => {
@@ -580,6 +697,9 @@ export const bulkUpdateInstallations = async (
  */
 export const getAllShipments = async (sectors: string[]): Promise<Shipment[]> => {
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     if (!sectors || sectors.length === 0) {
       console.warn("No sectors provided to getAllShipments");
       return [];
@@ -623,3 +743,32 @@ export const getAllShipments = async (sectors: string[]): Promise<Shipment[]> =>
     return [];
   }
 };
+
+/**
+ * Upload une image vers Cloudinary et retourne l'URL de l'image.
+ * @param fileBuffer Buffer du fichier image
+ * @param fileName Nom du fichier (optionnel)
+ * @returns URL de l'image Cloudinary
+ */
+export async function uploadImageToCloudinary(fileBuffer: Buffer, fileName?: string): Promise<string> {
+  const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'dkeqzl54y';
+  const CLOUDINARY_UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || 'jdc-img';
+  const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+  const formData = new FormData();
+  formData.append('file', fileBuffer, { filename: fileName || 'image.jpg' });
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+  const response = await fetch(CLOUDINARY_API_URL, {
+    method: 'POST',
+    body: formData as any,
+    headers: formData.getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error?.message || `Échec de l'upload Cloudinary (HTTP ${response.status})`);
+  }
+  const data = await response.json();
+  return data.secure_url;
+}

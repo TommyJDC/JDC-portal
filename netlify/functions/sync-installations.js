@@ -111,21 +111,35 @@ const COLUMN_MAPPINGS = {
 
 // --- Initialisation ---
 let db;
-try {
-  // Initialiser Firebase Admin (une seule fois)
-  // Assurez-vous que GOOGLE_APPLICATION_CREDENTIALS est défini dans l'environnement Netlify
-  // ou chargez les credentials manuellement avec cert()
-  initializeApp();
-  db = getFirestore();
-} catch (e) {
-  // Gérer le cas où l'app est déjà initialisée (peut arriver lors des reloads locaux)
-  if (e.code !== 'app/duplicate-app') {
-    console.error('Firebase Admin initialization error:', e);
-  }
-  if (!db) db = getFirestore(); // Obtenir l'instance existante
-}
+let installationsCollection;
 
-const installationsCollection = db.collection('installations');
+async function initializeFirebaseAdmin() {
+  try {
+    const app = initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      })
+    });
+    
+    db = getFirestore(app);
+    installationsCollection = db.collection('installations');
+    return db;
+  } catch (error) {
+    if (error.code === 'app/duplicate-app') {
+      const apps = require('firebase-admin/app').getApps();
+      const app = apps.length ? apps[0] : null;
+      if (app) {
+        db = getFirestore(app);
+        installationsCollection = db.collection('installations');
+        return db;
+      }
+    }
+    console.error('Firebase Admin initialization error:', error);
+    throw error;
+  }
+}
 
 // --- Fonctions Google Sheets ---
 async function getSheetData(auth, spreadsheetId, range) {
@@ -145,6 +159,42 @@ async function getSheetData(auth, spreadsheetId, range) {
         console.error(`Spreadsheet ${spreadsheetId} or range ${range} not found.`);
     }
     return []; // Retourne un tableau vide en cas d'erreur pour ne pas bloquer les autres secteurs
+  }
+}
+
+// Fonction pour récupérer le token Google Sheets
+async function getGoogleSheetsAuth() {
+  try {
+    const userDoc = await db.collection('users').doc('105906689661054220398').get();
+    if (!userDoc.exists) {
+      throw new Error('User with Google token not found');
+    }
+    
+    const userData = userDoc.data();
+    if (!userData) {
+      throw new Error('User data is empty');
+    }
+
+    const refreshToken = userData.googleRefreshToken;
+    if (!refreshToken) {
+      throw new Error('Google refresh token not found for user');
+    }
+    
+    const auth = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+    
+    auth.setCredentials({
+      refresh_token: refreshToken,
+      scope: userData.gmailAuthorizedScopes?.join(' ') || 'https://www.googleapis.com/auth/spreadsheets.readonly',
+      token_type: 'Bearer'
+    });
+    
+    return auth;
+  } catch (error) {
+    console.error('Error getting Google Sheets auth:', error);
+    throw error;
   }
 }
 
@@ -350,36 +400,25 @@ async function syncSector(sector, config, auth) {
 
 
 // --- Handler Netlify ---
-exports.handler = async (event, context) => {
+// Remarque : Assurez-vous que tous les imports sont également en ESM (avec `import`)
+export const handler = async (event, context) => {
   console.log("Starting Installations Sync Function...");
 
   // TODO: Sécuriser l'exécution (ex: vérifier un secret, l'origine de l'appel)
 
   try {
-    // Authentification avec le compte Tommy VILMEN
-    const db = getFirestore();
-    const userDoc = await db.collection('users').doc('105906689661054220398').get();
-    if (!userDoc.exists) {
-      throw new Error('User 105906689661054220398 not found in Firestore');
+    // Initialiser Firebase Admin
+    if (!db) {
+      db = await initializeFirebaseAdmin();
     }
-    const userData = userDoc.data();
-    
-    const auth = new google.auth.OAuth2({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    });
-    
-    auth.setCredentials({
-      refresh_token: userData.googleRefreshToken,
-      scope: userData.gmailAuthorizedScopes.join(' '),
-      token_type: 'Bearer',
-    });
-    
-    const authClient = await auth.getClient();
 
+    // Obtenir l'authentification Google Sheets
+    const auth = await getGoogleSheetsAuth();
+    
     // Synchroniser chaque secteur
     for (const sector in SPREADSHEET_CONFIG) {
-      await syncSector(sector, SPREADSHEET_CONFIG[sector], authClient);
+      const config = SPREADSHEET_CONFIG[sector];
+      await syncSector(sector, config, auth);
     }
 
     console.log("Installations Sync Function finished successfully.");

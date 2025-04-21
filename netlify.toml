@@ -29,13 +29,12 @@ for = "/assets/*" # ✅ vise bien les fichiers d'assets, pas "/build/*"
   [headers.values]
   Cache-Control = "public, max-age=31536000, immutable"
 
-[[redirects]]
-from = "/*"
-to = "/index.html"
-status = 200
 
 [build.environment]
-  SESSION_SECRET = "7gZfSqVQSHS9M9c/x9YVBSRPq+E1T/M6jN8dybzRhUY=" 
+  SESSION_SECRET = "7gZfSqVQSHS9M9c/x9YVBSRPq+E1T/M6jN8dybzRhUY="
   GOOGLE_CLIENT_ID = "1079234336489-rkeiomsnsejcfb670qt1riph0gvcpv62.apps.googleusercontent.com"
   GOOGLE_CLIENT_SECRET = "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"
   APP_BASE_URL = "https://jdc-portal-grenoble.netlify.app/"
+  FIREBASE_PROJECT_ID = "sap-jdc"
+  FIREBASE_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQClY/wXwuV5gSBi\nFxiXC6jms7Y5fUoBgy/Dapa43R0z0DXzEqq5w1tt6LcSwnBqMbV+zfPQFjDnJCxn\nSUg13UkQg6eqgUiRuKN3qdqeZBZI25P8tjXspZcEOy0uc4crm4UDLWKXVBbG3raG\nnzZe3mTgzrzZegRiS7/2eYNyatX2BCgWjrkw9LnpqbPLdMvkxGVBfC7EqB22np8s\nvIEl1o+gOmQMPcvcU08KhqcnzUB7KhSaT2nIkKwqb2XTaNdRbEvy1OygfqO/MGnl\nx21UYw/+u/SwqKO0iazA3tdLxmHVQ8uSJUqJaPpohFcS4H2xNAbYMy4ejJ9b6rqd\n1jps6Y1JAgMBAAECggEAHXT76t1/Eo+BjYbwjcJ5YDGk5INgoXlUkfkThDR5pYdR\nfIwYFULqr14x8SjpbbiRy1ZyNN8m8ZwbPoAqWNGjWEoinDcvjii1ELSTZ/+Kiop1\nRp7LZu0tQwcpKmtQKV+nJqQ4OZyz+9Kh7sM/o1D35aRctV1Kl5lHROZql3/YwNq+\nWmdTFCaOFXXLhJ/XHxsfvzPxw7Mb7KCk/BwGcvg4FjcYAiumwEpnBRGcFYAVungg\n44pzj2QR6AMzOTxltqE2ELRb168eOnICSSS6rMv2XbYldvx/OniJ4awbZSm36BqN\nSH5r+0JnEEtKujJ23B3AXCgxSfdGUz9y2yusuJE4iQKBgQDSVvJL+ZbuEsHGNja8\n77xcqXxdGIAyEQsgFD7/gIS6Q+SLIhKvIsS/dLHtYM9Tm/qQsBe3wKqE8WXopg+Z\nhn/oMD0kZsStcFEk01u1o37C82k9U8YvSthik1HKjNUcT3lRWHnlQ0Rk7ajjtz81\nrFWW91aVfsRJcWVM+wkDImFJbQKBgQDJSx2r8SjTWc8icMtyq/LtZulZvBprL77d\nRAC+3meZf8BayiIkztlwxYes9KlOmWEpRxSoMqcECAGIknlRYJPKoi3iCdP5rFoE\nfXsg8QohQN6a3tInlg4NzkdyjDvC/7YSgiOSarS2lO/6eDbKLtrlQoX0l5FS9G2s\neqpj+NklzQKBgEQ0Y18VcMaEGIdwXvGG/1pArw30+uTBOA1P41mwT9miWEJxawOV\nT50RdvyVLsVax7YRE6/G7sQrDrOQ3XAX9/PPaJQcKtxelkFNs+hDOsB2c4KqXpJJ\nP78/K/91CUmjz5/8A5K+7DeaBPDKI9oApsRMMaxKLdXuyj1bDYIRrOBFAoGBAK0z\ntCFJza4mHcPtuDFAYTQDFBDBeR33pExxgg66AfyjXxj/ymdPkOunG7onfzMBaQgC\ngHTFuM4QMXmZR0hNSH3YFJDlkf7IXWB1tCfBH81DKwepaLzlMcyRTQr0PUvpiXnd\nfswygrKD7wXewI4xyOnx1p+Cd2ogpen+VnTVH8uVAoGBAJNdH/rfAucOHsly+iOh\n+1d6HV9HLyrdjH4ZNwB4pQQNgqJRvwZleChtYhfggEM/cOOO61PsQ3DJFhHBeXke\n5YXPQrD3W0VrBvjcqZopmnZHpHK4OcyWwAV0TBAoKbSiGxb0tM/dyW0Zwde/9B78\nLWgjHueviWZesvEsk3p8Mnje\n-----END PRIVATE KEY-----\n"
+  FIREBASE_CLIENT_EMAIL = "firebase-adminsdk-fbsvc@sap-jdc.iam.gserviceaccount.com"

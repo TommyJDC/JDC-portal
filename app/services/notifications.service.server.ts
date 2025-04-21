@@ -1,10 +1,20 @@
-import { dbAdmin } from '~/firebase.admin.config.server';
+import { initializeFirebaseAdmin, getDb } from '~/firebase.admin.config.server';
 import type { Notification } from '~/types/firestore.types';
 import type { DocumentData, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
+let db: FirebaseFirestore.Firestore;
+
+const ensureDb = async () => {
+  if (!db) {
+    db = await initializeFirebaseAdmin();
+  }
+  return db;
+};
+
 export const getNotifications = async (userId: string) => {
   try {
-    const notificationsRef = dbAdmin.collection('notifications')
+    const db = await ensureDb();
+    const notificationsRef = db.collection('notifications')
       .where('userId', '==', userId)
       .orderBy('timestamp', 'desc')
       .limit(50);
@@ -22,7 +32,8 @@ export const getNotifications = async (userId: string) => {
 
 export const markNotificationAsRead = async (notificationId: string) => {
   try {
-    await dbAdmin.collection('notifications').doc(notificationId).update({
+    const db = await ensureDb();
+    await db.collection('notifications').doc(notificationId).update({
       read: true
     });
     return true;
@@ -34,8 +45,9 @@ export const markNotificationAsRead = async (notificationId: string) => {
 
 export const markAllNotificationsAsRead = async (userId: string) => {
   try {
-    const batch = dbAdmin.batch();
-    const notificationsRef = await dbAdmin.collection('notifications')
+    const db = await ensureDb();
+    const batch = db.batch();
+    const notificationsRef = await db.collection('notifications')
       .where('userId', '==', userId)
       .where('read', '==', false)
       .get();
@@ -54,13 +66,14 @@ export const markAllNotificationsAsRead = async (userId: string) => {
 
 export const createNotification = async (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
   try {
+    const db = await ensureDb();
     const notificationData = {
       ...notification,
       timestamp: new Date(),
       read: false
     };
 
-    const docRef = await dbAdmin.collection('notifications').add(notificationData);
+    const docRef = await db.collection('notifications').add(notificationData);
     return {
       id: docRef.id,
       ...notificationData
@@ -73,7 +86,8 @@ export const createNotification = async (notification: Omit<Notification, 'id' |
 
 export const deleteNotification = async (notificationId: string) => {
   try {
-    await dbAdmin.collection('notifications').doc(notificationId).delete();
+    const db = await ensureDb();
+    await db.collection('notifications').doc(notificationId).delete();
     return true;
   } catch (error) {
     console.error('Error deleting notification:', error);
@@ -83,7 +97,8 @@ export const deleteNotification = async (notificationId: string) => {
 
 export const getUnreadNotificationsCount = async (userId: string) => {
   try {
-    const snapshot = await dbAdmin.collection('notifications')
+    const db = await ensureDb();
+    const snapshot = await db.collection('notifications')
       .where('userId', '==', userId)
       .where('read', '==', false)
       .count()

@@ -48,18 +48,22 @@ export interface GmailProcessingConfig {
     kezia: {
       enabled: boolean;
       labels: string[];
+      responsables: string[];
     };
     haccp: {
       enabled: boolean;
       labels: string[];
+      responsables: string[];
     };
     chr: {
       enabled: boolean;
       labels: string[];
+      responsables: string[];
     };
     tabac: {
       enabled: boolean;
       labels: string[];
+      responsables: string[];
     };
   };
 }

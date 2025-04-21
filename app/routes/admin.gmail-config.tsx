@@ -4,7 +4,7 @@ import { authenticator } from "~/services/auth.server";
 import { getUserProfileSdk, getAllUserProfilesSdk, updateUserProfileSdk } from "~/services/firestore.service.server";
 import { getGoogleAuthClient } from "~/services/google.server";
 import type { UserProfile, GmailProcessingConfig } from "~/types/firestore.types";
-import { dbAdmin } from "~/firebase.admin.config.server";
+import { initializeFirebaseAdmin } from "~/firebase.admin.config.server";
 import type { UserSession } from "~/services/session.server";
 import { google } from 'googleapis';
 
@@ -36,6 +36,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const users = await getAllUserProfilesSdk();
 
   // Récupérer la configuration Gmail
+  const dbAdmin = await initializeFirebaseAdmin();
   const configDoc = await dbAdmin.collection('settings').doc('gmailProcessingConfig').get();
   const config = configDoc.exists ? configDoc.data() as GmailProcessingConfig : {
     maxEmailsPerRun: 50,
@@ -44,19 +45,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
     sectorCollections: {
       kezia: {
         enabled: false,
-        labels: []
+        labels: [],
+        responsables: []
       },
       haccp: {
         enabled: false,
-        labels: []
+        labels: [],
+        responsables: []
       },
       chr: {
         enabled: false,
-        labels: []
+        labels: [],
+        responsables: []
       },
       tabac: {
         enabled: false,
-        labels: []
+        labels: [],
+        responsables: []
       }
     }
   };
@@ -122,22 +127,27 @@ export async function action({ request }: ActionFunctionArgs) {
         const sectorCollections = {
           kezia: {
             enabled: formData.get("kezia-enabled") === "true",
-            labels: (formData.get("kezia-labels") as string || "").split(",").map(l => l.trim()).filter(l => l)
+            labels: (formData.get("kezia-labels") as string || "").split(",").map(l => l.trim()).filter(l => l),
+            responsables: (formData.getAll("kezia-responsables") as string[]).map(r => r.trim()).filter(r => r)
           },
           haccp: {
             enabled: formData.get("haccp-enabled") === "true",
-            labels: (formData.get("haccp-labels") as string || "").split(",").map(l => l.trim()).filter(l => l)
+            labels: (formData.get("haccp-labels") as string || "").split(",").map(l => l.trim()).filter(l => l),
+            responsables: (formData.getAll("haccp-responsables") as string[]).map(r => r.trim()).filter(r => r)
           },
           chr: {
             enabled: formData.get("chr-enabled") === "true",
-            labels: (formData.get("chr-labels") as string || "").split(",").map(l => l.trim()).filter(l => l)
+            labels: (formData.get("chr-labels") as string || "").split(",").map(l => l.trim()).filter(l => l),
+            responsables: (formData.getAll("chr-responsables") as string[]).map(r => r.trim()).filter(r => r)
           },
           tabac: {
             enabled: formData.get("tabac-enabled") === "true",
-            labels: (formData.get("tabac-labels") as string || "").split(",").map(l => l.trim()).filter(l => l)
+            labels: (formData.get("tabac-labels") as string || "").split(",").map(l => l.trim()).filter(l => l),
+            responsables: (formData.getAll("tabac-responsables") as string[]).map(r => r.trim()).filter(r => r)
           }
         };
 
+        const dbAdmin = await initializeFirebaseAdmin();
         await dbAdmin.collection('settings').doc('gmailProcessingConfig').set({
           maxEmailsPerRun,
           processedLabelName,
@@ -269,6 +279,24 @@ export default function AdminGmailConfig() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 />
               </div>
+              <div className="mt-2">
+                <label className="block text-sm text-gray-600 mb-1">
+                  Responsables Kezia
+                </label>
+                <select
+                  name="kezia-responsables"
+                  multiple
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  defaultValue={config.sectorCollections.kezia.responsables || []}
+                >
+                  {users.filter(u => u.googleRefreshToken).map(user => (
+                    <option key={user.uid} value={user.uid}>
+                      {user.displayName} ({user.email})
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-400">Maintenir Ctrl (Windows) ou Cmd (Mac) pour sélection multiple</span>
+              </div>
             </div>
 
             {/* HACCP */}
@@ -296,6 +324,24 @@ export default function AdminGmailConfig() {
                   defaultValue={config.sectorCollections.haccp.labels.join(", ")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 />
+              </div>
+              <div className="mt-2">
+                <label className="block text-sm text-gray-600 mb-1">
+                  Responsables HACCP
+                </label>
+                <select
+                  name="haccp-responsables"
+                  multiple
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  defaultValue={config.sectorCollections.haccp.responsables || []}
+                >
+                  {users.filter(u => u.googleRefreshToken).map(user => (
+                    <option key={user.uid} value={user.uid}>
+                      {user.displayName} ({user.email})
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-400">Maintenir Ctrl (Windows) ou Cmd (Mac) pour sélection multiple</span>
               </div>
             </div>
 
@@ -325,6 +371,24 @@ export default function AdminGmailConfig() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 />
               </div>
+              <div className="mt-2">
+                <label className="block text-sm text-gray-600 mb-1">
+                  Responsables CHR
+                </label>
+                <select
+                  name="chr-responsables"
+                  multiple
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  defaultValue={config.sectorCollections.chr.responsables || []}
+                >
+                  {users.filter(u => u.googleRefreshToken).map(user => (
+                    <option key={user.uid} value={user.uid}>
+                      {user.displayName} ({user.email})
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-400">Maintenir Ctrl (Windows) ou Cmd (Mac) pour sélection multiple</span>
+              </div>
             </div>
 
             {/* Tabac */}
@@ -352,6 +416,24 @@ export default function AdminGmailConfig() {
                   defaultValue={config.sectorCollections.tabac.labels.join(", ")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 />
+              </div>
+              <div className="mt-2">
+                <label className="block text-sm text-gray-600 mb-1">
+                  Responsables Tabac
+                </label>
+                <select
+                  name="tabac-responsables"
+                  multiple
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  defaultValue={config.sectorCollections.tabac.responsables || []}
+                >
+                  {users.filter(u => u.googleRefreshToken).map(user => (
+                    <option key={user.uid} value={user.uid}>
+                      {user.displayName} ({user.email})
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-400">Maintenir Ctrl (Windows) ou Cmd (Mac) pour sélection multiple</span>
               </div>
             </div>
           </div>

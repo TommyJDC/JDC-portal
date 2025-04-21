@@ -1,19 +1,14 @@
+import { initializeFirebaseAdmin } from '~/firebase.admin.config.server';
+import { FieldValue } from 'firebase-admin/firestore';
+import { gmail_v1 } from 'googleapis';
 import { google } from 'googleapis';
 import type { OAuth2Client } from 'google-auth-library';
-import { dbAdmin } from '~/firebase.admin.config.server';
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import type { GmailProcessingConfig } from '~/types/firestore.types';
+import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
-interface GmailLabel {
-  id: string;
-  name: string;
-  labelListVisibility?: string;
-  messageListVisibility?: string;
-}
+let db: FirebaseFirestore.Firestore;
 
-/**
- * Interface pour les données extraites des emails
- */
+// --- Types ---
 interface EmailData {
   date: string;
   raisonSociale: string;
@@ -168,7 +163,7 @@ export async function sapNumberExists(sapNumber: string, collection: string): Pr
   if (!sapNumber) return false;
 
   try {
-    const query = dbAdmin.collection(collection).where('numeroSAP', '==', sapNumber).limit(1);
+    const query = db.collection(collection).where('numeroSAP', '==', sapNumber).limit(1);
     const snapshot = await query.get();
     return !snapshot.empty;
   } catch (error) {
@@ -181,10 +176,8 @@ export async function sapNumberExists(sapNumber: string, collection: string): Pr
  * Envoie les données extraites à Firestore
  */
 export async function sendDataToFirebase(row: EmailData, sapNumber: string, collection: string): Promise<void> {
-  const FIRESTORE_SECRET = "E92N49W43Y29";
-  
   try {
-    await dbAdmin.collection(collection).add({
+    await db.collection(collection).add({
       date: { stringValue: row.date },
       raisonSociale: { stringValue: row.raisonSociale },
       numeroSAP: { stringValue: sapNumber },
@@ -193,7 +186,6 @@ export async function sendDataToFirebase(row: EmailData, sapNumber: string, coll
       telephone: { stringValue: row.telephone },
       demandeSAP: { stringValue: row.demandeSAP },
       messageId: { stringValue: row.messageId },
-      secret: { stringValue: FIRESTORE_SECRET },
       createdAt: FieldValue.serverTimestamp()
     });
     console.log(`[GmailService] Données envoyées à Firestore (${collection}) pour le numéro SAP: ${sapNumber}`);
@@ -207,17 +199,19 @@ export async function sendDataToFirebase(row: EmailData, sapNumber: string, coll
  * Supprime les documents avec "Non trouvé" comme numéro SAP
  */
 export async function deleteRowsWithNonTrouve(collection: string): Promise<void> {
-  const secret = "E92N49W43Y29";
+  if (!db) {
+    db = await initializeFirebaseAdmin();
+  }
   
   try {
-    const snapshot = await dbAdmin.collection(collection)
+    const snapshot = await db.collection(collection)
       .where('numeroSAP.stringValue', '==', 'Non trouvé')
       .get();
     
     console.log(`[GmailService] ${snapshot.size} documents avec "Non trouvé" trouvés dans ${collection}`);
     
-    const batch = dbAdmin.batch();
-    snapshot.docs.forEach(doc => {
+    const batch = db.batch();
+    snapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
       batch.delete(doc.ref);
     });
     
@@ -232,14 +226,18 @@ export async function deleteRowsWithNonTrouve(collection: string): Promise<void>
  * Supprime les documents avec des numéros SAP en double
  */
 export async function deleteRowsWithDuplicateSAP(collection: string): Promise<void> {
+  if (!db) {
+    db = await initializeFirebaseAdmin();
+  }
+
   try {
-    const snapshot = await dbAdmin.collection(collection).get();
+    const snapshot = await db.collection(collection).get();
     const docs = snapshot.docs;
     
     const seenSAP: Record<string, string> = {}; // sapNumber -> docId
     const toDelete: string[] = [];
     
-    docs.forEach(doc => {
+    docs.forEach((doc: QueryDocumentSnapshot) => {
       const data = doc.data();
       const sapNumber = data.numeroSAP?.stringValue;
       
@@ -256,9 +254,9 @@ export async function deleteRowsWithDuplicateSAP(collection: string): Promise<vo
     console.log(`[GmailService] ${toDelete.length} documents en double trouvés dans ${collection}`);
     
     if (toDelete.length > 0) {
-      const batch = dbAdmin.batch();
+      const batch = db.batch();
       toDelete.forEach(id => {
-        batch.delete(dbAdmin.collection(collection).doc(id));
+        batch.delete(db.collection(collection).doc(id));
       });
       
       await batch.commit();
@@ -280,8 +278,8 @@ async function addProcessedLabel(
   try {
     // Vérifier si le label existe, sinon le créer
     const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
-    const labels = (labelsResponse.data.labels || []) as GmailLabel[];
-    let processedLabel = labels.find((l: GmailLabel) => l.name === processedLabelName);
+    const labels = (labelsResponse.data.labels || []) as gmail_v1.Schema$Label[];
+    let processedLabel = labels.find((l: gmail_v1.Schema$Label) => l.name === processedLabelName);
 
     if (!processedLabel) {
       console.log(`[GmailService] Création du label "${processedLabelName}"`);

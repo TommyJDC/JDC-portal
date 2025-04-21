@@ -1,10 +1,10 @@
-import { getAuth } from "firebase-admin/auth";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import type { Notification } from "~/types/firestore.types";
 
 let db: FirebaseFirestore.Firestore;
 
-export async function initializeFirebaseAdmin() {
+async function initializeFirebaseAdmin() {
   try {
     const app = initializeApp({
       credential: cert({
@@ -30,16 +30,11 @@ export async function initializeFirebaseAdmin() {
   }
 }
 
-export const getDb = (): FirebaseFirestore.Firestore => {
+export async function sendNotification(notification: Notification) {
   if (!db) {
-    throw new Error('Firebase Admin not initialized. Call initializeFirebaseAdmin() first.');
+    db = await initializeFirebaseAdmin();
   }
-  return db;
-};
 
-export const auth = () => {
-  if (getApps().length === 0) {
-    throw new Error('Firebase Admin not initialized. Call initializeFirebaseAdmin() first.');
-  }
-  return getAuth();
-};
+  const notificationRef = db.collection("notifications").doc();
+  await notificationRef.set(notification);
+}
