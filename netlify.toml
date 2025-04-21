@@ -14,7 +14,7 @@ publish = "build/client" # ✅ pour servir correctement les assets
   schedule = "@hourly"
 
   [functions.sync-installations]
-  schedule = "*@hourly"
+  schedule = "@hourly"
 
 [[headers]]
 for = "/assets/*" # ✅ vise bien les fichiers d'assets, pas "/build/*"
