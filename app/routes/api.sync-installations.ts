@@ -105,9 +105,17 @@ const COLUMN_MAPPINGS: ColumnMappings = {
   }
 };
 
-import { getDb } from '~/firebase.admin.config.server';
+import { initializeFirebaseAdmin, getDb } from '~/firebase.admin.config.server';
 
-let db: Firestore = getDb();
+let db: Firestore;
+
+async function ensureFirebaseInitialized() {
+  if (!db) {
+    await initializeFirebaseAdmin();
+    db = getDb();
+  }
+  return db;
+}
 
 
 async function getSheetData(auth: any, spreadsheetId: string, range: string) {
@@ -159,7 +167,8 @@ async function getAllInstallationsFromFirestore(db: Firestore, sector: Sector) {
   return installations;
 }
 
-async function syncSector(db: Firestore, sector: Sector, config: { spreadsheetId: string; range: string }, auth: any) {
+async function syncSector(sector: Sector, config: { spreadsheetId: string; range: string }, auth: any) {
+  const db = await ensureFirebaseInitialized();
   console.log(`[sync-installations] Début synchronisation secteur ${sector}`);
   
   const [sheetData, firestoreData] = await Promise.all([
@@ -221,7 +230,7 @@ export async function action({ request }: DataFunctionArgs) {
   }
 
   try {
-    if (!db) db = getDb();
+    db = await ensureFirebaseInitialized();
     const auth = await getGoogleSheetsAuth(db);
     
     const results: Record<string, any> = {};
@@ -230,7 +239,7 @@ export async function action({ request }: DataFunctionArgs) {
     for (const sector in SPREADSHEET_CONFIG) {
       const typedSector = sector as Sector;
       console.log(`[sync-installations] Synchronisation secteur ${typedSector}`);
-      results[typedSector] = await syncSector(db, typedSector, SPREADSHEET_CONFIG[typedSector], auth);
+      results[typedSector] = await syncSector(typedSector, SPREADSHEET_CONFIG[typedSector], auth);
       console.log(`[sync-installations] Secteur ${typedSector} synchronisé:`, results[typedSector]);
     }
 
