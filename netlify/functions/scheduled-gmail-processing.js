@@ -2,16 +2,6 @@ import fetch from 'node-fetch';
 
 export const handler = async (event, context) => {
   console.log('[scheduled-gmail] Début du traitement planifié');
-  const secret = process.env.SCHEDULED_TASK_SECRET;
-  
-  // Vérification de sécurité
-  console.log('[scheduled-gmail] Vérification du secret d\'autorisation');
-  if (event.headers['x-scheduled-secret'] !== secret) {
-    return {
-      statusCode: 403,
-      body: 'Unauthorized'
-    };
-  }
 
   try {
     const apiUrl = `${process.env.URL}/api/gmail-to-firestore`;
@@ -20,8 +10,7 @@ export const handler = async (event, context) => {
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-scheduled-secret': secret
+        'Content-Type': 'application/json'
       }
     });
 
