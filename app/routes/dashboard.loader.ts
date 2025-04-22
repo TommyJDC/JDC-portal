@@ -10,10 +10,9 @@ import {
   getTotalTicketCountSdk,
   getDistinctClientCountFromEnvoiSdk,
   getLatestStatsSnapshotsSdk,
-  getInstallationsSnapshot,
-  type InstallationsSnapshot
+  getInstallationsSnapshot
 } from "~/services/firestore.service.server";
-    import type { SapTicket, Shipment, StatsSnapshot, UserProfile } from "~/types/firestore.types";
+    import type { SapTicket, Shipment, StatsSnapshot, UserProfile, InstallationsDashboardStats } from "~/types/firestore.types";
     import type { UserSession } from "~/services/session.server";
 
     interface CalendarEvent {
@@ -36,7 +35,7 @@ export interface DashboardLoaderData {
       distinctClientCountFromEnvoi: number | null;
     };
   };
-  installationsStats: InstallationsSnapshot | null;
+  installationsStats: InstallationsDashboardStats | null;
   recentTickets: SapTicket[];
   recentShipments: Shipment[];
   clientError: string | null;
@@ -52,7 +51,7 @@ export interface DashboardLoaderData {
       let stats: DashboardLoaderData['stats'] = { liveTicketCount: null, liveDistinctClientCountFromEnvoi: null, evolution: { ticketCount: null, distinctClientCountFromEnvoi: null } };
       let recentTickets: SapTicket[] = [];
       let recentShipments: Shipment[] = [];
-      let installationsStats: InstallationsSnapshot | null = null;
+      let installationsStats: InstallationsDashboardStats | null = null;
       let clientError: string | null = null;
 
       if (session?.userId) {
@@ -137,7 +136,35 @@ export interface DashboardLoaderData {
                 
                 recentTickets = recentTicketsResult.status === 'fulfilled' ? recentTicketsResult.value : [];
                 recentShipments = recentShipmentsResult.status === 'fulfilled' ? recentShipmentsResult.value.slice(0, 20) : [];
-                installationsStats = installationsResult.status === 'fulfilled' ? installationsResult.value : null;
+                
+                // Transform installations data to match component expectations
+                const rawInstallationsStats = installationsResult.status === 'fulfilled' ? installationsResult.value : null;
+                installationsStats = rawInstallationsStats ? {
+                  haccp: {
+                    total: rawInstallationsStats.bySector['HACCP']?.total || 0,
+                    enAttente: rawInstallationsStats.bySector['HACCP']?.byStatus['rendez-vous à prendre'] || 0,
+                    planifiees: rawInstallationsStats.bySector['HACCP']?.byStatus['rendez-vous pris'] || 0,
+                    terminees: rawInstallationsStats.bySector['HACCP']?.byStatus['installation terminée'] || 0
+                  },
+                  chr: {
+                    total: rawInstallationsStats.bySector['CHR']?.total || 0,
+                    enAttente: rawInstallationsStats.bySector['CHR']?.byStatus['rendez-vous à prendre'] || 0,
+                    planifiees: rawInstallationsStats.bySector['CHR']?.byStatus['rendez-vous pris'] || 0,
+                    terminees: rawInstallationsStats.bySector['CHR']?.byStatus['installation terminée'] || 0
+                  },
+                  tabac: {
+                    total: rawInstallationsStats.bySector['Tabac']?.total || 0,
+                    enAttente: rawInstallationsStats.bySector['Tabac']?.byStatus['rendez-vous à prendre'] || 0,
+                    planifiees: rawInstallationsStats.bySector['Tabac']?.byStatus['rendez-vous pris'] || 0,
+                    terminees: rawInstallationsStats.bySector['Tabac']?.byStatus['installation terminée'] || 0
+                  },
+                  kezia: {
+                    total: rawInstallationsStats.bySector['Kezia']?.total || 0,
+                    enAttente: rawInstallationsStats.bySector['Kezia']?.byStatus['rendez-vous à prendre'] || 0,
+                    planifiees: rawInstallationsStats.bySector['Kezia']?.byStatus['rendez-vous pris'] || 0,
+                    terminees: rawInstallationsStats.bySector['Kezia']?.byStatus['installation terminée'] || 0
+                  }
+                } : null;
 
                 if (recentTicketsResult.status === 'rejected') {
                   console.error("Dashboard Loader: Error fetching recent tickets:", recentTicketsResult.reason);

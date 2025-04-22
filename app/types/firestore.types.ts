@@ -201,6 +201,37 @@ export interface InstallationFilters {
  * Represents an Installation document in Firestore.
  * Data sourced initially from spreadsheets, then managed via the app.
  */
+export interface InstallationStats {
+  total: number;
+  enAttente: number;
+  planifiees: number;
+  terminees: number;
+}
+
+export interface InstallationsDashboardStats {
+  haccp: InstallationStats;
+  chr: InstallationStats;
+  tabac: InstallationStats;
+  kezia: InstallationStats;
+}
+
+export interface InstallationsSnapshot {
+  total: number;
+  byStatus: {
+    'rendez-vous à prendre': number;
+    'rendez-vous pris': number; 
+    'installation terminée': number;
+  };
+  bySector: Record<string, {
+    total: number;
+    byStatus: {
+      'rendez-vous à prendre': number;
+      'rendez-vous pris': number;
+      'installation terminée': number;
+    };
+  }>;
+}
+
 export interface Installation {
   id: string; // Firestore document ID
   secteur: 'CHR' | 'HACCP' | 'Tabac' | 'Kezia' | string; // Source sector
