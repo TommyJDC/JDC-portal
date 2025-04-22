@@ -11,7 +11,8 @@ export async function initializeFirebaseAdmin() {
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      })
+      }),
+      storageBucket: '' // Explicitement vide pour éviter toute initialisation de Storage
     });
     
     db = getFirestore(app);
