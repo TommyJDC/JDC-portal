@@ -107,10 +107,18 @@ const COLUMN_MAPPINGS: ColumnMappings = {
 
 let db: Firestore;
 
+let firebaseApp: any;
+
 async function initializeFirebaseAdmin() {
   console.log('[sync-installations] Initialisation Firebase Admin');
+  
+  if (firebaseApp) {
+    console.log('[sync-installations] Firebase déjà initialisé, réutilisation de l\'instance existante');
+    return getFirestore(firebaseApp);
+  }
+
   try {
-    const app = initializeApp({
+    firebaseApp = initializeApp({
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
@@ -118,11 +126,12 @@ async function initializeFirebaseAdmin() {
       })
     });
     
-    return getFirestore(app);
+    return getFirestore(firebaseApp);
   } catch (error: unknown) {
     console.error('[sync-installations] Erreur initialisation Firebase:', error);
     if (error instanceof Error && 'code' in error && error.code === 'app/duplicate-app') {
-      return getFirestore(require('firebase-admin/app').getApps()[0]);
+      firebaseApp = require('firebase-admin/app').getApps()[0];
+      return getFirestore(firebaseApp);
     }
     throw error;
   }
