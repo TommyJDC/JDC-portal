@@ -108,6 +108,7 @@ const COLUMN_MAPPINGS: ColumnMappings = {
 let db: Firestore;
 
 async function initializeFirebaseAdmin() {
+  console.log('[sync-installations] Initialisation Firebase Admin');
   try {
     const app = initializeApp({
       credential: cert({
@@ -119,6 +120,7 @@ async function initializeFirebaseAdmin() {
     
     return getFirestore(app);
   } catch (error: unknown) {
+    console.error('[sync-installations] Erreur initialisation Firebase:', error);
     if (error instanceof Error && 'code' in error && error.code === 'app/duplicate-app') {
       return getFirestore(require('firebase-admin/app').getApps()[0]);
     }
@@ -127,19 +129,21 @@ async function initializeFirebaseAdmin() {
 }
 
 async function getSheetData(auth: any, spreadsheetId: string, range: string) {
+  console.log(`[sync-installations] Récupération données sheet ${spreadsheetId}`);
   const sheets = google.sheets({ version: 'v4', auth });
   try {
     const response = await sheets.spreadsheets.values.get({ spreadsheetId, range });
     return response.data.values || [];
   } catch (err: unknown) {
     if (err instanceof Error) {
-      console.error(`Error fetching sheet data for ${spreadsheetId}:`, err.message);
+      console.error(`[sync-installations] Erreur récupération sheet ${spreadsheetId}:`, err.message);
     }
     return [];
   }
 }
 
 async function getGoogleSheetsAuth(db: Firestore) {
+  console.log('[sync-installations] Récupération auth Google Sheets');
   const userDoc = await db.collection('users').doc('105906689661054220398').get();
   if (!userDoc.exists) throw new Error('User with Google token not found');
   
@@ -162,25 +166,31 @@ async function getGoogleSheetsAuth(db: Firestore) {
 }
 
 async function getAllInstallationsFromFirestore(db: Firestore, sector: Sector) {
+  console.log(`[sync-installations] Récupération installations ${sector} depuis Firestore`);
   const snapshot = await db.collection('installations').where('secteur', '==', sector).get();
   const installations: Record<string, { id: string; [key: string]: unknown }> = {};
   snapshot.forEach(doc => {
     const data = doc.data();
     if (data.codeClient) installations[data.codeClient] = { id: doc.id, ...data };
   });
+  console.log(`[sync-installations] ${Object.keys(installations).length} installations trouvées pour ${sector}`);
   return installations;
 }
 
 async function syncSector(db: Firestore, sector: Sector, config: { spreadsheetId: string; range: string }, auth: any) {
+  console.log(`[sync-installations] Début synchronisation secteur ${sector}`);
+  
   const [sheetData, firestoreData] = await Promise.all([
     getSheetData(auth, config.spreadsheetId, config.range),
     getAllInstallationsFromFirestore(db, sector)
   ]);
 
   if (!sheetData) {
-    console.error(`Failed to fetch sheet data for ${sector}`);
+    console.error(`[sync-installations] Aucune donnée sheet pour ${sector}`);
     return { added: 0, updated: 0, terminated: 0 };
   }
+
+  console.log(`[sync-installations] ${sheetData.length} lignes trouvées pour ${sector}`);
 
   const sheetCodeClients = new Set();
   const updates: any[] = [];
@@ -203,18 +213,16 @@ async function syncSector(db: Firestore, sector: Sector, config: { spreadsheetId
       codeClient,
     };
 
-    // Add sector-specific fields...
-
     const existing = firestoreData[codeClient];
     if (existing) {
-      // Check for updates...
+      updates.push(installationData);
     } else {
       adds.push(installationData);
     }
   }
 
-  // Process updates, adds and terminations...
-  // Return sync statistics
+  console.log(`[sync-installations] Secteur ${sector}: ${adds.length} ajouts, ${updates.length} mises à jour`);
+  
   return { 
     added: adds.length, 
     updated: updates.length, 
@@ -223,7 +231,10 @@ async function syncSector(db: Firestore, sector: Sector, config: { spreadsheetId
 }
 
 export async function action({ request }: DataFunctionArgs) {
+  console.log('[sync-installations] Début de la synchronisation');
+  
   if (request.method !== 'POST') {
+    console.error('[sync-installations] Méthode non autorisée:', request.method);
     return json({ error: 'Method not allowed' }, { status: 405 });
   }
 
@@ -232,14 +243,22 @@ export async function action({ request }: DataFunctionArgs) {
     const auth = await getGoogleSheetsAuth(db);
     
     const results: Record<string, any> = {};
-  for (const sector in SPREADSHEET_CONFIG) {
-    const typedSector = sector as Sector;
-    results[typedSector] = await syncSector(db, typedSector, SPREADSHEET_CONFIG[typedSector], auth);
-  }
+    console.log('[sync-installations] Début synchronisation secteurs');
+    
+    for (const sector in SPREADSHEET_CONFIG) {
+      const typedSector = sector as Sector;
+      console.log(`[sync-installations] Synchronisation secteur ${typedSector}`);
+      results[typedSector] = await syncSector(db, typedSector, SPREADSHEET_CONFIG[typedSector], auth);
+      console.log(`[sync-installations] Secteur ${typedSector} synchronisé:`, results[typedSector]);
+    }
 
+    console.log('[sync-installations] Synchronisation terminée avec succès');
     return json({ success: true, results });
   } catch (error: any) {
-    console.error('Sync error:', error);
-    return json({ error: error.message }, { status: 500 });
+    console.error('[sync-installations] Erreur de synchronisation:', error);
+    return json({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: 500 });
   }
 }
