@@ -213,6 +213,21 @@ async function syncSector(sector: Sector, config: { spreadsheetId: string; range
   }
 
   console.log(`[sync-installations] Secteur ${sector}: ${adds.length} ajouts, ${updates.length} mises à jour`);
+
+  // Enregistrer les nouvelles installations
+  const batch = db.batch();
+  for (const add of adds) {
+    const newDocRef = db.collection('installations').doc();
+    batch.set(newDocRef, add);
+  }
+
+  // Mettre à jour les installations existantes
+  for (const update of updates) {
+    const docRef = db.collection('installations').doc(firestoreData[update.codeClient].id);
+    batch.update(docRef, update);
+  }
+
+  await batch.commit();
   
   return { 
     added: adds.length, 
@@ -230,8 +245,13 @@ export async function action({ request }: DataFunctionArgs) {
   }
 
   try {
+    console.log('[sync-installations] Initialisation Firebase...');
     db = await ensureFirebaseInitialized();
+    console.log('[sync-installations] Firebase initialisé avec succès');
+    
+    console.log('[sync-installations] Récupération auth Google Sheets...');
     const auth = await getGoogleSheetsAuth(db);
+    console.log('[sync-installations] Auth Google Sheets récupérée avec succès');
     
     const results: Record<string, any> = {};
     console.log('[sync-installations] Début synchronisation secteurs');
