@@ -132,6 +132,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
         useEffect(() => { setIsClient(true); }, []);
 
         const formatTicketDate = (date: Date | Timestamp | string | null | undefined): string => {
+            console.log('Ticket date value:', date);
             return formatFirestoreDate(date);
         };
 
@@ -183,14 +184,72 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
                                     )}
                                     <p className="flex items-center gap-2">
                                         <span className="w-24 text-gray-400">Adresse</span>
-                                        <span className="font-medium">{ticket.adresse || 'N/A'}</span>
+                                        <span className="font-medium">{ticket.adresse || 'Non trouvé'}</span>
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Rest of the component content... */}
-                        {/* (Le reste du contenu du composant serait ici) */}
+                        {/* Problem Description */}
+                        <div className="mb-6 p-4 bg-jdc-gray/20 rounded-lg border border-gray-700/50 backdrop-blur-sm">
+                            <h4 className="font-bold text-lg mb-2 text-jdc-yellow">Description du problème</h4>
+                            <div className="prose prose-invert max-w-none">
+                                {ticket.descriptionProbleme || ticket.demandeSAP || 'Aucune description disponible'}
+                            </div>
+                        </div>
+
+                        {/* AI Generated Content */}
+                        <div className="space-y-6 mb-6">
+                            <AnimatedTicketSummary
+                                ticketContent={problemDescriptionForAI}
+                                ticket={ticket}
+                                summary={generatedSummary}
+                                isLoading={isSummaryLoading}
+                                error={summaryError}
+                            />
+
+                            <AnimatedSolution
+                                ticketContent={problemDescriptionForAI}
+                                ticket={ticket}
+                                solution={generatedSolution}
+                                isLoading={isSolutionLoading}
+                                error={solutionError}
+                            />
+                        </div>
+
+                        {/* Status Update */}
+                        <div className="mb-6 p-4 bg-jdc-gray/20 rounded-lg border border-gray-700/50 backdrop-blur-sm">
+                            <h4 className="font-bold text-lg mb-3 text-jdc-yellow">Mettre à jour le statut</h4>
+                            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                                <select
+                                    value={currentStatus}
+                                    onChange={(e) => setCurrentStatus(e.target.value)}
+                                    className="select select-bordered w-full sm:w-auto"
+                                >
+                                    <option value="Nouveau">Nouveau</option>
+                                    <option value="En cours">En cours</option>
+                                    <option value="Terminé">Terminé</option>
+                                    <option value="Annulé">Annulé</option>
+                                </select>
+                                <button
+                                    onClick={handleStatusChange}
+                                    disabled={isLoadingAction || currentStatus === ticket.statutSAP}
+                                    className={`btn ${isLoadingAction ? 'loading' : ''}`}
+                                >
+                                    {isLoadingAction ? 'Enregistrement...' : 'Mettre à jour'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Comments Section */}
+                        <AnimatedComments
+                            comments={ticket.commentaires || []}
+                            onAddComment={(comment) => {
+                                setNewComment(comment);
+                                handleAddComment();
+                            }}
+                            isLoading={isLoadingAction}
+                        />
 
                     </div>
                 </div>

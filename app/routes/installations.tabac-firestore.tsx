@@ -53,7 +53,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const installations = await getInstallationsBySector('TABAC');
+    const installations = await getInstallationsBySector('tabac');
     return json<LoaderData>({ installations });
   } catch (error: any) {
     console.error("[installations.tabac Loader] Error:", error);

@@ -5,7 +5,6 @@ publish = "build/client" # ✅ pour servir correctement les assets
 [functions]
   [functions.framework]
   name = "vite"
-  external_node_modules = ["firebase-admin"]
 
   [functions.sap-notifications]
   schedule = "@hourly"

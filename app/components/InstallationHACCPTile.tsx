@@ -103,29 +103,53 @@ const InstallationHACCPTile: React.FC<InstallationHACCPTileProps> = ({ installat
 
       {/* Edit Fields */}
       <div className="mt-4 pt-4 border-t border-gray-700/30">
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <input
-            type="date"
-            className="bg-jdc-gray-700 text-white rounded px-2 py-1 text-sm focus:ring-jdc-blue focus:border-jdc-blue"
-            value={getDateValue(localInstallation.dateInstall)}
-            onChange={(e) => setLocalInstallation({ 
-              ...localInstallation, 
-              dateInstall: e.target.value 
-            })}
-            placeholder="Date d'installation"
-          />
-          <input
-            type="text"
-            className="bg-jdc-gray-700 text-white rounded px-2 py-1 text-sm focus:ring-jdc-blue focus:border-jdc-blue"
-            value={localInstallation.tech || ''}
-            onChange={(e) => setLocalInstallation({ ...localInstallation, tech: e.target.value })}
-            placeholder="Technicien"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {/* Date Installation */}
+          <div>
+            <label htmlFor={`dateInstall-${installation.id}`} className="block text-xs font-medium text-gray-400 mb-1">Date Install.</label>
+            <input
+              id={`dateInstall-${installation.id}`}
+              type="date"
+              className="w-full bg-black text-white rounded px-2 py-1 text-sm border border-gray-600 focus:ring-jdc-blue focus:border-jdc-blue"
+              value={getDateValue(localInstallation.dateInstall)}
+              onChange={(e) => setLocalInstallation({
+                ...localInstallation,
+                dateInstall: e.target.value
+              })}
+              placeholder="Date d'installation"
+            />
+          </div>
+          {/* Technicien */}
+          <div>
+            <label htmlFor={`tech-${installation.id}`} className="block text-xs font-medium text-gray-400 mb-1">Technicien</label>
+            <input
+              id={`tech-${installation.id}`}
+              type="text"
+              className="w-full bg-black text-white rounded px-2 py-1 text-sm border border-gray-600 focus:ring-jdc-blue focus:border-jdc-blue"
+              value={localInstallation.tech || ''}
+              onChange={(e) => setLocalInstallation({ ...localInstallation, tech: e.target.value })}
+              placeholder="Nom du tech"
+            />
+          </div>
+          {/* Statut Install */}
+          <div>
+            <label htmlFor={`installStatus-${installation.id}`} className="block text-xs font-medium text-gray-400 mb-1">Installé</label>
+            <select
+              id={`installStatus-${installation.id}`}
+              className="w-full bg-black text-white rounded px-2 py-1 text-sm border border-gray-600 focus:ring-jdc-blue focus:border-jdc-blue"
+              value={localInstallation.install || 'Non'} // Default to 'Non' if undefined
+              onChange={(e) => setLocalInstallation({ ...localInstallation, install: e.target.value })}
+            >
+              <option value="Non">Non</option>
+              <option value="Oui">Oui</option>
+            </select>
+          </div>
         </div>
         <button
           onClick={() => onSave({
             dateInstall: localInstallation.dateInstall,
             tech: localInstallation.tech,
+            install: localInstallation.install, // Include install status
             updatedAt: new Date()
           })}
           className="w-full bg-jdc-blue hover:bg-jdc-blue-dark text-white font-bold py-2 px-4 rounded flex items-center justify-center gap-2"

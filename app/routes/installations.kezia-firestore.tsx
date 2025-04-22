@@ -1,41 +1,31 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Link } from "@remix-run/react";
-import { authenticator } from "~/services/auth.server";
-import { getInstallationsBySector } from "~/services/firestore.service.server";
-import InstallationTile from "~/components/InstallationTile";
+import { useLoaderData, Link, useFetcher } from "@remix-run/react";
 import type { Installation } from "~/types/firestore.types";
+import InstallationTile from "~/components/InstallationTile";
+import { loader } from "./installations.kezia-firestore.loader";
+import type { LoaderData } from "./installations.kezia-firestore.loader";
+import type { ActionData } from "./installations.kezia-firestore.action";
+import { action } from "./installations.kezia-firestore.action";
 
-interface LoaderData {
-  installations: Installation[];
-  error?: string;
-}
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const session = await authenticator.isAuthenticated(request);
-  if (!session) {
-    return redirect("/auth/google");
-  }
-
-  try {
-    const installations = await getInstallationsBySector('kezia');
-    return json({ installations });
-  } catch (error) {
-    console.error("Error loading Kezia installations:", error);
-    return json({ 
-      installations: [], 
-      error: "Erreur lors du chargement des installations Kezia" 
-    });
-  }
-};
+export { loader, action };
 
 export default function KeziaInstallationsFirestore() {
-  const { installations, error } = useLoaderData<LoaderData>();
+  const { installations, shippedClientCodes, error } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher<ActionData>();
+
+  const handleSave = async (id: string, updates: Partial<Installation>) => {
+    fetcher.submit(
+      {
+        id,
+        updates: JSON.stringify(updates)
+      },
+      { method: "post" }
+    );
+  };
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-white">
-        Installations Kezia (Firestore)
+        Installations Kezia
       </h1>
 
       <Link to="/dashboard" className="text-jdc-blue hover:underline">
@@ -50,14 +40,25 @@ export default function KeziaInstallationsFirestore() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {installations.map((installation) => (
-          <InstallationTile 
-            key={installation.id}
-            installation={installation}
-            hasCTN={false}
-            onSave={() => {}}
-          />
-        ))}
+        {installations.map((installation) => {
+          const hasCTN = shippedClientCodes.includes(String(installation.codeClient));
+          const sanitizedInstallation = {
+            ...installation,
+            dateInstall: installation.dateInstall 
+              ? typeof installation.dateInstall === 'string'
+                ? installation.dateInstall
+                : new Date(installation.dateInstall.seconds * 1000).toISOString().split('T')[0]
+              : undefined
+          };
+          return (
+            <InstallationTile 
+              key={installation.id}
+              installation={sanitizedInstallation}
+              hasCTN={hasCTN}
+              onSave={(values) => handleSave(installation.id, values)}
+            />
+          );
+        })}
       </div>
 
       {installations.length === 0 && (

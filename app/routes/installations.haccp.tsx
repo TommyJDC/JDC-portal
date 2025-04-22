@@ -56,7 +56,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const installations = await getInstallationsBySector('HACCP');
+    const installations = await getInstallationsBySector('haccp');
     return json<LoaderData>({ installations });
   } catch (error: any) {
     console.error("[installations.haccp Loader] Error:", error);

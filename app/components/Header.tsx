@@ -44,10 +44,10 @@ const techniqueItems = [
   { 
     name: 'Installations',
     subItems: [
-      { name: 'Kezia', to: '/installations/kezia', icon: FaFileAlt },
-      { name: 'CHR', to: '/installations/chr', icon: FaFileAlt },
-      { name: 'HACCP', to: '/installations/haccp', icon: FaFileAlt },
-      { name: 'Tabac', to: '/installations/tabac', icon: FaFileAlt },
+      { name: 'Kezia', to: '/installations/kezia-firestore', icon: FaFileAlt },
+      { name: 'CHR', to: '/installations/chr-firestore', icon: FaFileAlt },
+      { name: 'HACCP', to: '/installations/haccp-firestore', icon: FaFileAlt },
+      { name: 'Tabac', to: '/installations/tabac-firestore', icon: FaFileAlt },
     ]
   },
 ];
@@ -58,8 +58,10 @@ const logistiqueItems = [
   { name: 'Recherche Articles', to: '/articles', icon: FaSearch },
 ];
 
-// Commercial menu items (vide pour le moment)
-const commercialItems: { name: string; to: string; icon: any; disabled?: boolean }[] = [];
+// Commercial menu items
+const commercialItems = [
+  { name: 'Upload Menus', to: '/commercial/upload', icon: FaFileAlt }
+];
 
 // Define Admin item separately
 const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
@@ -299,7 +301,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
               {/* Commercial Menu */}
               <Menu as="div" className="relative inline-block text-left">
                 <div>
-                  <Menu.Button className={`${menuButtonClass} opacity-50 cursor-not-allowed`}>
+                  <Menu.Button className={menuButtonClass}>
                     <span>Commercial</span>
                     <FaChevronDown className="ml-1.5 h-4 w-4" aria-hidden="true" />
                   </Menu.Button>

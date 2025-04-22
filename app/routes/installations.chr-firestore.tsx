@@ -53,7 +53,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const installations = await getInstallationsBySector('CHR');
+    const installations = await getInstallationsBySector('chr');
     return json<LoaderData>({ installations });
   } catch (error: any) {
     console.error("[installations.chr Loader] Error:", error);
