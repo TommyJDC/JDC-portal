@@ -51,6 +51,29 @@ export async function initializeFirebaseAdmin() {
   }
 }
 
+export async function getUserProfileSdk(uid: string): Promise<UserProfile | undefined> {
+  if (!db) await initializeFirebaseAdmin();
+  const userRef = db.collection('users').doc(uid);
+  const doc = await userRef.get();
+  if (!doc.exists) {
+    return undefined;
+  }
+  return doc.data() as UserProfile;
+}
+
+export async function createUserProfileSdk(profileData: UserProfile): Promise<UserProfile> {
+  if (!db) await initializeFirebaseAdmin();
+  await db.collection('users').doc(profileData.uid).set(profileData);
+  return profileData;
+}
+
+export async function updateUserProfileSdk(uid: string, updates: Partial<UserProfile>): Promise<void> {
+  if (!db) await initializeFirebaseAdmin();
+  const userRef = db.collection('users').doc(uid);
+  await userRef.update(updates);
+}
+
+
 // Fonction pour sauvegarder un fichier dans Firebase Storage
 export async function saveFileToStorage(
   buffer: Buffer | Uint8Array,
