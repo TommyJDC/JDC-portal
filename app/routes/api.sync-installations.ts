@@ -105,37 +105,10 @@ const COLUMN_MAPPINGS: ColumnMappings = {
   }
 };
 
-let db: Firestore;
+import { getDb } from '~/firebase.admin.config.server';
 
-let firebaseApp: any;
+let db: Firestore = getDb();
 
-async function initializeFirebaseAdmin() {
-  console.log('[sync-installations] Initialisation Firebase Admin');
-  
-  if (firebaseApp) {
-    console.log('[sync-installations] Firebase déjà initialisé, réutilisation de l\'instance existante');
-    return getFirestore(firebaseApp);
-  }
-
-  try {
-    firebaseApp = initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      })
-    });
-    
-    return getFirestore(firebaseApp);
-  } catch (error: unknown) {
-    console.error('[sync-installations] Erreur initialisation Firebase:', error);
-    if (error instanceof Error && 'code' in error && error.code === 'app/duplicate-app') {
-      firebaseApp = require('firebase-admin/app').getApps()[0];
-      return getFirestore(firebaseApp);
-    }
-    throw error;
-  }
-}
 
 async function getSheetData(auth: any, spreadsheetId: string, range: string) {
   console.log(`[sync-installations] Récupération données sheet ${spreadsheetId}`);
@@ -248,7 +221,7 @@ export async function action({ request }: DataFunctionArgs) {
   }
 
   try {
-    if (!db) db = await initializeFirebaseAdmin();
+    if (!db) db = getDb();
     const auth = await getGoogleSheetsAuth(db);
     
     const results: Record<string, any> = {};
