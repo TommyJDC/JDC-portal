@@ -36,18 +36,53 @@ import type { MetaFunction } from "@remix-run/node";
 
     // Helper to parse serialized dates (similar to dashboard)
     const parseSerializedDateNullable = (serializedDate: string | { seconds: number; nanoseconds: number; } | null | undefined): Date | null => {
-        if (!serializedDate) return null;
+        console.log('parseSerializedDateNullable: Input:', serializedDate, 'Type:', typeof serializedDate);
+        if (!serializedDate) {
+            console.log('parseSerializedDateNullable: Input is null/undefined, returning null');
+            return null;
+        }
         if (typeof serializedDate === 'string') {
+            console.log('parseSerializedDateNullable: Input is string, trying to parse...');
             try {
+                // Try parsing the French date string format first
+                const frenchDateParts = serializedDate.trim().split(' ');
+                if (frenchDateParts.length === 4) {
+                    const day = parseInt(frenchDateParts[1]);
+                    const month = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'].findIndex(m => m === frenchDateParts[2].toLowerCase());
+                    const year = parseInt(frenchDateParts[3]);
+                    if (!isNaN(day) && month !== -1 && !isNaN(year)) {
+                         const date = new Date(year, month, day);
+                         console.log('parseSerializedDateNullable: Parsed as French date string:', date);
+                         return date;
+                    }
+                }
+
+                // Fallback to standard Date parsing if French format fails
                 const date = new Date(serializedDate);
-                if (isNaN(date.getTime())) return null;
+                if (isNaN(date.getTime())) {
+                    console.log('parseSerializedDateNullable: Standard Date parsing failed, returning null');
+                    return null;
+                }
+                console.log('parseSerializedDateNullable: Parsed as standard Date string:', date);
                 return date;
-            } catch { return null; }
+            } catch (e) {
+                console.error('parseSerializedDateNullable: Error during string parsing:', e);
+                return null;
+            }
         }
         if (typeof serializedDate === 'object' && 'seconds' in serializedDate && typeof serializedDate.seconds === 'number' && 'nanoseconds' in serializedDate && typeof serializedDate.nanoseconds === 'number') {
-             try { return new Timestamp(serializedDate.seconds, serializedDate.nanoseconds).toDate(); }
-             catch { return null; }
+             console.log('parseSerializedDateNullable: Input is { seconds, nanoseconds }, trying to convert to Date...');
+             try {
+                 const date = new Timestamp(serializedDate.seconds, serializedDate.nanoseconds).toDate();
+                 console.log('parseSerializedDateNullable: Converted Timestamp to Date:', date);
+                 return date;
+             }
+             catch (e) {
+                 console.error('parseSerializedDateNullable: Error converting Timestamp:', e);
+                 return null;
+             }
         }
+        console.log('parseSerializedDateNullable: Unrecognized input format, returning null');
         return null;
     };
 

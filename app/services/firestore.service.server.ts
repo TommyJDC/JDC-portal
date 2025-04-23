@@ -88,7 +88,8 @@ export async function updateInstallation(id: string, updates: Partial<Installati
 
 export async function getInstallationsBySector(sector: string, filters?: InstallationFilters): Promise<Installation[]> {
   if (!db) await initializeFirebaseAdmin();
-  let query: admin.firestore.CollectionReference | admin.firestore.Query = db.collection(sector);
+  let query: admin.firestore.CollectionReference | admin.firestore.Query = db.collection('installations')
+    .where('secteur', '==', sector);
 
   if (filters) {
     if (filters.status) {
@@ -98,7 +99,32 @@ export async function getInstallationsBySector(sector: string, filters?: Install
   }
 
   const snapshot = await query.get();
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), secteur: sector })) as unknown[] as Installation[];
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    // Les données sont déjà mappées correctement dans Firestore par api.sync-installations
+    // Nous nous assurons simplement que les champs principaux sont présents et typés correctement
+    const installation: Installation = {
+      ...data, // Inclure toutes les données brutes de Firestore
+      id: doc.id, // Surcharger avec l'ID du document
+      secteur: sector, // Surcharger avec le secteur
+      
+      // Surcharger les champs principaux pour assurer leur présence et leur type
+      codeClient: data.codeClient || '',
+      nom: data.nom || '',
+      ville: data.ville || '',
+      contact: data.contact || '',
+      telephone: data.telephone || '', // Le champ telephone devrait être correct grâce à la synchronisation
+      commercial: data.commercial || '',
+      dateInstall: data.dateInstall || undefined, // Le formatage sera fait dans le loader de la route
+      tech: data.tech || '',
+      status: (data.status as InstallationStatus) || 'rendez-vous à prendre', // Assurer le type correct et une valeur par défaut
+      commentaire: data.commentaire || '',
+      
+      // Les autres champs spécifiques aux secteurs seront inclus via le spread ...data
+    };
+
+    return installation;
+  }) as Installation[];
 }
 
 export async function getClientCodesWithShipment(sector: string): Promise<Set<string>> {
@@ -125,15 +151,26 @@ export async function getAllTicketsForSectorsSdk() {
   let allTickets: SapTicket[] = [];
   for (const sector of sectors) {
     const snapshot = await db.collection(sector).get();
-    const sectorTickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), secteur: sector })) as unknown[] as SapTicket[]; // Add sector info
+  const sectorTickets = snapshot.docs.map(doc => {
+    const data = doc.data();
+    // Convert Firestore Timestamp to Date if needed
+    const date = data.date?.toDate ? data.date.toDate() : data.date;
+    return { 
+      id: doc.id, 
+      ...data, 
+      date,
+      secteur: sector 
+    } as SapTicket;
+  });
     allTickets = [...allTickets, ...sectorTickets];
   }
   return allTickets;
 }
 
-export async function updateSAPTICKET(ticketId: string, updates: Partial<SapTicket>): Promise<void> {
+export async function updateSAPTICKET(sectorId: string, ticketId: string, updates: Partial<SapTicket>): Promise<void> {
   if (!db) await initializeFirebaseAdmin();
-  const ticketRef = db.collection('tickets').doc(ticketId);
+  // Use the sectorId to get the correct collection
+  const ticketRef = db.collection(sectorId).doc(ticketId);
   await ticketRef.update(updates);
 }
 
@@ -151,7 +188,17 @@ export async function deleteShipmentSdk(shipmentId: string): Promise<void> {
 export async function getAllUserProfilesSdk(): Promise<UserProfile[]> {
   if (!db) await initializeFirebaseAdmin();
   const snapshot = await db.collection('users').get();
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as unknown[] as UserProfile[];
+  return snapshot.docs.map(doc => ({ 
+    uid: doc.id, // Use document ID as fallback uid
+    ...doc.data(),
+    // Ensure required fields have defaults
+    email: doc.data().email || '',
+    role: doc.data().role || '',
+    secteurs: doc.data().secteurs || [],
+    displayName: doc.data().displayName || '',
+    nom: doc.data().nom || '',
+    password: doc.data().password || ''
+  })) as UserProfile[];
 }
 
 export async function getTotalTicketCountSdk(sectors: string[]): Promise<number> {
@@ -176,11 +223,17 @@ export async function getRecentTicketsForSectors(sectors: string[], limit: numbe
       .limit(limit)
       .get();
       
-    const sectorTickets = snapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data(),
-      secteur: sector 
-    })) as SapTicket[];
+    const sectorTickets = snapshot.docs.map(doc => {
+      const data = doc.data();
+      // Convert Firestore Timestamp to Date if needed
+      const date = data.date?.toDate ? data.date.toDate() : data.date;
+      return {
+        id: doc.id,
+        ...data,
+        date,
+        secteur: sector
+      } as SapTicket;
+    });
     
     allTickets = [...allTickets, ...sectorTickets];
   }
@@ -293,6 +346,30 @@ export async function setGeocodeToCache(address: string, geocode: { lat: number;
   if (!db) await initializeFirebaseAdmin();
   const geocodeCacheRef = db.collection('geocodeCache').doc(address);
   await geocodeCacheRef.set(geocode);
+}
+
+export async function getAllInstallations(): Promise<Installation[]> {
+  if (!db) await initializeFirebaseAdmin();
+  const snapshot = await db.collection('installations').get();
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    const installation: Installation = {
+      ...data,
+      id: doc.id,
+      secteur: data.secteur || '',
+      codeClient: data.codeClient || '',
+      nom: data.nom || '',
+      ville: data.ville || '',
+      contact: data.contact || '',
+      telephone: data.telephone || '',
+      commercial: data.commercial || '',
+      dateInstall: data.dateInstall || undefined,
+      tech: data.tech || '',
+      status: (data.status as InstallationStatus) || 'rendez-vous à prendre',
+      commentaire: data.commentaire || '',
+    };
+    return installation;
+  }) as Installation[];
 }
 
 

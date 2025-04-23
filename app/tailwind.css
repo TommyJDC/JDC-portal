@@ -1,3 +1,16 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes pulse-once {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+.animate-pulse-once {
+  animation: pulse-once 1.5s ease-in-out 1; /* Animation de 1.5s, ease-in-out, une seule fois */
+}

@@ -26,7 +26,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
                 if (!newStatus) {
                     return json({ success: false, error: "Nouveau statut manquant." }, { status: 400 });
                 }
-                await updateSAPTICKET(sectorId, ticketId, { statutSAP: newStatus });
+                await updateSAPTICKET(sectorId, ticketId, { statutSAP: newStatus }); // Pass sectorId
                 return json({ success: true, message: "Statut mis à jour." });
 
             } else if (intent === "add_comment") {
@@ -46,7 +46,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
                      // Let's proceed with just the new comment for now.
                 }
                 const updatedComments = [newComment, ...existingComments];
-                await updateSAPTICKET(sectorId, ticketId, { commentaires: updatedComments });
+                await updateSAPTICKET(sectorId, ticketId, { commentaires: updatedComments }); // Pass sectorId
                 return json({ success: true, message: "Commentaire ajouté." });
 
             } else if (intent === "save_summary") {
@@ -54,7 +54,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
                  if (summary === null || summary === undefined) { // Allow empty string? Check requirements
                      return json({ success: false, error: "Résumé manquant." }, { status: 400 });
                  }
-                 await updateSAPTICKET(sectorId, ticketId, { summary: summary });
+                 await updateSAPTICKET(sectorId, ticketId, { summary: summary }); // Pass sectorId
                  return json({ success: true, message: "Résumé sauvegardé." });
 
             } else if (intent === "save_solution") {
@@ -62,7 +62,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
                   if (solution === null || solution === undefined) { // Allow empty string? Check requirements
                      return json({ success: false, error: "Solution manquante." }, { status: 400 });
                  }
-                 await updateSAPTICKET(sectorId, ticketId, { solution: solution });
+                 await updateSAPTICKET(sectorId, ticketId, { solution: solution }); // Pass sectorId
                  return json({ success: true, message: "Solution sauvegardée." });
 
             } else {

@@ -73,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
   const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
-    if (user) {
+    if (user?.userId) {
       // Initialiser les notifications
       const fetchNotifications = async () => {
         try {
@@ -97,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
       const interval = setInterval(fetchNotifications, 30000);
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user?.userId]);
 
   const handleMarkAsRead = async (id: string) => {
     try {

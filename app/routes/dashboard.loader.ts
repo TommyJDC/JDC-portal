@@ -10,9 +10,10 @@ import {
   getTotalTicketCountSdk,
   getDistinctClientCountFromEnvoiSdk,
   getLatestStatsSnapshotsSdk,
-  getInstallationsSnapshot
+  getInstallationsSnapshot,
+  getAllInstallations // Importer la nouvelle fonction
 } from "~/services/firestore.service.server";
-    import type { SapTicket, Shipment, StatsSnapshot, UserProfile, InstallationsDashboardStats } from "~/types/firestore.types";
+    import type { SapTicket, Shipment, StatsSnapshot, UserProfile, InstallationsDashboardStats, Installation } from "~/types/firestore.types"; // Ajouter Installation
     import type { UserSession } from "~/services/session.server";
 
     interface CalendarEvent {
@@ -36,6 +37,7 @@ export interface DashboardLoaderData {
     };
   };
   installationsStats: InstallationsDashboardStats | null;
+  allInstallations: Installation[]; // Ajouter le champ pour toutes les installations
   recentTickets: SapTicket[];
   recentShipments: Shipment[];
   clientError: string | null;
@@ -52,6 +54,7 @@ export interface DashboardLoaderData {
       let recentTickets: SapTicket[] = [];
       let recentShipments: Shipment[] = [];
       let installationsStats: InstallationsDashboardStats | null = null;
+      let allInstallations: Installation[] = []; // Initialiser la liste des installations
       let clientError: string | null = null;
 
       if (session?.userId) {
@@ -98,7 +101,8 @@ export interface DashboardLoaderData {
                   getDistinctClientCountFromEnvoiSdk(userProfile),
                   getRecentTicketsForSectors(sectorsForTickets, 20),
                   getAllShipments(sectorsForShipments),
-                  getInstallationsSnapshot(userProfile)
+                  getInstallationsSnapshot(userProfile),
+                  getAllInstallations() // Appeler la nouvelle fonction
                 ]);
 
                 const snapshotResult = results[0];
@@ -132,13 +136,15 @@ export interface DashboardLoaderData {
 
                 const recentTicketsResult = results[3];
                 const recentShipmentsResult = results[4];
-                const installationsResult = results[5];
+                const installationsSnapshotResult = results[5]; // Renommer pour plus de clarté
+                const allInstallationsResult = results[6]; // Récupérer le résultat de getAllInstallations
                 
                 recentTickets = recentTicketsResult.status === 'fulfilled' ? recentTicketsResult.value : [];
                 recentShipments = recentShipmentsResult.status === 'fulfilled' ? recentShipmentsResult.value.slice(0, 20) : [];
-                
+                allInstallations = allInstallationsResult.status === 'fulfilled' ? allInstallationsResult.value : []; // Assigner les installations
+
                 // Transform installations data to match component expectations
-                const rawInstallationsStats = installationsResult.status === 'fulfilled' ? installationsResult.value : null;
+                const rawInstallationsStats = installationsSnapshotResult.status === 'fulfilled' ? installationsSnapshotResult.value : null;
                 installationsStats = rawInstallationsStats ? {
                   haccp: {
                     total: rawInstallationsStats.bySector['HACCP']?.total || 0,
@@ -166,6 +172,15 @@ export interface DashboardLoaderData {
                   }
                 } : null;
 
+                if (installationsSnapshotResult.status === 'rejected') { // Mettre à jour le nom de la variable
+                  console.error("Dashboard Loader: Error fetching installations snapshot:", installationsSnapshotResult.reason);
+                  if (!clientError) clientError = "Erreur chargement statistiques installations.";
+                }
+                if (allInstallationsResult.status === 'rejected') { // Gérer l'erreur pour getAllInstallations
+                  console.error("Dashboard Loader: Error fetching all installations:", allInstallationsResult.reason);
+                  if (!clientError) clientError = "Erreur chargement liste installations.";
+                }
+
                 if (recentTicketsResult.status === 'rejected') {
                   console.error("Dashboard Loader: Error fetching recent tickets:", recentTicketsResult.reason);
                   if (!clientError) clientError = "Erreur chargement tickets récents.";
@@ -174,8 +189,9 @@ export interface DashboardLoaderData {
                   console.error("Dashboard Loader: Error fetching recent shipments:", recentShipmentsResult.reason);
                   if (!clientError) clientError = "Erreur chargement envois récents.";
                 }
-                if (installationsResult.status === 'rejected') {
-                  console.error("Dashboard Loader: Error fetching installations stats:", installationsResult.reason);
+                // Correction: Utiliser installationsSnapshotResult ici
+                if (installationsSnapshotResult.status === 'rejected') {
+                  console.error("Dashboard Loader: Error fetching installations stats:", installationsSnapshotResult.reason);
                   if (!clientError) clientError = "Erreur chargement statistiques installations.";
                 }
 
@@ -197,6 +213,7 @@ export interface DashboardLoaderData {
           recentTickets = [];
           recentShipments = [];
           installationsStats = null;
+          allInstallations = []; // Réinitialiser en cas d'erreur
         }
       } else {
           console.log("Dashboard Loader: User not authenticated.");
@@ -208,6 +225,7 @@ export interface DashboardLoaderData {
         calendarError,
         stats,
         installationsStats,
+        allInstallations, // Inclure la liste complète des installations
         recentTickets,
         recentShipments,
         clientError

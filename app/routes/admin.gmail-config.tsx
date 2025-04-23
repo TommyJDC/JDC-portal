@@ -9,13 +9,24 @@ import type { UserSession } from "~/services/session.server";
 import { google } from 'googleapis';
 
 interface GmailLabel {
-  id: string;
-  name: string;
+  id?: string | null;
+  name?: string | null;
 }
 
 interface UserWithLabels extends UserProfile {
   gmailLabels?: GmailLabel[];
+  gmailAuthStatus?: 'active' | 'expired' | 'unauthorized';
+  isGmailProcessor?: boolean;
+  googleRefreshToken?: string;
 }
+
+// Type pour le loader avec les labels
+type LoaderData = {
+  users: (UserWithLabels & {
+    gmailLabels?: GmailLabel[];
+  })[];
+  config: GmailProcessingConfig;
+};
 
 /**
  * Loader pour récupérer la configuration et les utilisateurs
@@ -127,22 +138,22 @@ export async function action({ request }: ActionFunctionArgs) {
         const sectorCollections = {
           kezia: {
             enabled: formData.get("kezia-enabled") === "true",
-            labels: (formData.get("kezia-labels") as string || "").split(",").map(l => l.trim()).filter(l => l),
+            labels: (formData.getAll("kezia-labels") as string[]).map(l => l.trim()).filter(l => l),
             responsables: (formData.getAll("kezia-responsables") as string[]).map(r => r.trim()).filter(r => r)
           },
           haccp: {
             enabled: formData.get("haccp-enabled") === "true",
-            labels: (formData.get("haccp-labels") as string || "").split(",").map(l => l.trim()).filter(l => l),
+            labels: (formData.getAll("haccp-labels") as string[]).map(l => l.trim()).filter(l => l),
             responsables: (formData.getAll("haccp-responsables") as string[]).map(r => r.trim()).filter(r => r)
           },
           chr: {
             enabled: formData.get("chr-enabled") === "true",
-            labels: (formData.get("chr-labels") as string || "").split(",").map(l => l.trim()).filter(l => l),
+            labels: (formData.getAll("chr-labels") as string[]).map(l => l.trim()).filter(l => l),
             responsables: (formData.getAll("chr-responsables") as string[]).map(r => r.trim()).filter(r => r)
           },
           tabac: {
             enabled: formData.get("tabac-enabled") === "true",
-            labels: (formData.get("tabac-labels") as string || "").split(",").map(l => l.trim()).filter(l => l),
+            labels: (formData.getAll("tabac-labels") as string[]).map(l => l.trim()).filter(l => l),
             responsables: (formData.getAll("tabac-responsables") as string[]).map(r => r.trim()).filter(r => r)
           }
         };
@@ -162,11 +173,25 @@ export async function action({ request }: ActionFunctionArgs) {
         const userId = formData.get("userId") as string;
         const isProcessor = formData.get("isProcessor") === "true";
 
-        await updateUserProfileSdk(userId, {
-          isGmailProcessor: isProcessor
-        });
+        if (!userId || typeof userId !== "string" || userId.trim() === "") {
+          return json({ 
+            success: false, 
+            error: "ID utilisateur invalide ou manquant" 
+          }, { status: 400 });
+        }
 
-        return json({ success: true, message: "Statut du processeur mis à jour avec succès" });
+        try {
+          await updateUserProfileSdk(userId, {
+            isGmailProcessor: isProcessor
+          });
+          return json({ success: true, message: "Statut du processeur mis à jour avec succès" });
+        } catch (error) {
+          console.error("Erreur lors de la mise à jour du profil utilisateur:", error);
+          return json({ 
+            success: false, 
+            error: `Erreur lors de la mise à jour: ${error instanceof Error ? error.message : String(error)}`
+          }, { status: 500 });
+        }
       }
 
       default:
@@ -188,10 +213,15 @@ export async function action({ request }: ActionFunctionArgs) {
  * Composant principal
  */
 export default function AdminGmailConfig() {
-  const { users, config } = useLoaderData<typeof loader>();
+  const { users, config } = useLoaderData<LoaderData>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+
+  // Fonction pour obtenir les labels d'un responsable
+  const getResponsableLabels = (responsableId: string) => {
+    return users.find(u => u.uid === responsableId)?.gmailLabels || [];
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -234,20 +264,6 @@ export default function AdminGmailConfig() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Délai de rafraîchissement (minutes)
-            </label>
-            <input
-              type="number"
-              name="refreshInterval"
-              defaultValue={config.refreshInterval}
-              min="1"
-              max="60"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-
           <div className="space-y-4">
             <label className="block text-sm font-medium text-gray-700">
               Configuration des collections
@@ -270,14 +286,24 @@ export default function AdminGmailConfig() {
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
-                  Labels Gmail (séparés par des virgules)
+                  Labels Gmail
                 </label>
-                <input
-                  type="text"
+                <select
                   name="kezia-labels"
-                  defaultValue={config.sectorCollections.kezia.labels.join(", ")}
+                  multiple
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
+                  defaultValue={config.sectorCollections.kezia.labels}
+                >
+                  {users
+                    .find(u => config.sectorCollections.kezia.responsables.includes(u.uid))
+                    ?.gmailLabels?.filter(label => label.name) // Filtrer les labels sans nom
+                    .map(label => (
+                      <option key={label.id} value={label.name || ''}>
+                        {label.name}
+                      </option>
+                    ))}
+                </select>
+                <span className="text-xs text-gray-400">Maintenir Ctrl (Windows) ou Cmd (Mac) pour sélection multiple</span>
               </div>
               <div className="mt-2">
                 <label className="block text-sm text-gray-600 mb-1">
@@ -316,14 +342,23 @@ export default function AdminGmailConfig() {
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
-                  Labels Gmail (séparés par des virgules)
+                  Labels Gmail
                 </label>
-                <input
-                  type="text"
+                <select
                   name="haccp-labels"
-                  defaultValue={config.sectorCollections.haccp.labels.join(", ")}
+                  multiple
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
+                  defaultValue={config.sectorCollections.haccp.labels}
+                >
+                  {users
+                    .find(u => config.sectorCollections.haccp.responsables.includes(u.uid))
+                    ?.gmailLabels?.map(label => (
+                      <option key={label.id} value={label.name || ''}>
+                        {label.name}
+                      </option>
+                    ))}
+                </select>
+                <span className="text-xs text-gray-400">Maintenir Ctrl (Windows) ou Cmd (Mac) pour sélection multiple</span>
               </div>
               <div className="mt-2">
                 <label className="block text-sm text-gray-600 mb-1">
@@ -362,14 +397,23 @@ export default function AdminGmailConfig() {
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
-                  Labels Gmail (séparés par des virgules)
+                  Labels Gmail
                 </label>
-                <input
-                  type="text"
+                <select
                   name="chr-labels"
-                  defaultValue={config.sectorCollections.chr.labels.join(", ")}
+                  multiple
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
+                  defaultValue={config.sectorCollections.chr.labels}
+                >
+                  {users
+                    .find(u => config.sectorCollections.chr.responsables.includes(u.uid))
+                    ?.gmailLabels?.map(label => (
+                      <option key={label.id} value={label.name || ''}>
+                        {label.name}
+                      </option>
+                    ))}
+                </select>
+                <span className="text-xs text-gray-400">Maintenir Ctrl (Windows) ou Cmd (Mac) pour sélection multiple</span>
               </div>
               <div className="mt-2">
                 <label className="block text-sm text-gray-600 mb-1">
@@ -408,14 +452,23 @@ export default function AdminGmailConfig() {
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
-                  Labels Gmail (séparés par des virgules)
+                  Labels Gmail
                 </label>
-                <input
-                  type="text"
+                <select
                   name="tabac-labels"
-                  defaultValue={config.sectorCollections.tabac.labels.join(", ")}
+                  multiple
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
+                  defaultValue={config.sectorCollections.tabac.labels}
+                >
+                  {users
+                    .find(u => config.sectorCollections.tabac.responsables.includes(u.uid))
+                    ?.gmailLabels?.map(label => (
+                      <option key={label.id} value={label.name || ''}>
+                        {label.name}
+                      </option>
+                    ))}
+                </select>
+                <span className="text-xs text-gray-400">Maintenir Ctrl (Windows) ou Cmd (Mac) pour sélection multiple</span>
               </div>
               <div className="mt-2">
                 <label className="block text-sm text-gray-600 mb-1">
@@ -469,6 +522,9 @@ export default function AdminGmailConfig() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Processeur Actif
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Labels Gmail
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -491,22 +547,47 @@ export default function AdminGmailConfig() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <Form method="post" className="inline">
+                    <Form method="post" className="inline" key={user.uid}>
                       <input type="hidden" name="_action" value="toggleProcessor" />
-                      <input type="hidden" name="userId" value={user.uid} />
-                      <input type="hidden" name="isProcessor" value={(!user.isGmailProcessor).toString()} />
+                      <input 
+                        type="hidden" 
+                        name="userId" 
+                        value={user.uid || ''}
+                        onChange={() => {}}
+                      />
+                      <input 
+                        type="hidden" 
+                        name="isProcessor" 
+                        value={(!user.isGmailProcessor).toString()} 
+                        onChange={() => {}}
+                      />
                       <button
                         type="submit"
                         disabled={!user.googleRefreshToken}
                         className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
                           user.isGmailProcessor ? 'bg-blue-600' : 'bg-gray-200'
                         }`}
+                        onClick={(e) => {
+                          if (!user.uid) {
+                            e.preventDefault();
+                            alert("ID utilisateur manquant");
+                          }
+                        }}
                       >
                         <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${
                           user.isGmailProcessor ? 'translate-x-5' : 'translate-x-0'
                         }`} />
                       </button>
                     </Form>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {user.gmailLabels?.length ? (
+                      <div className="text-sm text-gray-500 max-w-xs truncate">
+                        {user.gmailLabels?.map(label => label.name).filter(Boolean).join(', ')}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">Aucun label</div>
+                    )}
                   </td>
                 </tr>
               ))}

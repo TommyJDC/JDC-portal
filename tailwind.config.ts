@@ -28,6 +28,15 @@ export default {
           '"Noto Color Emoji"',
         ],
       },
+      animation: { // Ajouter la section animation
+        'pulse-once': 'pulse-once 1.5s ease-in-out 1', // Définir l'animation utilitaire
+      },
+      keyframes: { // Ajouter la section keyframes
+        'pulse-once': { // Définir les keyframes
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '.5' },
+        }
+      }
     },
   },
   plugins: [], // Remove DaisyUI plugin

@@ -91,9 +91,11 @@ export interface SapTicket {
 
   // Add other relevant fields from your Firestore documents:
   codeClient?: string; // Optional: If you have a separate client code
-  // priorite?: string; // Example: 'Haute', 'Moyenne', 'Basse'
+  priorite?: string; // Example: 'Haute', 'Moyenne', 'Basse'
   // technicien?: string; // Example: Assigned technician's name or ID
   // resolution?: string; // Example: Details of the resolution
+  origine?: string; // Added origine based on usage
+  type?: string; // Added type based on usage
 
   // Fields for TicketSAPDetails component
   descriptionProbleme?: string; // Main problem description (might overlap with 'description')
@@ -236,9 +238,9 @@ export interface Installation {
   id: string; // Firestore document ID
   secteur: 'CHR' | 'HACCP' | 'Tabac' | 'Kezia' | string; // Source sector
 
-  // Fields from spreadsheet/InstallationTile
+  // Fields from spreadsheet/InstallationTile and COLUMN_MAPPINGS
   dateCdeMateriel?: string | Timestamp | Date | { seconds: number; nanoseconds: number } | null;
-  ca?: string;
+  ca?: string; // Assuming 'ca' might exist, keep it optional
   codeClient: string; // Likely used as a key identifier
   nom: string;
   ville?: string;
@@ -252,13 +254,37 @@ export interface Installation {
   tech?: string; // Assigned technician
   dateInstall?: string | Timestamp | Date | { seconds: number; nanoseconds: number } | null;
   commentaire?: string;
+  
+  // Fields from COLUMN_MAPPINGS (making them optional as they vary by sector)
+  dateSignatureCde?: string | Timestamp | Date | { seconds: number; nanoseconds: number } | null; // HACCP, Tabac
+  materielPreParametrage?: string; // HACCP
+  materielLivre?: string; // CHR, HACCP
+  numeroColis?: string; // HACCP
+  commentaireInstall?: string; // HACCP
+  identifiantMotDePasse?: string; // HACCP
+  numerosSondes?: string; // HACCP
+  coordonneesTel?: string; // Tabac (used for telephone in Tabac)
+  materielBalance?: string; // Tabac
+  typeInstall?: string; // Tabac
+  commentaireEtatMateriel?: string; // Tabac
+  colonne1?: string; // Kezia (assuming this is a data field)
+  personneContact?: string; // Kezia
+  materielEnvoye?: string; // Kezia
+  confirmationReception?: string; // Kezia
+  heure?: string; // CHR
+  commentaireTech?: string; // CHR
+  commentaireEnvoiBT?: string; // CHR
+  techSecu?: string; // CHR
+  techAffecte?: string; // CHR
+  integrationJalia?: string; // CHR
+
 
   // New status field
   status: InstallationStatus;
 
   // Timestamps
-  createdAt: Timestamp | Date | { seconds: number; nanoseconds: number };
-  updatedAt: Timestamp | Date | { seconds: number; nanoseconds: number };
+  createdAt?: Timestamp | Date | { seconds: number; nanoseconds: number }; // Make optional if not always present
+  updatedAt?: Timestamp | Date | { seconds: number; nanoseconds: number }; // Make optional if not always present
 
   // Optional: Link back to spreadsheet row if needed, e.g., using row index or a unique ID from the sheet
   // spreadsheetRowIndex?: number;

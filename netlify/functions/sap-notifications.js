@@ -138,24 +138,37 @@ async function notifySapFromInstallations() {
   if (!db) {
     db = await initializeFirebaseAdmin();
   }
+
+  const users = await getNotifiableUsers(); // Récupérer les utilisateurs notifiables
+
   // Récupérer toutes les installations, tous secteurs confondus
   const snapshot = await db.collection('installations').get();
   let notified = 0;
   for (const doc of snapshot.docs) {
     const data = doc.data();
     if (data.status === 'rendez-vous pris' && !data.sapNotificationSent) {
-      await notifyNewSapTicket({
-        id: doc.id,
-        secteur: data.secteur,
-        raisonSociale: data.nom,
-        client: data.codeClient,
-        description: data.commentaire || '',
+      const notificationPromises = users.map(user => {
+        if (user.secteurs.includes(data.secteur)) { // Vérifier si l'utilisateur est dans le secteur de l'installation
+          return createNotification({
+            userId: user.uid, // Attribuer la notification à l'utilisateur
+            title: `Installation SAP - ${data.secteur}`,
+            message: `${data.nom || data.codeClient} - ${data.commentaire || 'Nouvelle installation SAP'}`,
+            type: 'installation',
+            sourceId: doc.id,
+            link: `/installations/kezia-firestore?id=${doc.id}` // Lien vers l'installation (ajuster si nécessaire pour d'autres types d'installations)
+          });
+        }
+        return null;
       });
-      await doc.ref.update({ sapNotificationSent: true });
-      notified++;
+
+      const results = await Promise.all(notificationPromises.filter(Boolean));
+      if (results.filter(Boolean).length > 0) {
+        await doc.ref.update({ sapNotificationSent: true });
+        notified++;
+      }
     }
   }
-  console.log(`[sap-notifications] ${notified} notifications SAP envoyées depuis installations`);
+  console.log(`[sap-notifications] ${notified} installations ont généré des notifications SAP`);
   return notified;
 }
 

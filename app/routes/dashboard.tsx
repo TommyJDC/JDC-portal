@@ -23,7 +23,7 @@ import {
   faCalendarDays 
 } from "@fortawesome/free-solid-svg-icons";
 
-import type { SapTicket, Shipment } from "~/types/firestore.types";
+import type { SapTicket, Shipment, Installation } from "~/types/firestore.types"; // Importer Installation
 import type { UserSession } from "~/services/session.server";
 
 interface CalendarEvent {
@@ -110,6 +110,7 @@ export default function Dashboard() {
     recentTickets: serializedTickets,
     recentShipments: serializedShipments,
     installationsStats,
+    allInstallations, // Récupérer allInstallations
     clientError
   } = useLoaderData<typeof loader>();
 
@@ -121,6 +122,16 @@ export default function Dashboard() {
   const recentShipments: Shipment[] = (serializedShipments ?? []).map(shipment => ({
     ...shipment,
     dateCreation: parseSerializedDateOptional(shipment.dateCreation),
+  }));
+
+  // Désérialiser les dates dans allInstallations
+  const installations: Installation[] = (allInstallations ?? []).map(installation => ({
+    ...installation,
+    dateInstall: parseSerializedDateOptional(installation.dateInstall),
+    createdAt: parseSerializedDateOptional(installation.createdAt),
+    updatedAt: parseSerializedDateOptional(installation.updatedAt),
+    // Désérialiser uniquement les champs de date qui sont susceptibles d'exister et de causer des problèmes de type
+    // Les autres champs de date spécifiques aux secteurs seront gérés si nécessaire.
   }));
 
   const formatStatValue = (value: number | string | null): string => 
@@ -167,15 +178,13 @@ export default function Dashboard() {
         </div>
 
         <div>
-          <h2 className="text-xl font-semibold text-white mb-4">Installations par Secteur</h2>
+          <h2 className="text-xl font-semibold text-white mb-4">État des Installations</h2>
           <InstallationsSnapshot
-            stats={installationsStats || {
-              haccp: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
-              chr: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
-              tabac: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
-              kezia: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 }
-            }}
+            allInstallations={installations} // Passer la liste désérialisée des installations
             isLoading={false}
+            // Vous pouvez supprimer la prop stats ici si vous utilisez allInstallations
+            // ou la laisser pour une compatibilité descendante si nécessaire.
+            // stats={installationsStats} 
           />
         </div>
       </div>

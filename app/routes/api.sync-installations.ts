@@ -29,26 +29,30 @@ const SPREADSHEET_CONFIG: SpreadsheetConfig = {
   },
 };
 
-const COLUMN_MAPPINGS: ColumnMappings = {
+export const COLUMN_MAPPINGS: ColumnMappings = {
   chr: {
-    dateCdeMateriel: 2,
-    codeClient: 4,
-    nom: 5,
-    ville: 6,
-    telephone: 7,
-    commercial: 8,
-    configCaisse: 9,
-    cdc: 10,
-    integrationJalia: 11,
-    dossier: 12,
-    tech: 13,
-    dateInstall: 14,
-    heure: 15,
-    commentaireTech: 17,
-    materielLivre: 18,
-    commentaireEnvoiBT: 19,
-    techSecu: 20,
-    techAffecte: 21
+    // commande: 0, // Non mappé dans le code actuel
+    dateCdeMateriel: 1, // B
+    // CA: 2, // Non mappé dans le code actuel
+    codeClient: 3, // D
+    nom: 4, // E
+    ville: 5, // F
+    telephone: 6, // G
+    commercial: 7, // H
+    // MATERIEL A INSTALLER: 8, // Non mappé dans le code actuel
+    cdc: 9, // J
+    integrationJalia: 10, // K
+    dossier: 11, // L
+    tech: 12, // M
+    dateInstall: 13, // N
+    heure: 14, // O
+    // RELANCE PROG: 15, // Non mappé dans le code actuel
+    commentaireTech: 16, // Q
+    materielLivre: 17, // R
+    commentaireEnvoiBT: 18, // S
+    // BT: 19, // Non mappé dans le code actuel
+    techSecu: 20, // U
+    techAffecte: 21 // V
   },
   haccp: {
     dateSignatureCde: 0,
@@ -106,6 +110,7 @@ const COLUMN_MAPPINGS: ColumnMappings = {
 };
 
 import { initializeFirebaseAdmin, getDb } from '~/firebase.admin.config.server';
+import type { InstallationStatus } from "~/types/firestore.types"; // Importer le type InstallationStatus
 
 let db: Firestore;
 
@@ -193,16 +198,47 @@ async function syncSector(sector: Sector, config: { spreadsheetId: string; range
     if (!codeClient) continue;
     
     sheetCodeClients.add(codeClient);
-    const installationData = {
-      secteur: sector,
-      status: 'rendez-vous à prendre',
-      nom: row[sectorMapping.nom] || '',
-      ville: row[sectorMapping.ville] || '',
-      telephone: row[sectorMapping.telephone] || '',
-      commercial: row[sectorMapping.commercial] || '',
-      dateCdeMateriel: row[sectorMapping.dateCdeMateriel] || null,
-      codeClient,
+    // Construire l'objet installationData en mappant toutes les colonnes définies dans COLUMN_MAPPINGS
+    const installationData: Record<string, any> = {
+      secteur: sector, // Toujours inclure le secteur
+      codeClient: codeClient, // Toujours inclure le code client
+      status: 'rendez-vous à prendre', // Définir un statut par défaut si non présent dans la feuille? Ou mapper depuis la feuille si un champ status existe? (Actuellement non mappé dans COLUMN_MAPPINGS)
     };
+
+    // Log pour le débogage - Afficher la ligne brute et les données mappées pour Kezia
+    if (sector === 'kezia') {
+      console.log(`[sync-installations][DEBUG] Kezia Row:`, row);
+      console.log(`[sync-installations][DEBUG] Kezia Mapped Data (before processing):`, installationData);
+    }
+
+    // Mapper tous les champs définis dans le mapping du secteur
+    for (const key in sectorMapping) {
+      const columnIndex = sectorMapping[key];
+      const value = row[columnIndex];
+      
+      // Gérer les cas spécifiques ou formater si nécessaire (ex: dates)
+      if (key === 'dateInstall' || key === 'dateCdeMateriel' || key === 'dateSignatureCde') {
+        // Tenter de parser la date si elle existe
+        const date = value ? new Date(value) : null;
+        // Vérifier si la date est valide. Si non, stocker null.
+        installationData[key] = date && !isNaN(date.getTime()) ? date : null;
+      } else if (key === 'telephone' && sector === 'tabac') {
+         // Gérer le cas spécifique du téléphone pour Tabac si le champ est nommé différemment dans la feuille
+         // Note: Le mapping COLUMN_MAPPINGS.tabac.coordonneesTel est déjà utilisé pour 'telephone' ci-dessous
+         installationData['telephone'] = value || '';
+      }
+       else {
+        // Pour les autres champs, stocker la valeur brute (ou une chaîne vide si undefined/null)
+        installationData[key] = value || '';
+      }
+    }
+
+    // Assurer que les champs obligatoires par le type Installation sont présents, même s'ils sont vides
+    // (Cela peut être redondant si le mapping les couvre, mais assure la robustesse)
+    installationData.nom = installationData.nom || '';
+    installationData.codeClient = installationData.codeClient || '';
+    installationData.status = (installationData.status as InstallationStatus) || 'rendez-vous à prendre';
+
 
     const existing = firestoreData[codeClient];
     if (existing) {
@@ -267,9 +303,27 @@ export async function action({ request }: DataFunctionArgs) {
     return json({ success: true, results });
   } catch (error: any) {
     console.error('[sync-installations] Erreur de synchronisation:', error);
+    
+    // Log supplémentaire pour Firebase
+    if (error.code && error.code.startsWith('firebase')) {
+      console.error('[sync-installations] Erreur Firebase:', error.code, error.details);
+    }
+    
+    // Log supplémentaire pour Google Sheets
+    if (error.response) {
+      console.error('[sync-installations] Erreur Google API:', {
+        status: error.response.status,
+        data: error.response.data
+      });
+    }
+
     return json({ 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message || 'An unknown error has occurred',
+      details: process.env.NODE_ENV === 'development' ? {
+        code: error.code,
+        stack: error.stack,
+        response: error.response?.data
+      } : undefined
     }, { status: 500 });
   }
 }

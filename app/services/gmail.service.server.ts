@@ -77,26 +77,46 @@ export async function extractEmailContent(
         const body = getMessageBody(messageData);
         
         // Extraire les données avec des expressions régulières
-        const date = /Pour le (.*)/i.exec(body);
-        const raisonSociale = /Enseigne \*(.*?)\*/.exec(body);
-        const numeroSAP = /Numéro \*(.*?)\*/.exec(body);
-        const codeClient = /Client (\d+)/.exec(body);
-        const regexAdresse = /Adresse((?! de livraison)[\s\S]*?)(?=\nTéléphone 1)/;
-        const matchAdresse = regexAdresse.exec(body);
-        const adresse = matchAdresse ? matchAdresse[1].trim() : "Non trouvé";
-        const telephone = /Téléphone 1 (\d+)[^\d\n]*(?:\nTéléphone 2 (\d+))?/i.exec(body);
-        const demandeSAP = /Commentaires([\s\S]*)/i.exec(body);
+        // Extraction plus robuste des données
+        const dateMatch = /Pour le (.*?)(?:\n|$)/i.exec(body);
+        const date = dateMatch ? dateMatch[1].trim() : "Non trouvé";
+        
+        const raisonSocialeMatch = /Enseigne\s*[\*:]?\s*(.*?)(?:\n|\*|$)/i.exec(body);
+        const raisonSociale = raisonSocialeMatch ? raisonSocialeMatch[1].trim() : "Non trouvé";
+        
+        const numeroSAPMatch = /Num(?:éro)?\s*SAP\s*[\*:]?\s*(.*?)(?:\n|\*|$)/i.exec(body);
+        const numeroSAP = numeroSAPMatch ? numeroSAPMatch[1].trim() : "Non trouvé";
+        
+        const codeClientMatch = /Client\s*[\*:]?\s*(\d+)/i.exec(body);
+        const codeClient = codeClientMatch ? codeClientMatch[1] : "Non trouvé";
+        
+        // Extraction de l'adresse avec plusieurs formats possibles
+        const adresseMatch = /Adresse\s*[\*:]?\s*((?:(?!\nTéléphone).)*)/is.exec(body);
+        const adresse = adresseMatch ? adresseMatch[1].trim().replace(/\n/g, ' ') : "Non trouvé";
+        
+        // Extraction des téléphones avec formats variés
+        const telephones = [];
+        const phoneRegex = /Téléphone\s*(?:1)?\s*[\*:]?\s*(\d{10})/gi;
+        let phoneMatch;
+        while ((phoneMatch = phoneRegex.exec(body)) !== null) {
+          telephones.push(phoneMatch[1]);
+        }
+        const telephone = telephones.length > 0 ? telephones.join(', ') : "Non trouvé";
+        
+        // Extraction de la demande SAP
+        const demandeSAPMatch = /Commentaires?\s*[\*:]?\s*(.*)/is.exec(body);
+        const demandeSAP = demandeSAPMatch ? demandeSAPMatch[1].trim() : "Non trouvé";
         const messageId = messageData.id || '';
 
         emailData.push({
-          date: date ? date[1] : "Non trouvé",
-          raisonSociale: raisonSociale ? raisonSociale[1] : "Non trouvé",
-          numeroSAP: numeroSAP ? numeroSAP[1] : "Non trouvé",
-          codeClient: codeClient ? codeClient[1] : "Non trouvé",
-          adresse: adresse,
-          telephone: telephone ? (telephone[1] + (telephone[2] ? ', ' + telephone[2] : '')) : "Non trouvé",
-          demandeSAP: demandeSAP ? demandeSAP[1] : "Non trouvé",
-          messageId: messageId
+          date,
+          raisonSociale,
+          numeroSAP,
+          codeClient,
+          adresse,
+          telephone,
+          demandeSAP,
+          messageId
         });
       } catch (error) {
         console.error(`[GmailService] Erreur lors du traitement du message ${message.id}:`, error);
@@ -151,9 +171,27 @@ function getMessageBody(message: any): string {
 /**
  * Normalise un numéro SAP en supprimant tous les caractères non numériques
  */
-function normalizeSapNumber(sapNumber: string | null | undefined): string {
-  if (!sapNumber) return "";
-  return sapNumber.replace(/[^0-9]/g, "").trim();
+function normalizeSapNumber(sapNumber: string | null | undefined, collection: string): string {
+  if (!sapNumber || sapNumber === "Non trouvé") {
+    console.log(`[GmailService] Numéro SAP manquant ou "Non trouvé" dans ${collection}`);
+    return "";
+  }
+  
+  // Nettoyer le numéro SAP
+  const cleaned = sapNumber.replace(/[^0-9]/g, "").trim();
+  
+  // Validation différente selon la collection
+  if (collection === 'HACCP' && cleaned.length !== 10) {
+    console.warn(`[GmailService] Numéro SAP HACCP invalide (doit avoir 10 chiffres): ${sapNumber} -> ${cleaned}`);
+    return "";
+  }
+  
+  if ((collection === 'Kezia' || collection === 'CHR' || collection === 'Tabac') && cleaned.length === 0) {
+    console.warn(`[GmailService] Numéro SAP ${collection} invalide (vide après nettoyage): ${sapNumber}`);
+    return "";
+  }
+  
+  return cleaned;
 }
 
 /**
@@ -163,6 +201,9 @@ export async function sapNumberExists(sapNumber: string, collection: string): Pr
   if (!sapNumber) return false;
 
   try {
+    if (!db) {
+      db = await initializeFirebaseAdmin();
+    }
     const query = db.collection(collection).where('numeroSAP', '==', sapNumber).limit(1);
     const snapshot = await query.get();
     return !snapshot.empty;
@@ -320,20 +361,30 @@ export async function processGmailToFirestore(
   authClient: OAuth2Client,
   config: GmailProcessingConfig
 ): Promise<void> {
+  // Déclarer les variables en dehors du try pour qu'elles soient accessibles dans le catch
+  let collections: { name: string; config: any }[] = [];
+  let name: string | null = null; 
+
   try {
     console.log('[GmailService] Démarrage du traitement Gmail vers Firestore');
     
-    // Traiter chaque collection activée
-    const collections = [
+    // Initialiser les collections ici
+    collections = [
       { name: 'Kezia', config: config.sectorCollections.kezia },
       { name: 'HACCP', config: config.sectorCollections.haccp },
       { name: 'CHR', config: config.sectorCollections.chr },
       { name: 'Tabac', config: config.sectorCollections.tabac }
     ];
 
-    for (const { name, config: collectionConfig } of collections) {
+    for (const collectionItem of collections) {
+      name = collectionItem.name; // Mettre à jour le nom de la collection en cours
+      const collectionConfig = collectionItem.config;
+
       if (!collectionConfig.enabled || collectionConfig.labels.length === 0) {
-        console.log(`[GmailService] Collection ${name} désactivée ou sans labels, ignorée`);
+        console.log(`[GmailService] Collection ${name} ignorée - 
+          Statut: ${collectionConfig.enabled ? 'activée' : 'désactivée'}
+          Labels configurés: ${collectionConfig.labels.length}
+          Responsables: ${collectionConfig.responsables?.length || 0}`);
         continue;
       }
 
@@ -345,10 +396,17 @@ export async function processGmailToFirestore(
       
       // Traiter chaque email
       for (const row of data) {
-        const sapNumber = normalizeSapNumber(row.numeroSAP);
+        const sapNumber = normalizeSapNumber(row.numeroSAP, name);
         
-        if (!sapNumber || sapNumber === "") {
-          console.log(`[GmailService] Numéro SAP invalide dans ${name}, saut de l'entrée.`);
+        if (!sapNumber) {
+          const originalNum = row.numeroSAP;
+          const cleanedNum = originalNum.replace(/[^0-9]/g, "").trim();
+          console.log(`[GmailService] Numéro SAP rejeté dans ${name}:
+            Original: "${originalNum}"
+            Nettoyé: "${cleanedNum}"
+            Message ID: ${row.messageId}
+            Raison sociale: ${row.raisonSociale}
+            Code client: ${row.codeClient}`);
           continue;
         }
         
@@ -373,7 +431,11 @@ export async function processGmailToFirestore(
     
     console.log('[GmailService] Traitement Gmail vers Firestore terminé avec succès');
   } catch (error) {
-    console.error('[GmailService] Erreur lors du traitement Gmail vers Firestore:', error);
+    console.error(`[GmailService] Erreur critique lors du traitement Gmail vers Firestore:
+      Message: ${error instanceof Error ? error.message : String(error)}
+      Stack: ${error instanceof Error ? error.stack : 'Non disponible'}
+      Collections configurées: ${collections.map((c: { name: string }) => c.name).join(', ')}
+      Dernière collection traitée: ${name ?? 'Aucune'}`); // Utiliser ?? pour gérer null/undefined
     throw new Error(`Échec du traitement Gmail vers Firestore: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

@@ -6,20 +6,38 @@ import {
   getInstallationsBySector, 
   updateInstallation,
   deleteInstallation,
-  bulkUpdateInstallations 
+  bulkUpdateInstallations,
+  getAllShipments // Importer la fonction pour récupérer les envois
 } from "~/services/firestore.service.server";
 import InstallationTile from "~/components/InstallationTile";
+import type { Installation, Shipment } from "~/types/firestore.types"; // Importer les types
+import { formatFirestoreDate } from "~/utils/dateUtils"; // Importer la fonction de formatage
+import { COLUMN_MAPPINGS } from "~/routes/api.sync-installations"; // Importer les mappings
 
 interface ActionData {
   success?: boolean;
   error?: string;
 }
 
+// Interface pour les données d'installation traitées, correspondant aux props de InstallationTile
+interface ProcessedInstallation {
+  id: string;
+  codeClient: string;
+  nom: string;
+  ville?: string;
+  contact?: string;
+  telephone?: string;
+  commercial?: string;
+  dateInstall?: string; // Type attendu par InstallationTile
+  tech?: string;
+  status?: string;
+  commentaire?: string;
+  hasCTN: boolean; // Propriété ajoutée
+  // Inclure d'autres champs si nécessaire, en s'assurant que les types correspondent
+}
+
 interface LoaderData {
-  installations: {
-    id: string;
-    [key: string]: any;
-  }[];
+  installations: ProcessedInstallation[]; // Utiliser le type traité
   error?: string;
 }
 
@@ -53,10 +71,60 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const installations = await getInstallationsBySector('tabac');
+    // 1. Récupérer tous les envois
+    const allShipments = await getAllShipments();
+    
+    // 2. Créer un Set des codeClient pour le secteur 'tabac'
+    const tabacShipmentClientCodes = new Set<string>();
+    allShipments.forEach((shipment: Shipment) => {
+      // Assurez-vous que les champs existent et correspondent au secteur 'tabac'
+      if (shipment.secteur?.toLowerCase() === 'tabac' && shipment.codeClient) {
+        tabacShipmentClientCodes.add(shipment.codeClient);
+      }
+    });
+
+    // 3. Récupérer les installations Tabac
+    const installationsRaw = await getInstallationsBySector('tabac');
+
+    const sector = 'tabac';
+    const sectorMapping = COLUMN_MAPPINGS[sector];
+
+    // 4. Mapper les données brutes, formater la date et ajouter la propriété hasCTN à chaque installation
+    const installations: ProcessedInstallation[] = installationsRaw.map(installation => {
+      const data = installation as any; // Utiliser 'any' temporairement
+
+      // Accéder aux propriétés directement par leur nom, car les données de Firestore
+      // sont déjà mappées avec les clés correctes par la fonction de synchronisation.
+      return {
+        id: installation.id, // L'ID est toujours présent
+        codeClient: data.codeClient || '',
+        nom: data.nom || '',
+        ville: data.ville || '',
+        contact: data.contact || '', // Utiliser la clé directe
+        telephone: data.telephone || '', // Utiliser la clé directe (assurez-vous que la synchronisation mappe coordonneesTel à telephone)
+        commercial: data.commercial || '',
+        tech: data.tech || '',
+        status: data.status || '', // Utiliser la clé directe
+        commentaire: data.commentaire || '',
+        
+        // --- Champs traités ---
+        // Récupérer les dates comme des chaînes brutes
+        dateInstall: data.dateInstall ? String(data.dateInstall) : '', 
+        hasCTN: tabacShipmentClientCodes.has(data.codeClient), 
+        
+        // Inclure d'autres champs spécifiques au secteur Tabac si nécessaire
+        dateSignatureCde: data.dateSignatureCde ? String(data.dateSignatureCde) : '', 
+        materielBalance: data.materielBalance || '',
+        offreTpe: data.offreTpe || '',
+        cdc: data.cdc || '',
+        typeInstall: data.typeInstall || '',
+        commentaireEtatMateriel: data.commentaireEtatMateriel || '',
+      };
+    });
+
     return json<LoaderData>({ installations });
   } catch (error: any) {
-    console.error("[installations.tabac Loader] Error:", error);
+    console.error("[installations.tabac Loader] Error fetching data:", error);
     return json<LoaderData>({ 
       installations: [],
       error: error.message || "Erreur lors du chargement des installations Tabac." 
@@ -99,6 +167,7 @@ export default function TabacInstallations() {
             <InstallationTile
               key={installation.id}
               installation={installation}
+              hasCTN={installation.hasCTN} // Passer la prop hasCTN
               onSave={(values) => handleSave(installation.id, values)}
             />
           ))}

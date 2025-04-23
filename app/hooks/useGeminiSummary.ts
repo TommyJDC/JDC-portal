@@ -51,6 +51,8 @@ const useGeminiSummary = (apiKey: string) => {
         // Vérifier si une génération est déjà en cours pour ce ticket
         if (generatingTickets.has(ticket.id)) {
             console.log(`[useGeminiSummary] Generation already in progress for ticket ${ticket.id}`);
+            // Optionally, check if the existing generation is stuck in an error state (e.g., quota)
+            // If it's a quota error, we might want to allow retries after a delay, but for now, just prevent immediate re-triggering.
             return;
         }
 
@@ -62,22 +64,22 @@ const useGeminiSummary = (apiKey: string) => {
             console.log(`[useGeminiSummary] Using cached ${targetField} for ticket ${ticket.id}`);
             setSummary(existingContent);
             setIsCached(true);
-            setError(null);
+            setError(null); // Clear any previous error
             return;
         }
 
         // Marquer le début de la génération
         generatingTickets.add(ticket.id);
         setIsLoading(true);
-        setError(null);
+        setError(null); // Clear previous error before starting
         setIsCached(false);
-        setSummary('');
+        setSummary(''); // Clear previous summary
 
         if (!prompt) {
             console.log("[useGeminiSummary] No prompt provided, skipping generation.");
-            // setSummary(''); // Already cleared
-            setError("Prompt vide fourni pour la génération."); // Set specific error
+            setError("Prompt vide fourni pour la génération.");
             setIsLoading(false);
+            generatingTickets.delete(ticket.id); // Ensure we remove from generating set
             return;
         }
 
@@ -92,12 +94,13 @@ const useGeminiSummary = (apiKey: string) => {
             console.error("[useGeminiSummary] genAI client not initialized. Cannot generate.");
             setError("Client API Gemini non initialisé. Vérifiez la clé API.");
             setIsLoading(false);
-            return;
-        }
+        return;
+    }
 
-        console.log("[useGeminiSummary] Generating with prompt:", prompt);
+    console.log("[useGeminiSummary] API Key received:", apiKey ? "Present" : "Missing"); // Added log
+    console.log("[useGeminiSummary] Generating with prompt:", prompt);
 
-        try {
+    try {
             // Use stable production model
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 

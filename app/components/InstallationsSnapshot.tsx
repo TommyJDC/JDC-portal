@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react'; // Importer useMemo
 import { Link } from '@remix-run/react';
 import { Button } from '~/components/ui/Button';
 import { format } from 'date-fns';
@@ -11,6 +11,8 @@ import {
   FaSync
 } from 'react-icons/fa';
 
+import type { Installation, InstallationStatus } from "~/types/firestore.types"; // Importer Installation et InstallationStatus
+
 interface InstallationStats {
   total: number;
   enAttente: number;
@@ -19,12 +21,13 @@ interface InstallationStats {
 }
 
 interface InstallationsSnapshotProps {
-  stats: {
+  stats?: { // Rendre stats optionnel
     haccp: InstallationStats;
     chr: InstallationStats;
     tabac: InstallationStats;
     kezia: InstallationStats;
   };
+  allInstallations?: Installation[]; // Ajouter la prop pour la liste complète
   isLoading?: boolean;
   lastUpdate?: Date;
   onRefresh?: () => void;
@@ -77,7 +80,58 @@ const InstallationCard = ({
   </Link>
 );
 
-export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = ({ stats, isLoading = false, lastUpdate, onRefresh }) => {
+export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = ({ stats, allInstallations, isLoading = false, lastUpdate, onRefresh }) => {
+
+  const calculatedStats = useMemo(() => {
+    if (!allInstallations) {
+      return stats || { // Utiliser les stats passées si allInstallations n'est pas défini
+        haccp: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
+        chr: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
+        tabac: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
+        kezia: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 }
+      };
+    }
+
+    const initialStats = {
+      total: 0,
+      enAttente: 0,
+      planifiees: 0,
+      terminees: 0,
+    };
+
+    const sectorStats: { [key: string]: InstallationStats } = {
+      haccp: { ...initialStats },
+      chr: { ...initialStats },
+      tabac: { ...initialStats },
+      kezia: { ...initialStats },
+    };
+
+    allInstallations.forEach(installation => {
+      const sectorKey = installation.secteur?.toLowerCase() as keyof typeof sectorStats;
+      if (sectorKey && sectorStats[sectorKey]) {
+        sectorStats[sectorKey].total++;
+        switch (installation.status) {
+          case 'rendez-vous à prendre':
+            sectorStats[sectorKey].enAttente++;
+            break;
+          case 'rendez-vous pris':
+            sectorStats[sectorKey].planifiees++;
+            break;
+          case 'installation terminée':
+            sectorStats[sectorKey].terminees++;
+            break;
+          default:
+            // Gérer d'autres statuts si nécessaire
+            break;
+        }
+      }
+    });
+
+    return sectorStats;
+
+  }, [allInstallations, stats]); // Recalculer si allInstallations ou stats changent
+
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -88,6 +142,7 @@ export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = ({ st
     );
   }
 
+  // Utiliser calculatedStats pour l'affichage
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -114,7 +169,7 @@ export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = ({ st
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <InstallationCard
           title="HACCP"
-          stats={stats.haccp}
+          stats={calculatedStats.haccp} // Utiliser calculatedStats
           icon={FaClipboardCheck}
           to="/installations/haccp"
           gradientFrom="green-600"
@@ -122,7 +177,7 @@ export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = ({ st
         />
         <InstallationCard
           title="CHR"
-          stats={stats.chr}
+          stats={calculatedStats.chr} // Utiliser calculatedStats
           icon={FaUtensils}
           to="/installations/chr-firestore"
           gradientFrom="blue-600"
@@ -130,7 +185,7 @@ export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = ({ st
         />
         <InstallationCard
           title="Tabac"
-          stats={stats.tabac}
+          stats={calculatedStats.tabac} // Utiliser calculatedStats
           icon={FaSmoking}
           to="/installations/tabac-firestore"
           gradientFrom="red-600"
@@ -138,7 +193,7 @@ export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = ({ st
         />
         <InstallationCard
           title="Kezia"
-          stats={stats.kezia}
+          stats={calculatedStats.kezia} // Utiliser calculatedStats
           icon={FaStore}
           to="/installations/kezia-firestore"
           gradientFrom="purple-600"

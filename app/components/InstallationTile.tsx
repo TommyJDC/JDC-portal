@@ -23,6 +23,8 @@ interface InstallationTileProps {
 const InstallationTile: React.FC<InstallationTileProps> = ({ installation, hasCTN, onSave }) => {
   const [localInstallation, setLocalInstallation] = useState(installation);
 
+  console.log(`[InstallationTile][DEBUG] Received installation prop:`, installation);
+
   return (
     <div className="bg-jdc-card p-4 rounded-lg shadow-lg border border-gray-700/50 hover:border-jdc-blue/50 transition-colors">
       {/* Header */}

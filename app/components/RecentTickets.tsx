@@ -19,26 +19,32 @@ export const RecentTickets: React.FC<RecentTicketsProps> = ({ tickets, isLoading
     return ticket.raisonSociale || ticket.codeClient || 'Client inconnu';
   };
 
-  const getSummaryDisplay = (summary?: string): string => {
-    if (!summary) return 'Pas de résumé';
-    return summary.length > 40 ? summary.substring(0, 40) + '...' : summary;
-  };
+  // Supprimer la fonction getSummaryDisplay car le résumé ne sera plus affiché ici
 
   const getStatusClasses = (status?: string): string => {
+    let baseClasses = 'px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ';
     switch (status) {
       case 'Nouveau':
-        return 'bg-jdc-yellow text-black';
+        baseClasses += 'bg-jdc-yellow text-black';
+        break;
       case 'Demande de RMA':
-        return 'bg-blue-600 text-white';
+        baseClasses += 'bg-blue-600 text-white';
+        break;
       case 'Ouvert':
-        return 'bg-red-600 text-white';
+        baseClasses += 'bg-red-600 text-white';
+        break;
       case 'En cours':
-        return 'bg-jdc-yellow text-black';
+        baseClasses += 'bg-jdc-yellow text-black';
+        break;
       case 'Fermé':
-        return 'bg-gray-600 text-white';
+        baseClasses += 'bg-gray-600 text-white';
+        break;
       default:
-        return 'bg-gray-500 text-white';
+        baseClasses += 'bg-gray-500 text-white';
     }
+    // Ajouter une classe pour l'animation (exemple simple: pulsation)
+    baseClasses += ' animate-pulse-once'; // Ajouter une classe d'animation
+    return baseClasses;
   };
 
   return (
@@ -68,15 +74,21 @@ export const RecentTickets: React.FC<RecentTicketsProps> = ({ tickets, isLoading
             <li key={ticket.id} className="flex justify-between items-start text-sm p-2 bg-jdc-gray-800 rounded hover:bg-jdc-gray-700">
               <div className="flex-grow mr-2">
                 <span className="font-medium text-white block">{getClientDisplay(ticket)}</span>
-                <span className="text-jdc-gray-400 block text-xs">
-                  {getSummaryDisplay(ticket.summary)} - {ticket.secteur || 'Secteur N/A'}
-                 </span>
-                 <span className="text-jdc-gray-500 block text-xs italic">
-                  {formatFirestoreDate(ticket.date)}
-                </span>
+                {ticket.telephone && ( // Afficher le numéro de téléphone s'il existe
+                  <span className="text-jdc-gray-400 block text-xs">
+                    Tel: {ticket.telephone}
+                  </span>
+                )}
+                {ticket.date && (
+                  <span className="text-jdc-gray-500 block text-xs italic">
+                    {formatFirestoreDate(ticket.date, { 
+                      defaultValue: 'Date non spécifiée'
+                    }) as string}
+                  </span>
+                )}
               </div>
               <div className="flex-shrink-0 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${getStatusClasses(ticket.statut)}`}>
+                <span className={getStatusClasses(ticket.statut)}> {/* Appliquer les classes d'animation ici */}
                   {ticket.statut || 'N/A'}
                 </span>
               </div>

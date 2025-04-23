@@ -41,3 +41,10 @@ declare module '~/services/firestore.service.server' {
   export function getGeocodeFromCache(address: string): Promise<{ lat: number, lng: number } | null>;
   export function setGeocodeToCache(address: string, coordinates: { lat: number, lng: number }): Promise<void>;
 }
+
+// Extend HTMLElement to include the _root property for React 18 compatibility
+declare global {
+  interface HTMLElement {
+    _root?: import('react-dom/client').Root;
+  }
+}

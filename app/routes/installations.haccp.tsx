@@ -11,6 +11,7 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import InstallationHACCPTile from "~/components/InstallationHACCPTile";
 import type { Installation } from "~/types/firestore.types";
+import { COLUMN_MAPPINGS } from "~/routes/api.sync-installations"; // Importer les mappings
 
 interface ActionData {
   success?: boolean;
@@ -56,7 +57,42 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const installations = await getInstallationsBySector('haccp');
+    const installationsRaw = await getInstallationsBySector('haccp');
+    const sector = 'haccp';
+    const sectorMapping = COLUMN_MAPPINGS[sector];
+
+    // Mapper les données brutes de Firestore aux clés attendues par InstallationHACCPTile
+    const installations = installationsRaw.map(installation => {
+      const data = installation as any; // Utiliser 'any' temporairement
+
+      return {
+        id: installation.id, // L'ID est toujours présent
+        codeClient: data.codeClient || '',
+        nom: data.nom || '',
+        ville: data.ville || '',
+        contact: data.contact || '', // Assurez-vous que cette clé existe dans Firestore pour HACCP
+        telephone: data.telephone || '', // Assurez-vous que cette clé existe dans Firestore pour HACCP
+        commercial: data.commercial || '',
+        tech: data.tech || '', // Assurez-vous que cette clé existe dans Firestore pour HACCP
+        status: data.status || '', // Assurez-vous que cette clé existe dans Firestore pour HACCP
+        commentaire: data.commentaire || '',
+
+        // Champs spécifiques HACCP
+        // Récupérer les dates comme des chaînes brutes
+        dateSignatureCde: data.dateSignatureCde ? String(data.dateSignatureCde) : '',
+        dateCdeMateriel: data.dateCdeMateriel ? String(data.dateCdeMateriel) : '',
+        dateInstall: data.dateInstall ? String(data.dateInstall) : '',
+        materielPreParametrage: data.materielPreParametrage || '',
+        dossier: data.dossier || '',
+        materielLivre: data.materielLivre || '',
+        numeroColis: data.numeroColis || '',
+        commentaireInstall: data.commentaireInstall || '',
+        identifiantMotDePasse: data.identifiantMotDePasse || '',
+        numerosSondes: data.numerosSondes || '',
+        install: data.install || 'Non', // Assurez-vous que cette clé existe dans Firestore pour HACCP
+      };
+    });
+
     return json<LoaderData>({ installations });
   } catch (error: any) {
     console.error("[installations.haccp Loader] Error:", error);

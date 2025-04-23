@@ -38,7 +38,10 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
                 // Filter out tickets without raisonSociale on the server
                 allTickets = fetchedTickets.filter(t => t.raisonSociale);
                 console.log(`Tickets SAP Loader: Fetched ${allTickets.length} tickets with raisonSociale.`);
-                console.log('Sample ticket dates:', allTickets.slice(0, 3).map(t => t.date));
+                console.log('Sample ticket dates (value and type):');
+                allTickets.slice(0, 5).forEach((ticket, index) => {
+                    console.log(`  Ticket ${index}: value =`, ticket.date, `, type =`, typeof ticket.date, `, instanceof Date =`, ticket.date instanceof Date);
+                });
             }
 
         } catch (err: any) {

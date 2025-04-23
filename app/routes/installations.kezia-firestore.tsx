@@ -9,7 +9,8 @@ import { action } from "./installations.kezia-firestore.action";
 export { loader, action };
 
 export default function KeziaInstallationsFirestore() {
-  const { installations, shippedClientCodes, error } = useLoaderData<typeof loader>();
+  // Ne plus déstructurer shippedClientCodes car il n'est plus retourné par le loader
+  const { installations, error } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<ActionData>();
 
   const handleSave = async (id: string, updates: Partial<Installation>) => {
@@ -41,20 +42,13 @@ export default function KeziaInstallationsFirestore() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {installations.map((installation) => {
-          const hasCTN = shippedClientCodes.includes(String(installation.codeClient));
-          const sanitizedInstallation = {
-            ...installation,
-            dateInstall: installation.dateInstall 
-              ? typeof installation.dateInstall === 'string'
-                ? installation.dateInstall
-                : new Date(installation.dateInstall.seconds * 1000).toISOString().split('T')[0]
-              : undefined
-          };
+          // hasCTN est maintenant directement une propriété de l'objet installation
+          // Le formatage de date est également géré dans le loader
           return (
             <InstallationTile 
               key={installation.id}
-              installation={sanitizedInstallation}
-              hasCTN={hasCTN}
+              installation={installation} // L'objet installation inclut déjà hasCTN et dateInstall formatée
+              hasCTN={installation.hasCTN} // Utiliser la prop hasCTN de l'objet installation
               onSave={(values) => handleSave(installation.id, values)}
             />
           );
