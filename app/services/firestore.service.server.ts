@@ -182,7 +182,7 @@ export async function getAllShipments() {
 
 export async function deleteShipmentSdk(shipmentId: string): Promise<void> {
   if (!db) await initializeFirebaseAdmin();
-  await db.collection('shipments').doc(shipmentId).delete();
+  await db.collection('Envoi').doc(shipmentId).delete();
 }
 
 export async function getAllUserProfilesSdk(): Promise<UserProfile[]> {
@@ -442,18 +442,32 @@ export async function searchArticles({ code, nom }: { code: string; nom: string 
   if (!db) await initializeFirebaseAdmin();
   
   let query: FirebaseFirestore.Query = db.collection('articles');
+  let articles: Article[] = [];
 
-  if (code) {
-    query = query.where('code', '==', code);
+  // Convert input to uppercase for case-insensitive search against uppercase data in Firestore
+  const upperCode = code.toUpperCase();
+  const upperNom = nom.toUpperCase();
+
+  if (upperCode) {
+    // Prioritize exact code search if provided
+    console.log("[searchArticles] Searching by code (uppercase):", upperCode);
+    query = query.where('Code', '==', upperCode); // Use 'Code' field name as per Article type
+    const snapshot = await query.get();
+    articles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Article[];
+  } else if (upperNom) {
+    // If no code, search by name prefix
+    console.log("[searchArticles] Searching by nom (uppercase):", upperNom);
+    query = query.where('Désignation', '>=', upperNom) // Use 'Désignation' field name as per Article type
+                 .where('Désignation', '<=', upperNom + '\uf8ff');
+    const snapshot = await query.get();
+    articles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Article[];
+  } else {
+    // If neither is provided, return empty array (loader handles this too, but good practice here)
+    console.log("[searchArticles] No search criteria provided.");
+    articles = [];
   }
 
-  if (nom) {
-    query = query.where('nom', '>=', nom)
-                 .where('nom', '<=', nom + '\uf8ff');
-  }
-
-  const snapshot = await query.get();
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Article[];
+  return articles;
 }
 
 // ... [le reste du fichier existant reste inchangé]

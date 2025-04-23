@@ -62,13 +62,16 @@ export interface DashboardLoaderData {
         try {
           userProfile = await getUserProfileSdk(session.userId);
           
-          if (!userProfile?.secteurs || userProfile.secteurs.length === 0) {
-            return redirect("/create-profile");
+          // Si le profil utilisateur n'existe pas, rediriger vers la page de création/gestion de profil
+          if (!userProfile) {
+             console.log(`Dashboard Loader: User profile not found for ${session.userId}, redirecting to /user-profile`);
+             return redirect("/user-profile");
           }
 
-          const userSectors = userProfile.secteurs;
-          const sectorsForTickets = userSectors;
-          const sectorsForShipments = userProfile?.role === 'Admin' ? ['haccp', 'chr', 'tabac', 'kezia'] : userSectors;
+          const userSectors = userProfile.secteurs || []; // Assurez-vous que userSectors est toujours un tableau
+          // Si l'utilisateur est admin, inclure tous les secteurs pour les tickets, sinon utiliser les secteurs du profil
+          const sectorsForTickets = userProfile.role === 'Admin' ? ['CHR', 'HACCP', 'Kezia', 'Tabac'] : userSectors;
+          const sectorsForShipments = userProfile.role === 'Admin' ? ['haccp', 'chr', 'tabac', 'kezia'] : userSectors;
 
           const calendarPromise = (async () => {
             try {
@@ -95,23 +98,43 @@ export interface DashboardLoaderData {
 
           const dataPromise = (async () => {
             try {
+                // Définir les promesses
+                const latestStatsSnapshotsPromise = getLatestStatsSnapshotsSdk(1);
+                const totalTicketCountPromise = getTotalTicketCountSdk(sectorsForTickets);
+                const recentTicketsPromise = getRecentTicketsForSectors(sectorsForTickets, 20);
+                const allShipmentsPromise = getAllShipments(sectorsForShipments);
+                const allInstallationsPromise = getAllInstallations();
+
+                // Définir les promesses dépendantes de userProfile
+                const distinctClientCountPromise = userProfile ? getDistinctClientCountFromEnvoiSdk(userProfile) : Promise.resolve(0);
+                const installationsSnapshotPromise = userProfile ? getInstallationsSnapshot(userProfile) : Promise.resolve(null);
+
+
+                // Exécuter toutes les promesses en parallèle
                 const results = await Promise.allSettled([
-                  getLatestStatsSnapshotsSdk(1),
-                  getTotalTicketCountSdk(sectorsForTickets),
-                  getDistinctClientCountFromEnvoiSdk(userProfile),
-                  getRecentTicketsForSectors(sectorsForTickets, 20),
-                  getAllShipments(sectorsForShipments),
-                  getInstallationsSnapshot(userProfile),
-                  getAllInstallations() // Appeler la nouvelle fonction
+                  latestStatsSnapshotsPromise,
+                  totalTicketCountPromise,
+                  distinctClientCountPromise,
+                  recentTicketsPromise,
+                  allShipmentsPromise,
+                  installationsSnapshotPromise,
+                  allInstallationsPromise,
                 ]);
 
+                // Accéder aux résultats en vérifiant le statut et la valeur
                 const snapshotResult = results[0];
                 const ticketCountResult = results[1];
                 const distinctClientCountResult = results[2];
-                const latestSnapshot = snapshotResult.status === 'fulfilled' && snapshotResult.value.length > 0 ? snapshotResult.value[0] : null;
+                const recentTicketsResult = results[3];
+                const recentShipmentsResult = results[4];
+                const installationsSnapshotResult = results[5];
+                const allInstallationsResult = results[6];
+
+                const latestSnapshot = snapshotResult.status === 'fulfilled' && snapshotResult.value && snapshotResult.value.length > 0 ? snapshotResult.value[0] : null;
 
                 stats.liveTicketCount = ticketCountResult.status === 'fulfilled' ? ticketCountResult.value : null;
                 stats.liveDistinctClientCountFromEnvoi = distinctClientCountResult.status === 'fulfilled' ? distinctClientCountResult.value : null;
+
 
                 if (latestSnapshot) {
                     if (stats.liveTicketCount !== null && latestSnapshot.totalTickets !== undefined) {
@@ -134,11 +157,6 @@ export interface DashboardLoaderData {
                      if (!clientError) clientError = "Erreur chargement clients distincts.";
                  }
 
-                const recentTicketsResult = results[3];
-                const recentShipmentsResult = results[4];
-                const installationsSnapshotResult = results[5]; // Renommer pour plus de clarté
-                const allInstallationsResult = results[6]; // Récupérer le résultat de getAllInstallations
-                
                 recentTickets = recentTicketsResult.status === 'fulfilled' ? recentTicketsResult.value : [];
                 recentShipments = recentShipmentsResult.status === 'fulfilled' ? recentShipmentsResult.value.slice(0, 20) : [];
                 allInstallations = allInstallationsResult.status === 'fulfilled' ? allInstallationsResult.value : []; // Assigner les installations
@@ -147,36 +165,36 @@ export interface DashboardLoaderData {
                 const rawInstallationsStats = installationsSnapshotResult.status === 'fulfilled' ? installationsSnapshotResult.value : null;
                 installationsStats = rawInstallationsStats ? {
                   haccp: {
-                    total: rawInstallationsStats.bySector['HACCP']?.total || 0,
-                    enAttente: rawInstallationsStats.bySector['HACCP']?.byStatus['rendez-vous à prendre'] || 0,
-                    planifiees: rawInstallationsStats.bySector['HACCP']?.byStatus['rendez-vous pris'] || 0,
-                    terminees: rawInstallationsStats.bySector['HACCP']?.byStatus['installation terminée'] || 0
+                    total: rawInstallationsStats.bySector?.['HACCP']?.total || 0, // Utiliser ?. pour l'accès sécurisé
+                    enAttente: rawInstallationsStats.bySector?.['HACCP']?.byStatus?.['rendez-vous à prendre'] || 0, // Utiliser ?.
+                    planifiees: rawInstallationsStats.bySector?.['HACCP']?.byStatus?.['rendez-vous pris'] || 0, // Utiliser ?.
+                    terminees: rawInstallationsStats.bySector?.['HACCP']?.byStatus?.['installation terminée'] || 0 // Utiliser ?.
                   },
                   chr: {
-                    total: rawInstallationsStats.bySector['CHR']?.total || 0,
-                    enAttente: rawInstallationsStats.bySector['CHR']?.byStatus['rendez-vous à prendre'] || 0,
-                    planifiees: rawInstallationsStats.bySector['CHR']?.byStatus['rendez-vous pris'] || 0,
-                    terminees: rawInstallationsStats.bySector['CHR']?.byStatus['installation terminée'] || 0
+                    total: rawInstallationsStats.bySector?.['CHR']?.total || 0, // Utiliser ?.
+                    enAttente: rawInstallationsStats.bySector?.['CHR']?.byStatus?.['rendez-vous à prendre'] || 0, // Utiliser ?.
+                    planifiees: rawInstallationsStats.bySector?.['CHR']?.byStatus?.['rendez-vous pris'] || 0, // Utiliser ?.
+                    terminees: rawInstallationsStats.bySector?.['CHR']?.byStatus?.['installation terminée'] || 0 // Utiliser ?.
                   },
                   tabac: {
-                    total: rawInstallationsStats.bySector['Tabac']?.total || 0,
-                    enAttente: rawInstallationsStats.bySector['Tabac']?.byStatus['rendez-vous à prendre'] || 0,
-                    planifiees: rawInstallationsStats.bySector['Tabac']?.byStatus['rendez-vous pris'] || 0,
-                    terminees: rawInstallationsStats.bySector['Tabac']?.byStatus['installation terminée'] || 0
+                    total: rawInstallationsStats.bySector?.['Tabac']?.total || 0, // Utiliser ?.
+                    enAttente: rawInstallationsStats.bySector?.['Tabac']?.byStatus?.['rendez-vous à prendre'] || 0, // Utiliser ?.
+                    planifiees: rawInstallationsStats.bySector?.['Tabac']?.byStatus?.['rendez-vous pris'] || 0, // Utiliser ?.
+                    terminees: rawInstallationsStats.bySector?.['Tabac']?.byStatus?.['installation terminée'] || 0 // Utiliser ?.
                   },
                   kezia: {
-                    total: rawInstallationsStats.bySector['Kezia']?.total || 0,
-                    enAttente: rawInstallationsStats.bySector['Kezia']?.byStatus['rendez-vous à prendre'] || 0,
-                    planifiees: rawInstallationsStats.bySector['Kezia']?.byStatus['rendez-vous pris'] || 0,
-                    terminees: rawInstallationsStats.bySector['Kezia']?.byStatus['installation terminée'] || 0
+                    total: rawInstallationsStats.bySector?.['Kezia']?.total || 0, // Utiliser ?.
+                    enAttente: rawInstallationsStats.bySector?.['Kezia']?.byStatus?.['rendez-vous à prendre'] || 0, // Utiliser ?.
+                    planifiees: rawInstallationsStats.bySector?.['Kezia']?.byStatus?.['rendez-vous pris'] || 0, // Utiliser ?.
+                    terminees: rawInstallationsStats.bySector?.['Kezia']?.byStatus?.['installation terminée'] || 0 // Utiliser ?.
                   }
                 } : null;
 
-                if (installationsSnapshotResult.status === 'rejected') { // Mettre à jour le nom de la variable
+                if (installationsSnapshotResult.status === 'rejected') {
                   console.error("Dashboard Loader: Error fetching installations snapshot:", installationsSnapshotResult.reason);
                   if (!clientError) clientError = "Erreur chargement statistiques installations.";
                 }
-                if (allInstallationsResult.status === 'rejected') { // Gérer l'erreur pour getAllInstallations
+                if (allInstallationsResult.status === 'rejected') {
                   console.error("Dashboard Loader: Error fetching all installations:", allInstallationsResult.reason);
                   if (!clientError) clientError = "Erreur chargement liste installations.";
                 }

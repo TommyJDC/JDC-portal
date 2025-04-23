@@ -80,6 +80,8 @@ export function formatFirestoreDate(
 ): string | Date {
   const { defaultValue = 'N/A', returnDateObject = false } = options || {};
 
+  console.log('formatFirestoreDate: Input received:', date, 'Type:', typeof date);
+
   if (!date) {
     console.log('formatFirestoreDate: Input is null/undefined, returning default value:', defaultValue);
     return returnDateObject ? new Date(0) : defaultValue;
@@ -93,29 +95,44 @@ export function formatFirestoreDate(
       dateObj = date.toDate();
     } else if (typeof date === 'string') {
       console.log('formatFirestoreDate: Input is string:', date);
+      const trimmedDate = date.trim();
       // Try to parse if it's an ISO string
-      if (date.includes('T')) {
+      if (trimmedDate.includes('T')) {
         console.log('formatFirestoreDate: Trying to parse as ISO string');
-        dateObj = new Date(date);
+        dateObj = new Date(trimmedDate);
         if (isNaN(dateObj.getTime())) {
           console.log('formatFirestoreDate: ISO string parsing failed, returning original string');
           return date; // Return original if invalid
         }
       }
-      // Try to parse French date string
-      else if (/[a-z]+ \d{1,2} [a-z]+ \d{4}/i.test(date.trim())) { // Use trim() here too
-        console.log('formatFirestoreDate: Trying to parse as French date string');
-        const parsed = parseFrenchDateFromString(date);
+      // Try to parse French date string (e.g., "mardi 22 avril 2025")
+      else if (/[a-z]+ \d{1,2} [a-z]+ \d{4}/i.test(trimmedDate)) {
+        console.log('formatFirestoreDate: Trying to parse as full French date string');
+        const parsed = parseFrenchDateFromString(trimmedDate);
         if (parsed) {
-          console.log('formatFirestoreDate: French date string parsed successfully:', parsed);
+          console.log('formatFirestoreDate: Full French date string parsed successfully:', parsed);
           dateObj = parsed;
         }
         else {
-          console.log('formatFirestoreDate: French date string parsing failed, returning original string');
+          console.log('formatFirestoreDate: Full French date string parsing failed, returning original string');
           return date; // Return original if can't parse
         }
       }
-      else {
+      // Try to parse French date string without year (e.g., "05/06") and add current year
+      else if (/^\d{1,2}\/\d{1,2}$/.test(trimmedDate)) {
+        console.log('formatFirestoreDate: Trying to parse as JJ/MM string and add current year');
+        const currentYear = new Date().getFullYear();
+        const dateWithYear = `${trimmedDate}/${currentYear}`;
+        const parsed = parseFrenchDate(dateWithYear); // Use parseFrenchDate for JJ/MM/AAAA
+         if (parsed) {
+          console.log('formatFirestoreDate: JJ/MM string parsed successfully with current year:', parsed);
+          dateObj = parsed;
+        } else {
+           console.log('formatFirestoreDate: JJ/MM string parsing failed, returning original string');
+           return date; // Return original if can't parse even with year
+        }
+      }
+       else {
         console.log('formatFirestoreDate: String format not recognized, returning original string');
         return date; // Already formatted or unrecognized string
       }
@@ -136,17 +153,33 @@ export function formatFirestoreDate(
       return defaultValue; // Return default if the resulting Date object is invalid
     }
 
+    // Check if the year is in the past (e.g., 2001) and update to current year if necessary
+    const currentYear = new Date().getFullYear();
+    if (dateObj.getFullYear() < currentYear) {
+        console.log(`formatFirestoreDate: Detected past year ${dateObj.getFullYear()}, updating to current year ${currentYear}`);
+        dateObj.setFullYear(currentYear);
+    }
+
+
     if (returnDateObject) {
       console.log('formatFirestoreDate: returnDateObject is true, returning Date object:', dateObj);
       return dateObj;
     }
 
-    const formatted = dateObj.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+    const dateYear = dateObj.getFullYear();
+
+    const options: Intl.DateTimeFormatOptions = {
+      day: '2-digit',
+      month: '2-digit',
+    };
+
+    // Only show year if it's not the current year (after potentially updating it)
+    if (dateYear !== currentYear) {
+      options.year = 'numeric';
+    }
+
+    const formatted = dateObj.toLocaleDateString('fr-FR', options);
+
     console.log('formatFirestoreDate: Successfully formatted date:', formatted);
     return formatted || defaultValue;
   } catch (error) {

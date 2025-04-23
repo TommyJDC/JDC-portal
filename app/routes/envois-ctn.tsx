@@ -179,7 +179,7 @@ import type { MetaFunction } from "@remix-run/node";
       // Show message if user is not logged in (based on context)
       if (!user) {
          return (
-            <div className="text-center text-jdc-gray-400 py-10">
+            <div className="text-center text-gray-400 py-10">
                 Veuillez vous connecter pour voir les envois.
             </div>
          )
@@ -191,17 +191,18 @@ import type { MetaFunction } from "@remix-run/node";
        }
 
       return (
-        <div>
-          <h1 className="text-2xl font-semibold text-white mb-4 flex items-center">
+        <div className="space-y-6 p-6 bg-gray-900 min-h-screen">
+          <h1 className="text-3xl font-semibold text-white mb-6 flex items-center">
             <FontAwesomeIcon icon={faTruckFast} className="mr-3 text-jdc-yellow" />
             Suivi des Envois CTN
+            {isLoading && <FontAwesomeIcon icon={faSpinner} spin className="ml-3 text-jdc-yellow" title="Rafraîchissement..." />}
           </h1>
 
           {/* Filter and Search Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-jdc-card rounded-lg shadow">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-800 rounded-lg shadow-xl border border-gray-700">
             {/* Sector Filter - Disable based on fetcher state */}
             <div className="col-span-1">
-              <label htmlFor="sector-filter" className="block text-sm font-medium text-jdc-gray-300 mb-1">
+              <label htmlFor="sector-filter" className="block text-sm font-medium text-gray-400 mb-1">
                 <FontAwesomeIcon icon={faFilter} className="mr-1" /> Filtrer par Secteur
               </label>
               <select
@@ -209,7 +210,7 @@ import type { MetaFunction } from "@remix-run/node";
                 name="sector-filter"
                 value={selectedSector}
                 onChange={(e) => setSelectedSector(e.target.value)}
-                className="block w-full rounded-md bg-jdc-gray-800 border-transparent focus:border-jdc-yellow focus:ring focus:ring-jdc-yellow focus:ring-opacity-50 text-white py-2 pl-3 pr-10"
+                className="block w-full rounded-md bg-gray-900 border-gray-700 focus:border-jdc-blue focus:ring focus:ring-jdc-blue focus:ring-opacity-50 text-white py-2 pl-3 pr-10 text-sm"
                 disabled={isLoading || availableSectors.length === 0} // Disable during action
               >
                 <option value="">Tous les secteurs</option>
@@ -219,10 +220,10 @@ import type { MetaFunction } from "@remix-run/node";
               </select>
                {/* Messages adjusted based on loader data */}
                {availableSectors.length === 0 && !isLoading && allShipments.length > 0 && (
-                 <p className="text-xs text-jdc-gray-500 mt-1">Aucun secteur trouvé dans les envois affichés.</p>
+                 <p className="text-xs text-gray-500 mt-1">Aucun secteur trouvé dans les envois affichés.</p>
                )}
                {availableSectors.length === 0 && !isLoading && allShipments.length === 0 && !loaderError && (
-                 <p className="text-xs text-jdc-gray-500 mt-1">Aucun envoi accessible trouvé.</p>
+                 <p className="text-xs text-gray-500 mt-1">Aucun envoi accessible trouvé.</p>
                )}
             </div>
 
@@ -238,13 +239,15 @@ import type { MetaFunction } from "@remix-run/node";
                  icon={<FontAwesomeIcon icon={faSearch} />}
                  wrapperClassName="mb-0"
                  disabled={isLoading} // Disable during action
+                 className="bg-gray-900 text-white border-gray-700 focus:border-jdc-blue focus:ring-jdc-blue"
+                 labelClassName="text-gray-400"
                />
             </div>
           </div>
 
           {/* Loading State for Action */}
           {isLoading && (
-            <div className="text-center text-jdc-gray-400 py-10">
+            <div className="text-center text-gray-400 py-10">
               <FontAwesomeIcon icon={faSpinner} spin className="text-2xl mr-2" />
               Traitement en cours...
             </div>
@@ -252,7 +255,7 @@ import type { MetaFunction } from "@remix-run/node";
 
           {/* No Results State */}
           {!isLoading && !loaderError && clientGroups.length === 0 && (
-            <div className="text-center text-jdc-gray-400 py-10">
+            <div className="text-center text-gray-400 py-10">
               {allShipments.length > 0
                 ? "Aucun envoi trouvé correspondant à votre recherche ou filtre."
                 : "Aucun envoi accessible trouvé."}
@@ -262,20 +265,20 @@ import type { MetaFunction } from "@remix-run/node";
 
           {/* Shipments List */}
           {!isLoading && !loaderError && clientGroups.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {clientGroups.map(([clientName, clientShipments]) => (
-                <div key={clientName} className="bg-jdc-card rounded-lg shadow overflow-hidden">
+                <div key={clientName} className="bg-gray-800 rounded-lg shadow-xl overflow-hidden border border-gray-700">
                   <details className="group">
-                    <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-jdc-gray-800 list-none transition-colors gap-4">
+                    <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700 list-none transition-colors gap-4">
                       <div className="flex items-center min-w-0 mr-2 flex-grow">
-                        <FontAwesomeIcon icon={faBuilding} className="mr-3 text-jdc-gray-300 text-lg flex-shrink-0" />
+                        <FontAwesomeIcon icon={faBuilding} className="mr-3 text-jdc-blue text-lg flex-shrink-0" />
                         <div className="min-w-0">
-                            <span className="font-semibold text-white text-lg block truncate" title={clientName}>{clientName}</span>
-                            <span className="ml-0 md:ml-3 text-sm text-jdc-gray-400">
+                            <span className="font-semibold text-yellow-400 text-lg block truncate" title={clientName}>{clientName}</span>
+                            <span className="ml-0 md:ml-3 text-sm text-gray-400">
                                 ({clientShipments.length} envoi{clientShipments.length > 1 ? 's' : ''})
                             </span>
                              {clientShipments[0]?.codeClient && clientShipments[0].codeClient !== clientName && (
-                                <span className="block text-xs text-jdc-gray-500 truncate" title={`Code: ${clientShipments[0].codeClient}`}>Code: {clientShipments[0].codeClient}</span>
+                                <span className="block text-xs text-gray-500 truncate" title={`Code: ${clientShipments[0].codeClient}`}>Code: {clientShipments[0].codeClient}</span>
                              )}
                         </div>
                       </div>
@@ -301,12 +304,12 @@ import type { MetaFunction } from "@remix-run/node";
                         )}
                         <FontAwesomeIcon
                           icon={faChevronRight}
-                          className="text-jdc-gray-400 transition-transform duration-200 group-open:rotate-90 text-xl flex-shrink-0"
+                          className="text-gray-400 transition-transform duration-200 group-open:rotate-90 text-xl flex-shrink-0"
                         />
                       </div>
                     </summary>
 
-                    <div className="border-t border-jdc-gray-700 bg-jdc-gray-900 p-4 space-y-3">
+                    <div className="border-t border-gray-700 bg-gray-900 p-4 space-y-3">
                       {clientShipments.map((shipment) => {
                         const statusStyle = getShipmentStatusStyle(shipment.statutExpedition);
                         const truncatedArticle = shipment.articleNom && shipment.articleNom.length > 50
@@ -317,19 +320,19 @@ import type { MetaFunction } from "@remix-run/node";
                         // const displayDate = shipment.dateCreation ? shipment.dateCreation.toLocaleDateString('fr-FR') : 'N/A';
 
                         return (
-                          <div key={shipment.id} className="flex items-center justify-between text-sm border-b border-jdc-gray-700 pb-2 last:border-b-0 gap-2">
+                          <div key={shipment.id} className="flex items-center justify-between text-sm border-b border-gray-700 pb-2 last:border-b-0 gap-2">
                             <div className="flex-1 min-w-0 mr-1">
-                              <span className="text-jdc-gray-200 block font-medium truncate" title={shipment.articleNom}>
+                              <span className="text-gray-200 block font-medium truncate" title={shipment.articleNom}>
                                 {truncatedArticle || 'Article non spécifié'}
                               </span>
                               <div className="flex items-center flex-wrap mt-1 space-x-2">
                                   <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${statusStyle.bgColor} ${statusStyle.textColor}`}>
                                     {shipment.statutExpedition || 'Inconnu'}
                                   </span>
-                                  <span className="text-jdc-gray-500 text-xs whitespace-nowrap" title={`ID: ${shipment.id}`}>
+                                  <span className="text-gray-500 text-xs whitespace-nowrap" title={`ID: ${shipment.id}`}>
                                     ID: {shipment.id.substring(0, 8)}...
                                   </span>
-                                   <span className="text-jdc-gray-500 text-xs whitespace-nowrap">
+                                   <span className="text-gray-500 text-xs whitespace-nowrap">
                                      Secteur: {shipment.secteur || 'N/A'}
                                    </span>
                                    {/* Optionally display parsed dateCreation */}

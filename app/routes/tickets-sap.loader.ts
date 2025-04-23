@@ -28,10 +28,14 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
                 throw new Error("Profil utilisateur introuvable.");
             }
 
-            const sectorsToQuery = userProfile.secteurs ?? [];
+            // Déterminer les secteurs à interroger en fonction du rôle de l'utilisateur
+            const sectorsToQuery = userProfile.role === 'Admin' 
+                ? ['CHR', 'HACCP', 'Kezia', 'Tabac'] // Admins voient tous les secteurs
+                : userProfile.secteurs ?? []; // Autres utilisateurs voient leurs secteurs définis
+
             if (sectorsToQuery.length === 0) {
-                console.warn(`Tickets SAP Loader: User ${session.userId} (Role: ${userProfile.role}) has no sectors assigned.`);
-                // Return empty tickets but profile is still valid
+                console.warn(`Tickets SAP Loader: User ${session.userId} (Role: ${userProfile.role}) has no sectors assigned or is not an Admin.`);
+                // allTickets reste []
             } else {
                 console.log(`Tickets SAP Loader: Fetching tickets for sectors: ${sectorsToQuery.join(', ')}`);
                 const fetchedTickets = await getAllTicketsForSectorsSdk(sectorsToQuery);

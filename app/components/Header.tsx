@@ -147,9 +147,9 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
       console.error('Error marking all notifications as read:', error);
     }
   };
-  const linkActiveClass = "text-jdc-yellow relative after:content-[''] after:absolute after:bottom-[-0.5rem] after:left-0 after:w-full after:h-[2px] after:bg-jdc-yellow after:transform after:scale-x-100 after:transition-transform";
-  const linkInactiveClass = "text-jdc-gray-300 hover:text-jdc-yellow transition-colors relative after:content-[''] after:absolute after:bottom-[-0.5rem] after:left-0 after:w-full after:h-[2px] after:bg-jdc-yellow after:transform after:scale-x-0 hover:after:scale-x-100 after:transition-transform";
-  const menuButtonClass = `${linkInactiveClass} font-medium flex items-center transition-all duration-200 ease-in-out hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75`;
+  const linkActiveClass = "text-jdc-yellow font-semibold flex items-center transition-colors duration-200 ease-in-out hover:scale-105 text-lg";
+  const linkInactiveClass = "text-jdc-gray-300 hover:text-jdc-yellow font-semibold flex items-center transition-colors duration-200 ease-in-out hover:scale-105 text-lg";
+  const menuButtonClass = `text-jdc-gray-300 hover:text-jdc-yellow font-semibold flex items-center transition-colors duration-200 ease-in-out hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 text-lg`;
   const menuItemBaseClass = 'group flex w-full items-center rounded-md px-2 py-2 text-sm';
 
   // Determine if the Admin link should be shown
@@ -163,12 +163,12 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
   console.log('Header - showAdminLink:', showAdminLink);
 
   return (
-    <header className="bg-jdc-blue-dark border-b border-jdc-gray-800 py-3 px-4 md:px-6 sticky top-0 z-40 shadow-lg backdrop-blur-sm bg-opacity-95">
+<header className="bg-gradient-to-r from-jdc-blue-dark to-jdc-blue border-b border-jdc-gray-800 py-5 px-4 md:px-10 sticky top-0 z-40 shadow-xl backdrop-blur-sm bg-opacity-95">
       <div className="flex justify-between items-center max-w-7xl mx-auto">
         {/* Left Section: Logo, Mobile Button, Desktop Nav */}
-        <div className="flex items-center space-x-4 md:space-x-6">
+        <div className="flex items-center space-x-6 md:space-x-10">
           <Link to={user ? "/dashboard" : "/"} className="flex-shrink-0">
-            <img src={JDC_LOGO_URL} alt="JDC Logo" className="h-8 w-auto" />
+            <img src={JDC_LOGO_URL} alt="JDC Logo" className="h-9 w-auto" />
           </Link>
           {/* Mobile Menu Button */}
           <button
@@ -178,7 +178,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
             aria-expanded="false"
             aria-haspopup="true"
           >
-                  <FaBars className="text-lg" />
+                  <FaBars className="text-xl" />
           </button>
 
           {/* Desktop Navigation */}
@@ -192,7 +192,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                   className={({ isActive }) => `${isActive ? linkActiveClass : linkInactiveClass} font-medium flex items-center transition-transform duration-200 ease-in-out hover:scale-105`}
                   prefetch="intent"
                 >
-                  <item.icon className="mr-1.5" />
+                  <item.icon className="mr-2" />
                   {item.name}
                 </NavLink>
               ))}
@@ -228,10 +228,10 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                                   <NavLink
                                     to={subItem.to}
                                     className={`${menuItemBaseClass} ${
-                                      active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
-                                    } hover:bg-jdc-gray-700 hover:text-white pl-6`}
-                                  >
-                                    <subItem.icon className="mr-2 h-5 w-5" aria-hidden="true" />
+                                    active ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'
+                                  } hover:bg-jdc-gray-700 hover:text-white pl-6`}
+                                >
+                                  <subItem.icon className="mr-2 h-5 w-5" aria-hidden="true" />
                                     {subItem.name}
                                   </NavLink>
                                 )}
@@ -244,7 +244,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                               <NavLink
                                 to={item.to}
                                 className={`${menuItemBaseClass} ${
-                                  active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
+                                  active ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'
                                 } hover:bg-jdc-gray-700 hover:text-white`}
                               >
                                 <item.icon className="mr-2 h-5 w-5" aria-hidden="true" />
@@ -284,7 +284,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                             <NavLink
                               to={item.to}
                               className={`${menuItemBaseClass} ${
-                                active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
+                                active ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'
                               } hover:bg-jdc-gray-700 hover:text-white`}
                             >
                               <item.icon className="mr-2 h-5 w-5" aria-hidden="true" />
@@ -327,11 +327,11 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                             {({ active }) => (
                               <NavLink
                                 to={item.to}
-                                className={`${menuItemBaseClass} ${
-                                  active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'
-                                } hover:bg-jdc-gray-700 hover:text-white`}
-                              >
-                                <item.icon className="mr-2 h-5 w-5" aria-hidden="true" />
+                              className={`${menuItemBaseClass} ${
+                                active ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'
+                              } hover:bg-jdc-gray-700 hover:text-white`}
+                            >
+                              <item.icon className="mr-2 h-5 w-5" aria-hidden="true" />
                                 {item.name}
                               </NavLink>
                             )}
@@ -421,13 +421,26 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                   <div className="px-1 py-1">
                     <Menu.Item>
                       {({ active }) => (
-                        <div className={`${menuItemBaseClass} ${active ? 'bg-jdc-blue text-white' : 'text-jdc-gray-300'}`}>
+                        <div className={`${menuItemBaseClass} ${active ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'}`}>
                           <FaUser className="mr-2" />
                           <div className="flex flex-col">
                             <span className="font-medium">{profile?.displayName || user.displayName}</span>
                             <span className="text-xs opacity-75">{user.email}</span>
                           </div>
                         </div>
+                      )}
+                    </Menu.Item>
+                  </div>
+                  <div className="px-1 py-1">
+                     <Menu.Item>
+                      {({ active }) => (
+                        <NavLink
+                          to="/user-profile"
+                          className={`${menuItemBaseClass} ${active ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'}`}
+                        >
+                          <FaUser className="mr-2" />
+                          Mon Profil
+                        </NavLink>
                       )}
                     </Menu.Item>
                   </div>

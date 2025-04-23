@@ -23,7 +23,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   );
   
   // Déterminer l'URL de redirection AVANT l'authentification
-  let returnTo = redirectSession.get("returnTo") || "/create-profile"; // Ou une autre page par défaut post-connexion
+  let returnTo = redirectSession.get("returnTo") || "/user-profile"; // Ou une autre page par défaut post-connexion
   const mode = redirectSession.get("mode");
 
   if (mode === "gmail") {

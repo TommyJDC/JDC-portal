@@ -18,7 +18,7 @@ interface ProcessedInstallation {
   contact?: string;
   telephone?: string; // Champ générique attendu par InstallationTile
   commercial?: string;
-  dateInstall?: string; // Type attendu par InstallationTile
+  dateInstall?: string | Date; // Accepter string ou Date
   tech?: string;
   status?: string;
   commentaire?: string;
@@ -85,8 +85,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         commentaire: data.commentaire || '',
         
         // --- Champs traités ---
-        // Récupérer les dates comme des chaînes brutes
-        dateInstall: data.dateInstall ? String(data.dateInstall) : '', 
+        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : '', // Utiliser formatFirestoreDate
         hasCTN: keziaShipmentClientCodes.has(data.codeClient), 
         
         // Inclure d'autres champs spécifiques au secteur Kezia si nécessaire

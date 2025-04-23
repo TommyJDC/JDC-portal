@@ -50,31 +50,31 @@ const InstallationCard = ({
 }) => (
   <Link
     to={to}
-    className="bg-jdc-card p-4 rounded-lg shadow-lg border border-gray-700/50 hover:border-jdc-blue/50 transition-colors"
+    className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out block" // Utiliser block pour que le lien remplisse la carte
   >
-    <div className="flex items-center gap-3 mb-3">
-      <div className={`p-2 rounded bg-gradient-to-r from-${gradientFrom} to-${gradientTo}`}>
-        <IconComponent className="text-white" />
+    <div className="flex items-center gap-3 mb-4">
+      <div className={`p-3 rounded-full bg-gradient-to-r from-${gradientFrom} to-${gradientTo}`}> {/* Rendre l'icône plus grande et ronde */}
+        <IconComponent className="text-white text-xl" /> {/* Ajuster la taille de l'icône */}
       </div>
-      <h3 className="font-bold text-lg text-white">{title}</h3>
+      <h3 className="font-extrabold text-xl text-white">{title}</h3> {/* Ajuster la taille et le poids du titre */}
     </div>
     
-    <div className="grid grid-cols-2 gap-3">
-      <div className="space-y-2">
-        <p className="text-sm text-gray-400">Total</p>
-        <p className="text-2xl font-bold text-white">{stats.total}</p>
+    <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-gray-300"> {/* Ajuster l'espacement */}
+      <div className="space-y-1"> {/* Ajuster l'espacement */}
+        <p className="text-sm text-gray-400 font-medium">Total</p> {/* Rendre le label plus petit et medium */}
+        <p className="text-2xl font-bold text-white">{stats.total}</p> {/* Ajuster la taille et le poids de la valeur */}
       </div>
-      <div className="space-y-2">
-        <p className="text-sm text-gray-400">En attente</p>
-        <p className="text-2xl font-bold text-yellow-400">{stats.enAttente}</p>
+      <div className="space-y-1"> {/* Ajuster l'espacement */}
+        <p className="text-sm text-gray-400 font-medium">En attente</p> {/* Rendre le label plus petit et medium */}
+        <p className="text-2xl font-bold text-yellow-400">{stats.enAttente}</p> {/* Ajuster la taille et le poids de la valeur */}
       </div>
-      <div className="space-y-2">
-        <p className="text-sm text-gray-400">Planifiées</p>
-        <p className="text-2xl font-bold text-blue-400">{stats.planifiees}</p>
+      <div className="space-y-1"> {/* Ajuster l'espacement */}
+        <p className="text-sm text-gray-400 font-medium">Planifiées</p> {/* Rendre le label plus petit et medium */}
+        <p className="text-2xl font-bold text-blue-400">{stats.planifiees}</p> {/* Ajuster la taille et le poids de la valeur */}
       </div>
-      <div className="space-y-2">
-        <p className="text-sm text-gray-400">Terminées</p>
-        <p className="text-2xl font-bold text-green-400">{stats.terminees}</p>
+      <div className="space-y-1"> {/* Ajuster l'espacement */}
+        <p className="text-sm text-gray-400 font-medium">Terminées</p> {/* Rendre le label plus petit et medium */}
+        <p className="text-2xl font-bold text-green-400">{stats.terminees}</p> {/* Ajuster la taille et le poids de la valeur */}
       </div>
     </div>
   </Link>

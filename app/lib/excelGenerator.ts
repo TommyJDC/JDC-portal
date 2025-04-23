@@ -1,9 +1,3 @@
-import * as ExcelJS from 'exceljs';
-
-declare global {
-  interface Buffer extends Uint8Array {}
-}
-
 export interface CommercialArticle {
   groupe: string;
   famille: string;
@@ -32,8 +26,12 @@ export interface CommercialData {
   menus: CommercialMenu[];
 }
 
-export async function generateCommercialExcel(data: CommercialData): Promise<ExcelJS.Buffer> {
-  const workbook = new ExcelJS.Workbook();
+export async function generateCommercialExcel(data: CommercialData): Promise<Uint8Array> {
+  // Perform dynamic import directly within the function
+  // @ts-ignore: This import is only for server-side
+  const ExcelJS = await import('exceljs');
+  console.log("ExcelJS imported dynamically:", !!ExcelJS); // Add log here
+  const workbook = new ExcelJS.default.Workbook();
 
   // Feuille ARTICLE
   const articleSheet = workbook.addWorksheet('ARTICLE');
@@ -114,5 +112,6 @@ export async function generateCommercialExcel(data: CommercialData): Promise<Exc
     };
   });
 
-  return workbook.xlsx.writeBuffer();
+  const buffer = await workbook.xlsx.writeBuffer();
+  return new Uint8Array(buffer); // Explicitly cast Buffer to Uint8Array
 }

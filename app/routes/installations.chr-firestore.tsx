@@ -13,6 +13,7 @@ import InstallationTile from "~/components/InstallationTile";
 import type { Installation, Shipment } from "~/types/firestore.types"; // Importer les types
 import { formatFirestoreDate } from "~/utils/dateUtils"; // Importer la fonction de formatage
 import { COLUMN_MAPPINGS } from "~/routes/api.sync-installations"; // Importer les mappings
+import { useState } from 'react'; // Importer useState
 
 interface ActionData {
   success?: boolean;
@@ -28,7 +29,7 @@ interface ProcessedInstallation {
   contact?: string;
   telephone?: string;
   commercial?: string;
-  dateInstall?: string; // Type attendu par InstallationTile
+  dateInstall?: string | Date; // Accepter string ou Date
   tech?: string;
   status?: string;
   commentaire?: string;
@@ -110,8 +111,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         commentaire: data.commentaire || '',
         
         // --- Champs traités ---
-        // Récupérer les dates comme des chaînes brutes
-        dateInstall: data.dateInstall ? String(data.dateInstall) : '', 
+        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : '', // Utiliser formatFirestoreDate
         hasCTN: chrShipmentClientCodes.has(data.codeClient), 
         
         // Inclure d'autres champs spécifiques au secteur si nécessaire
@@ -141,6 +141,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function CHRInstallations() {
   const { installations, error } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<ActionData>();
+  const [searchTerm, setSearchTerm] = useState(''); // Ajouter l'état pour le terme de recherche
 
   const handleSave = async (id: string, updates: any) => {
     fetcher.submit(
@@ -152,6 +153,21 @@ export default function CHRInstallations() {
     );
   };
 
+  // Filtrer les installations en fonction du terme de recherche
+  const filteredInstallations = installations.filter(installation => {
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    return (
+      installation.nom.toLowerCase().includes(lowerCaseSearchTerm) ||
+      installation.codeClient.toLowerCase().includes(lowerCaseSearchTerm) ||
+      (installation.ville && installation.ville.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (installation.contact && installation.contact.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (installation.telephone && installation.telephone.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (installation.commercial && installation.commercial.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (installation.tech && installation.tech.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (installation.commentaire && installation.commentaire.toLowerCase().includes(lowerCaseSearchTerm))
+    );
+  });
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-white">Installations CHR</h1>
@@ -160,6 +176,17 @@ export default function CHRInstallations() {
         &larr; Retour au Tableau de Bord
       </Link>
 
+      {/* Champ de recherche */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Rechercher par nom, code client, ville, contact, téléphone, commercial, technicien ou commentaire..."
+          className="w-full px-3 py-2 bg-black text-white font-bold border rounded-md focus:outline-none focus:ring focus:border-blue-300"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       {error && (
         <div className="bg-red-900 bg-opacity-50 text-red-300 p-4 rounded-md">
           <p className="font-semibold">Erreur :</p>
@@ -167,20 +194,20 @@ export default function CHRInstallations() {
         </div>
       )}
 
-      {!error && installations.length > 0 && (
+      {!error && filteredInstallations.length > 0 && ( // Utiliser la liste filtrée
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {installations.map((installation) => (
+          {filteredInstallations.map((installation) => ( // Utiliser la liste filtrée
             <InstallationTile
               key={installation.id}
               installation={installation}
-              hasCTN={installation.hasCTN} // Passer la prop hasCTN
+              hasCTN={installation.hasCTN}
               onSave={(values) => handleSave(installation.id, values)}
             />
           ))}
         </div>
       )}
 
-      {!error && installations.length === 0 && (
+      {!error && filteredInstallations.length === 0 && ( // Vérifier la longueur de la liste filtrée
         <p className="text-jdc-gray-400">Aucune installation CHR à afficher.</p>
       )}
     </div>

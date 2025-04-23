@@ -181,7 +181,7 @@ import type { MetaFunction } from "@remix-run/node";
         groupsWithDates.sort((a, b) => {
           if (!b.mostRecentDate) return -1;
           if (!a.mostRecentDate) return 1;
-          return b.mostRecentDate.getTime() - a.mostRecentDate.getTime();
+          return b.mostRecentDate.getTime() - a.mostRecentDate.getTime(); // Corrected sorting logic
         });
 
         return groupsWithDates.map(group => [group.raisonSociale, group.tickets] as [string, SapTicket[]]);
@@ -214,7 +214,7 @@ import type { MetaFunction } from "@remix-run/node";
          setSelectedTicket(null);
        };
 
-       // Use revalidator hook to refresh data after modal update
+       // Use revalidator hook to trigger revalidation
        const handleTicketUpdated = useCallback(() => {
          console.log("Ticket update detected from modal, revalidating data...");
          revalidator.revalidate();
@@ -226,7 +226,7 @@ import type { MetaFunction } from "@remix-run/node";
       // Show message if user is not logged in (based on context)
       if (!user) {
          return (
-            <div className="text-center text-jdc-gray-400 py-10">
+            <div className="text-center text-gray-400 py-10">
                 Veuillez vous connecter pour voir les tickets SAP.
             </div>
          )
@@ -244,18 +244,18 @@ import type { MetaFunction } from "@remix-run/node";
        const isLoading = revalidator.state === 'loading';
 
       return (
-        <div>
-          <h1 className="text-2xl font-semibold text-white mb-4 flex items-center">
+        <div className="space-y-6 p-6 bg-gray-900 min-h-screen"> {/* Ajuster le conteneur principal */}
+          <h1 className="text-3xl font-semibold text-white mb-6 flex items-center"> {/* Ajuster le titre */}
             <FontAwesomeIcon icon={faTicket} className="mr-3 text-jdc-blue" />
             Gestion des Tickets SAP
             {isLoading && <FontAwesomeIcon icon={faSpinner} spin className="ml-3 text-jdc-yellow" title="Rafraîchissement..." />}
           </h1>
 
           {/* Filter and Search Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-jdc-card rounded-lg shadow">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-800 rounded-lg shadow-xl border border-gray-700"> {/* Ajuster le conteneur des contrôles */}
             {/* Sector Filter */}
             <div className="col-span-1">
-              <label htmlFor="sector-filter" className="block text-sm font-medium text-jdc-gray-300 mb-1">
+              <label htmlFor="sector-filter" className="block text-sm font-medium text-gray-400 mb-1"> {/* Ajuster le style du label */}
                 <FontAwesomeIcon icon={faFilter} className="mr-1" /> Filtrer par Secteur
               </label>
               <select
@@ -263,7 +263,7 @@ import type { MetaFunction } from "@remix-run/node";
                 name="sector-filter"
                 value={selectedSector}
                 onChange={(e) => setSelectedSector(e.target.value)}
-                className="block w-full rounded-md bg-jdc-gray-800 border-transparent focus:border-jdc-blue focus:ring focus:ring-jdc-blue focus:ring-opacity-50 text-white py-2 pl-3 pr-10"
+                className="block w-full rounded-md bg-gray-900 border-gray-700 focus:border-jdc-blue focus:ring focus:ring-jdc-blue focus:ring-opacity-50 text-white py-2 pl-3 pr-10 text-sm"
                 disabled={isLoading || availableSectors.length === 0} // Disable during revalidation
               >
                 <option value="">Tous les secteurs ({userProfile?.secteurs?.length ?? 0})</option>
@@ -272,7 +272,7 @@ import type { MetaFunction } from "@remix-run/node";
                 ))}
               </select>
                {availableSectors.length === 0 && !isLoading && !loaderError && (
-                 <p className="text-xs text-jdc-gray-500 mt-1">Aucun secteur assigné à votre profil.</p>
+                 <p className="text-xs text-gray-500 mt-1">Aucun secteur assigné à votre profil.</p>
                )}
             </div>
 
@@ -288,6 +288,8 @@ import type { MetaFunction } from "@remix-run/node";
                  icon={<FontAwesomeIcon icon={faSearch} />}
                  wrapperClassName="mb-0"
                  disabled={isLoading} // Disable during revalidation
+                 className="bg-gray-900 text-white border-gray-700 focus:border-jdc-blue focus:ring-jdc-blue" // Use className for input
+                 labelClassName="text-gray-400" // Use labelClassName for label
                />
             </div>
           </div>
@@ -297,7 +299,7 @@ import type { MetaFunction } from "@remix-run/node";
 
           {/* No Results State */}
           {!isLoading && !loaderError && clientGroups.length === 0 && (
-            <div className="text-center text-jdc-gray-400 py-10">
+            <div className="text-center text-gray-400 py-10">
               {allTickets.length > 0
                 ? "Aucun ticket trouvé correspondant à votre recherche ou filtre."
                 : "Aucun ticket SAP avec une raison sociale trouvée pour les secteurs assignés."}
@@ -307,33 +309,33 @@ import type { MetaFunction } from "@remix-run/node";
 
           {/* Tickets List */}
           {!isLoading && !loaderError && clientGroups.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {clientGroups.map(([raisonSociale, clientTickets]) => (
-                <div key={raisonSociale} className="bg-jdc-card rounded-lg shadow overflow-hidden">
+                <div key={raisonSociale} className="bg-gray-800 rounded-lg shadow-xl overflow-hidden border border-gray-700">
                   <details className="group" open={clientGroups.length < 5}>
-                    <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-jdc-gray-800 list-none transition-colors">
+                    <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700 list-none transition-colors">
                       <div className="flex items-center min-w-0 mr-2">
-                        <FontAwesomeIcon icon={faUserTag} className="mr-3 text-jdc-gray-300 text-lg flex-shrink-0" />
+                        <FontAwesomeIcon icon={faUserTag} className="mr-3 text-jdc-blue text-lg flex-shrink-0" />
                         <div className="min-w-0">
-                            <span className="font-semibold text-white text-lg block truncate" title={raisonSociale}>{raisonSociale}</span>
-                            <span className="ml-0 md:ml-3 text-sm text-jdc-gray-400">
+                            <span className="font-semibold text-yellow-400 text-lg block truncate" title={raisonSociale}>{raisonSociale}</span>
+                            <span className="ml-0 md:ml-3 text-sm text-gray-400">
                                 ({clientTickets.length} ticket{clientTickets.length > 1 ? 's' : ''})
                             </span>
                         </div>
                       </div>
                       <FontAwesomeIcon
                         icon={faChevronRight}
-                        className="text-jdc-gray-400 transition-transform duration-200 group-open:rotate-90 text-xl flex-shrink-0"
+                        className="text-gray-400 transition-transform duration-200 group-open:rotate-90 text-xl flex-shrink-0"
                       />
                     </summary>
-                    <div className="border-t border-jdc-gray-700 bg-jdc-gray-900 p-4 space-y-3">
+                    <div className="border-t border-gray-700 bg-gray-900 p-4 space-y-3">
                       {clientTickets.sort((a, b) => {
                           // Use parsed dates for sorting
                           const dateA = a.date;
                           const dateB = b.date;
                           if (!(dateB instanceof Date)) return -1;
                           if (!(dateA instanceof Date)) return 1;
-                          return dateB.getTime() - dateA.getTime();
+                          return dateB.getTime() - dateA.getTime(); // Corrected sorting logic
                         }).map((ticket) => {
                         const statusStyle = getTicketStatusStyle(ticket.statut);
                         // Ensure the date passed is Date | null
@@ -343,7 +345,7 @@ import type { MetaFunction } from "@remix-run/node";
                         return (
                           <div
                             key={ticket.id}
-                            className="border-b border-jdc-gray-700 pb-3 last:border-b-0 text-sm cursor-pointer hover:bg-jdc-gray-800 transition-colors duration-150 p-3 rounded"
+                            className="border-b border-gray-700 pb-3 last:border-b-0 text-sm cursor-pointer hover:bg-gray-800 transition-colors duration-150 p-3 rounded-md"
                             onClick={() => handleTicketClick(ticket)}
                             role="button"
                             tabIndex={0}
@@ -353,22 +355,22 @@ import type { MetaFunction } from "@remix-run/node";
                                <div className="flex-1 min-w-0 mb-2 md:mb-0 md:mr-4">
                                   <div className="flex items-center mb-1">
                                     <FontAwesomeIcon icon={faInfoCircle} className="mr-2 text-jdc-blue w-4 text-center" />
-                                    <span className="text-jdc-gray-100 font-semibold" title={`SAP: ${ticket.numeroSAP || 'N/A'}`}>
+                                    <span className="text-white font-semibold" title={`SAP: ${ticket.numeroSAP || 'N/A'}`}>
                                       {ticket.numeroSAP || 'N/A'}
                                     </span>
                                     <span className={`ml-3 inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${statusStyle.bgColor} ${statusStyle.textColor}`}>
                                       {ticket.statut || 'Inconnu'}
                                     </span>
                                   </div>
-                                  <div className="flex items-center text-xs text-jdc-gray-400">
-                                    <FontAwesomeIcon icon={faCalendarAlt} className="mr-2 text-jdc-gray-500 w-4 text-center" />
+                                  <div className="flex items-center text-xs text-gray-400">
+                                    <FontAwesomeIcon icon={faCalendarAlt} className="mr-2 text-gray-500 w-4 text-center" />
                                     <span>{displayDate}</span>
                                     <span className="mx-2">|</span>
-                                    <span className="text-jdc-gray-500" title={`ID: ${ticket.id}`}>
+                                    <span className="text-gray-500" title={`ID: ${ticket.id}`}>
                                       ID: {ticket.id.substring(0, 8)}...
                                     </span>
                                     <span className="mx-2">|</span>
-                                    <span className="text-jdc-gray-500">
+                                    <span className="text-gray-500">
                                       Secteur: {ticket.secteur || 'N/A'}
                                     </span>
                                   </div>
@@ -393,7 +395,7 @@ import type { MetaFunction } from "@remix-run/node";
                                         )}
                                       </Button>
                                       {showNumberOptions[ticket.id] && phoneNumbersArray.length > 1 && (
-                                        <div className="absolute right-0 mt-2 w-48 bg-jdc-gray-800 rounded-md shadow-lg z-10 border border-jdc-gray-700">
+                                        <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg z-10 border border-gray-700">
                                           <ul className="py-1">
                                             {phoneNumbersArray.map((number, index) => (
                                               <li key={index}>
@@ -405,7 +407,7 @@ import type { MetaFunction } from "@remix-run/node";
                                                     handleNumberSelection(number);
                                                     setShowNumberOptions(prevState => ({ ...prevState, [ticket.id]: false }));
                                                   }}
-                                                  className="block px-4 py-2 text-sm text-jdc-gray-200 hover:bg-jdc-blue hover:text-white"
+                                                  className="block px-4 py-2 text-sm text-gray-300 hover:bg-jdc-blue hover:text-white"
                                                 >
                                                   {number}
                                                 </a>
@@ -418,26 +420,26 @@ import type { MetaFunction } from "@remix-run/node";
                                   )}
                                </div>
                             </div>
-                            <div className="space-y-1 text-xs">
+                            <div className="space-y-1 text-xs text-gray-400">
                                {ticket.deducedSalesperson && (
-                                 <div className="flex items-center text-jdc-gray-400">
-                                   <FontAwesomeIcon icon={faUserTie} className="mr-2 text-jdc-gray-500 w-4 text-center" />
+                                 <div className="flex items-center">
+                                   <FontAwesomeIcon icon={faUserTie} className="mr-2 text-gray-500 w-4 text-center" />
                                    <span>{ticket.deducedSalesperson}</span>
                                  </div>
                                )}
                                {ticket.adresse && (
-                                 <div className="flex items-center text-jdc-gray-400">
-                                   <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-jdc-gray-500 w-4 text-center" />
+                                 <div className="flex items-center">
+                                   <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-gray-500 w-4 text-center" />
                                    <span className="truncate" title={ticket.adresse}>{ticket.adresse}</span>
                                  </div>
                                )}
                                {ticket.description && (
-                                 <div className="text-jdc-gray-300 pt-1">
+                                 <div className="text-gray-300 pt-1">
                                    <p className="line-clamp-2" title={ticket.description}>{ticket.description}</p>
                                  </div>
                                )}
                                {ticket.demandeSAP && (
-                                 <div className="text-jdc-gray-500 italic pt-1">
+                                 <div className="text-gray-500 italic pt-1">
                                     Demande SAP: ({ticket.demandeSAP.length > 40 ? ticket.demandeSAP.substring(0, 37) + '...' : ticket.demandeSAP})
                                  </div>
                                )}

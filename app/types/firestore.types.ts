@@ -27,7 +27,7 @@ export interface UserProfile {
   secteur?: string;
   displayName: string;
   nom: string;
-  password: string;
+  password?: string; // Rendre le mot de passe optionnel
   createdAt?: Timestamp | Date;
   updatedAt?: Timestamp | Date;
   // Gmail processing fields
@@ -35,6 +35,11 @@ export interface UserProfile {
   isGmailProcessor?: boolean;
   gmailAuthorizedScopes?: string[];
   gmailAuthStatus?: 'active' | 'expired' | 'unauthorized';
+  phone?: string;
+  address?: string;
+  avatarUrl?: string;
+  jobTitle?: string;
+  department?: 'technique' | 'commercial' | 'admin';
 }
 
 /**

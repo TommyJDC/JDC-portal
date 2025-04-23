@@ -6,7 +6,10 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
     import type { Article, AppUser, UserProfile } from "~/types/firestore.types";
     import { useOutletContext } from "@remix-run/react";
     import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // Importer pour icônes
-    import { faPlus, faSpinner, faTimes, faTrashAlt } from '@fortawesome/free-solid-svg-icons'; // Importer icônes + faTrashAlt
+    import { faPlus, faSpinner, faTimes, faTrashAlt, faSearch } from '@fortawesome/free-solid-svg-icons'; // Importer icônes + faTrashAlt + faSearch
+    import { Input } from "~/components/ui/Input"; // Importer le composant Input
+    import { Button } from "~/components/ui/Button"; // Importer le composant Button
+
 
     // Exporter loader et action pour que Remix les utilise
     export { loader, action };
@@ -157,14 +160,18 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
       const isLoadingData = fetcher.state === 'loading';
 
       return (
-        <div className="container mx-auto p-4">
-          <h1 className="text-2xl font-bold mb-4 text-gray-100">Recherche d'Articles</h1>
+        <div className="space-y-6 p-6 bg-gray-900 min-h-screen">
+          <h1 className="text-3xl font-semibold text-white mb-6 flex items-center">
+             <FontAwesomeIcon icon={faSearch} className="mr-3 text-jdc-yellow" />
+             Recherche d'Articles
+             {isLoadingData && <FontAwesomeIcon icon={faSpinner} spin className="ml-3 text-jdc-yellow" title="Chargement..." />}
+          </h1>
 
-          {/* Formulaire de recherche (inchangé, utilise GET) */}
-          <Form method="get" className="mb-6 p-4 border border-gray-700 rounded-lg shadow-sm bg-jdc-blue-darker">
+          {/* Formulaire de recherche */}
+          <Form method="get" className="mb-6 p-6 bg-gray-800 rounded-xl shadow-xl border border-gray-700">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 items-end">
               <div>
-                <label htmlFor="code" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="code" className="block text-sm font-medium text-gray-400 mb-1">
                   Code Article
                 </label>
                 <input
@@ -173,12 +180,13 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                   id="code"
                   value={codeSearch}
                   onChange={(e) => setCodeSearch(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-jdc-yellow focus:border-jdc-yellow bg-jdc-gray-800 text-gray-100 placeholder-gray-400"
+                  className="w-full px-3 py-2 border border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-jdc-blue focus:border-jdc-blue bg-gray-900 text-white placeholder-gray-500 text-sm"
                   placeholder="Code exact"
+                  disabled={isLoadingData}
                 />
               </div>
               <div>
-                <label htmlFor="nom" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="nom" className="block text-sm font-medium text-gray-400 mb-1">
                   Nom Article
                 </label>
                 <input
@@ -187,31 +195,37 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                   id="nom"
                   value={nomSearch}
                   onChange={(e) => setNomSearch(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-jdc-yellow focus:border-jdc-yellow bg-jdc-gray-800 text-gray-100 placeholder-gray-400"
+                  className="w-full px-3 py-2 border border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-jdc-blue focus:border-jdc-blue bg-gray-900 text-white placeholder-gray-500 text-sm"
                   placeholder="Nom partiel ou complet"
+                  disabled={isLoadingData}
                 />
               </div>
               <div className="md:pt-6">
                 <button
                   type="submit"
-                  className="w-full bg-jdc-yellow text-black hover:bg-yellow-300 font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-jdc-yellow focus:ring-opacity-50 transition duration-150 ease-in-out"
+                  className="w-full bg-jdc-blue text-white hover:bg-jdc-blue-dark font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-jdc-blue transition duration-150 ease-in-out flex items-center justify-center gap-2"
                   disabled={isLoadingData}
                 >
-                  {isLoadingData ? 'Recherche...' : 'Rechercher'}
+                   {isLoadingData ? (
+                     <FontAwesomeIcon icon={faSpinner} spin />
+                   ) : (
+                     <FontAwesomeIcon icon={faSearch} />
+                   )}
+                  <span>{isLoadingData ? 'Recherche...' : 'Rechercher'}</span>
                 </button>
               </div>
             </div>
           </Form>
 
           {/* Section des résultats */}
-          <div className="bg-jdc-blue-darker p-4 border border-gray-700 rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-3 text-gray-200">Résultats</h2>
+          <div className="bg-gray-800 p-6 border border-gray-700 rounded-xl shadow-xl">
+            <h2 className="text-xl font-semibold mb-4 text-white">Résultats</h2>
 
-            {loaderError && <p className="text-red-500 text-sm mb-3">{loaderError}</p>}
+            {loaderError && <p className="text-red-400 text-sm mb-3">{loaderError}</p>}
 
             {/* Afficher l'erreur de l'action seulement si elle existe et a la propriété error */}
             {fetcher.data && !fetcher.data.success && hasErrorProperty(fetcher.data) && (
-              <p className="text-red-500 text-sm mb-3">{fetcher.data.error}</p>
+              <p className="text-red-400 text-sm mb-3">{fetcher.data.error}</p>
             )}
 
             {isLoadingData && <p className="text-gray-400 italic">Chargement...</p>}
@@ -219,19 +233,19 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
             {!isLoadingData && !loaderError && (
               <>
                 {loaderArticles && loaderArticles.length > 0 ? (
-                  <ul className="divide-y divide-gray-700">
+                  <ul className="divide-y divide-gray-700 space-y-4">
                     {loaderArticles.map((article) => {
                       const isUploadingCurrent = uploadingImageId === article.id && fetcher.state !== 'idle';
                       const isDeletingCurrent = (imageUrl: string) => deletingImageUrl === imageUrl && fetcher.state !== 'idle';
 
                       return (
-                        <li key={article.id} className="py-4 px-1 hover:bg-jdc-gray-800">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-gray-100">Code: {article.Code}</p>
+                        <li key={article.id} className="py-4 px-3 hover:bg-gray-700/30 rounded-md transition-colors">
+                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-white">Code: <span className="text-yellow-400">{article.Code}</span></p>
                               <p className="text-sm text-gray-300">Désignation: {article.Désignation}</p>
                               {article.imageUrls && article.imageUrls.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-2">
+                                <div className="mt-3 flex flex-wrap gap-2">
                                   {article.imageUrls.map((url, index) => {
                                     const deletingThis = isDeletingCurrent(url);
                                     return (
@@ -239,7 +253,7 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                                         <img
                                           src={url}
                                           alt={`Image ${index + 1} pour ${article.Code}`}
-                                          className={`h-16 w-16 object-cover rounded border border-gray-600 transition-opacity ${deletingThis ? 'opacity-50' : 'group-hover:opacity-70 cursor-pointer'}`}
+                                          className={`h-16 w-16 object-cover rounded-md border border-gray-600 transition-opacity ${deletingThis ? 'opacity-50' : 'group-hover:opacity-70 cursor-pointer'}`}
                                           loading="lazy"
                                           onClick={() => !deletingThis && openImageModal(url)}
                                         />
@@ -247,7 +261,7 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); handleDeleteImage(article.id, url); }}
                                           disabled={deletingThis || fetcher.state !== 'idle'}
-                                          className={`absolute top-0 right-0 p-1 bg-red-600 bg-opacity-75 rounded-full text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${deletingThis ? 'cursor-not-allowed opacity-50' : 'hover:bg-red-700'}`}
+                                          className={`absolute top-1 right-1 p-1 bg-red-600 bg-opacity-75 rounded-full text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${deletingThis ? 'cursor-not-allowed opacity-50' : 'hover:bg-red-700'}`}
                                           aria-label="Supprimer l'image"
                                         >
                                           {deletingThis ? (
@@ -262,15 +276,15 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                                 </div>
                               )}
                             </div>
-                            <div className="ml-4 flex-shrink-0">
+                            <div className="ml-0 md:ml-4 flex-shrink-0 mt-4 md:mt-0">
                               <button
                                 type="button"
                                 onClick={() => handleAddPhotoClick(article.id)}
                                 disabled={isUploadingCurrent || fetcher.state !== 'idle'}
-                                className={`inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded shadow-sm text-white ${
+                                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
                                   isUploadingCurrent || fetcher.state !== 'idle'
                                     ? 'bg-gray-500 cursor-not-allowed'
-                                    : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-jdc-blue-darker focus:ring-indigo-500'
+                                    : 'bg-jdc-yellow hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-jdc-yellow'
                                 }`}
                               >
                                 {isUploadingCurrent ? (
@@ -315,17 +329,17 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
               onClick={closeImageModal}
             >
               <div
-                className="relative bg-white p-2 rounded-lg max-w-3xl max-h-[80vh]"
+                className="relative bg-gray-800 p-4 rounded-lg max-w-3xl max-h-[80vh] border border-gray-700"
                 onClick={(e) => e.stopPropagation()}
               >
                 <img
                   src={selectedImageUrl}
                   alt="Image agrandie"
-                  className="block max-w-full max-h-[calc(80vh-40px)] object-contain"
+                  className="block max-w-full max-h-[calc(80vh-40px)] object-contain rounded-md"
                 />
                 <button
                   onClick={closeImageModal}
-                  className="absolute top-2 right-2 text-black bg-white bg-opacity-50 hover:bg-opacity-75 rounded-full p-1 focus:outline-none"
+                  className="absolute top-3 right-3 text-white bg-gray-700 bg-opacity-75 hover:bg-opacity-100 rounded-full p-1 focus:outline-none"
                   aria-label="Fermer l'image"
                 >
                   <FontAwesomeIcon icon={faTimes} size="lg" />
@@ -336,3 +350,4 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
         </div>
       );
     }
+

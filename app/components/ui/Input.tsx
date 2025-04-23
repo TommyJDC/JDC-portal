@@ -5,10 +5,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   icon?: React.ReactElement;
   wrapperClassName?: string;
+  labelClassName?: string; // Add labelClassName prop
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, id, name, type = 'text', error, icon, className = '', wrapperClassName = '', ...props }, ref) => {
+  ({ label, id, name, type = 'text', error, icon, className = '', wrapperClassName = '', labelClassName = '', ...props }, ref) => { // Include labelClassName
     const inputId = id || name; // Use name as fallback for id if not provided
     const hasIcon = !!icon;
 
@@ -19,7 +20,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className={`mb-4 ${wrapperClassName}`}>
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-jdc-gray-300 mb-1">
+          <label htmlFor={inputId} className={`block text-sm font-medium text-jdc-gray-300 mb-1 ${labelClassName}`}> {/* Apply labelClassName */}
             {label}
           </label>
         )}

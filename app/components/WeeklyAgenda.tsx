@@ -65,21 +65,21 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
     const handlePrevWeek = () => setCurrentDate(addWeeks(currentDate, -1));
     const handleNextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
 
-    const buttonStyle = "p-2 rounded-full hover:bg-jdc-gray-700 transition-colors text-jdc-yellow";
+    const buttonStyle = "p-2 rounded-full hover:bg-gray-700 transition-colors text-jdc-yellow";
 
     if (isLoading) {
         return (
-            <div className="bg-jdc-card p-4 rounded-lg shadow-lg min-h-[200px] flex items-center justify-center">
+            <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 min-h-[200px] flex items-center justify-center">
                 <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-xl mr-2" />
-                <span className="text-jdc-gray-400">Chargement de l'agenda...</span>
+                <span className="text-gray-400">Chargement de l'agenda...</span>
             </div>
         );
     }
 
     return (
-        <div className="bg-jdc-card p-4 rounded-lg shadow-lg h-[600px]">
-            <div className="flex justify-between items-center mb-3">
-                <h3 className="text-lg font-semibold text-white flex items-center">
+        <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-[600px]">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-white flex items-center">
                     <FontAwesomeIcon icon={faCalendarDays} className="mr-2 text-jdc-yellow" />
                     Agenda de la semaine
                 </h3>
@@ -117,7 +117,7 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
             )}
 
             {!error && events.length === 0 && (
-                <p className="text-jdc-gray-400">Aucun événement trouvé pour cette période.</p>
+                <p className="text-gray-400">Aucun événement trouvé pour cette période.</p>
             )}
 
             {!error && events.length > 0 && (
@@ -143,10 +143,10 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
                     }}
                     eventPropGetter={() => ({
                         style: {
-                            backgroundColor: '#3b82f6', // jdc-blue
+                            backgroundColor: '#facc15', // yellow-400
                             border: 'none',
-                            borderRadius: '6px',
-                            color: 'white',
+                            borderRadius: '4px',
+                            color: '#1f2937', // gray-800
                             padding: '4px 8px',
                             fontSize: '14px',
                             boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
@@ -156,7 +156,7 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
                     })}
                     components={{
                         event: ({ event }) => (
-                            <div className="hover:bg-blue-500 hover:shadow-lg transition-all duration-200">
+                            <div className="hover:bg-yellow-500 hover:shadow-lg transition-all duration-200">
                                 {event.title}
                             </div>
                         ),
@@ -164,10 +164,15 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
                     dayPropGetter={(date) => ({
                         style: {
                             backgroundColor: getDay(date) === 0 || getDay(date) === 6 
-                                ? 'rgba(31, 41, 55, 0.5)' // jdc-gray-800 with opacity
-                                : '#1f2937', // jdc-gray-800
+                                ? 'rgba(31, 41, 55, 0.5)' // gray-800 with opacity
+                                : '#1f2937', // gray-800
                         },
                     })}
+                     // Ajuster les styles des en-têtes et des cellules du calendrier
+                    // Utiliser des classes CSS personnalisées si nécessaire, ou des styles inline
+                    // Exemple de styles inline pour les en-têtes de jour (peut nécessiter d'inspecter les classes de react-big-calendar)
+                    // headerStyle: { backgroundColor: '#1f2937', color: '#d1d5db' }, // gray-800, gray-300
+                    // cellStyle: { border: '1px solid #374151' }, // gray-700
                 />
             )}
         </div>

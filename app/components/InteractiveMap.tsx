@@ -270,15 +270,15 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
 
 
   return (
-    <div className="bg-jdc-card p-4 rounded-lg shadow-lg relative min-h-[450px]">
-      <h2 className="text-xl font-semibold text-white mb-3 flex items-center">
+    <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 relative min-h-[450px]">
+      <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
         <FontAwesomeIcon icon={faMapMarkedAlt} className="mr-2 text-jdc-yellow" />
         Carte des Tickets Récents (Mapbox)
       </h2>
 
       {/* Loading and Error Overlays */}
       {(isLoadingTickets || (isGeocoding && geocodedCoordinates.size === 0 && uniqueAddresses.length > 0)) && (
-        <div className="absolute inset-0 z-[500] flex items-center justify-center bg-jdc-card bg-opacity-75 rounded-lg">
+        <div className="absolute inset-0 z-[500] flex items-center justify-center bg-gray-800 bg-opacity-75 rounded-xl">
           <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-3xl mr-2" />
           <span className="text-white">
             {isLoadingTickets ? "Chargement des tickets..." : "Géocodage des adresses..."}
