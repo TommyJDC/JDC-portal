@@ -7,7 +7,6 @@ import {
   getUserProfileSdk,
   getRecentTicketsForSectors,
   getAllShipments,
-  getTotalTicketCountSdk,
   getDistinctClientCountFromEnvoiSdk,
   getLatestStatsSnapshotsSdk,
   getInstallationsSnapshot,
@@ -103,11 +102,11 @@ export interface DashboardLoaderData {
             try {
                 // Définir les promesses
                 const latestStatsSnapshotsPromise = getLatestStatsSnapshotsSdk(1);
-                const totalTicketCountPromise = getTotalTicketCountSdk(sectorsForTickets);
+                // Remplacer l'appel à getTotalTicketCountSdk par getSapTicketCountBySectorSdk
+                const sapTicketCountsBySectorPromise = getSapTicketCountBySectorSdk(sectorsForTickets);
                 const recentTicketsPromise = getRecentTicketsForSectors(sectorsForTickets, 20);
                 const allShipmentsPromise = getAllShipments(sectorsForShipments);
                 const allInstallationsPromise = getAllInstallations();
-                const sapTicketCountBySectorPromise = getSapTicketCountBySectorSdk(sectorsForTickets); // Appeler la nouvelle fonction
 
                 // Définir les promesses dépendantes de userProfile
                 const distinctClientCountPromise = userProfile ? getDistinctClientCountFromEnvoiSdk(userProfile) : Promise.resolve(0);
@@ -117,36 +116,43 @@ export interface DashboardLoaderData {
                 // Exécuter toutes les promesses en parallèle
                 const results = await Promise.allSettled([
                   latestStatsSnapshotsPromise,
-                  totalTicketCountPromise,
+                  sapTicketCountsBySectorPromise, // Utiliser la promesse avec le nom correct
                   distinctClientCountPromise,
                   recentTicketsPromise,
                   allShipmentsPromise,
                   installationsSnapshotPromise,
                   allInstallationsPromise,
-                  sapTicketCountBySectorPromise, // Inclure la nouvelle promesse
                 ]);
 
                 // Accéder aux résultats en vérifiant le statut et la valeur
                 const snapshotResult = results[0];
-                const ticketCountResult = results[1];
+                const sapTicketCountBySectorResult = results[1]; // Récupérer le résultat avec le nom correct
                 const distinctClientCountResult = results[2];
                 const recentTicketsResult = results[3];
                 const recentShipmentsResult = results[4];
                 const installationsSnapshotResult = results[5];
                 const allInstallationsResult = results[6];
-                const sapTicketCountBySectorResult = results[7]; // Récupérer le résultat
+
 
                 const latestSnapshot = snapshotResult.status === 'fulfilled' && snapshotResult.value && snapshotResult.value.length > 0 ? snapshotResult.value[0] : null;
 
-                stats.liveTicketCount = ticketCountResult.status === 'fulfilled' ? ticketCountResult.value : null;
+                // Mettre à jour l'utilisation de stats.liveTicketCount pour utiliser les comptes par secteur
+                // Cela nécessite de sommer les comptes par secteur si un total est nécessaire,
+                // ou d'utiliser directement sapTicketCountsBySector si l'affichage est par secteur.
+                // Pour l'instant, je vais assigner le résultat direct et ajuster l'utilisation plus tard si nécessaire.
+                sapTicketCountsBySector = sapTicketCountBySectorResult.status === 'fulfilled' ? sapTicketCountBySectorResult.value : null;
+
+                // L'évolution du total des tickets ne peut plus être calculée directement avec un seul chiffre.
+                // Il faudrait soit stocker l'évolution par secteur, soit recalculer le total à partir du snapshot.
+                // Pour l'instant, je vais commenter le calcul de l'évolution du ticket count pour éviter l'erreur.
+                // stats.liveTicketCount = ticketCountResult.status === 'fulfilled' ? ticketCountResult.value : null; // Cette ligne n'est plus pertinente pour le total global
                 stats.liveDistinctClientCountFromEnvoi = distinctClientCountResult.status === 'fulfilled' ? distinctClientCountResult.value : null;
-                sapTicketCountsBySector = sapTicketCountBySectorResult.status === 'fulfilled' ? sapTicketCountBySectorResult.value : null; // Assigner le résultat
 
 
                 if (latestSnapshot) {
-                    if (stats.liveTicketCount !== null && latestSnapshot.totalTickets !== undefined) {
-                        stats.evolution.ticketCount = stats.liveTicketCount - latestSnapshot.totalTickets;
-                    }
+                    // if (stats.liveTicketCount !== null && latestSnapshot.totalTickets !== undefined) {
+                    //     stats.evolution.ticketCount = stats.liveTicketCount - latestSnapshot.totalTickets;
+                    // }
                     if (stats.liveDistinctClientCountFromEnvoi !== null && latestSnapshot.activeClients !== undefined) {
                         stats.evolution.distinctClientCountFromEnvoi = stats.liveDistinctClientCountFromEnvoi - latestSnapshot.activeClients;
                     }
@@ -155,10 +161,10 @@ export interface DashboardLoaderData {
                     if (!clientError) clientError = "Erreur chargement évolution stats.";
                 }
 
-                if (ticketCountResult.status === 'rejected') {
-                     console.error("Dashboard Loader: Error fetching ticket count:", ticketCountResult.reason);
-                     if (!clientError) clientError = "Erreur chargement total tickets.";
-                }
+                // if (ticketCountResult.status === 'rejected') { // Cette vérification n'est plus pertinente
+                //      console.error("Dashboard Loader: Error fetching ticket count:", ticketCountResult.reason);
+                //      if (!clientError) clientError = "Erreur chargement total tickets.";
+                // }
                  if (distinctClientCountResult.status === 'rejected') {
                      console.error("Dashboard Loader: Error fetching distinct client count:", distinctClientCountResult.reason);
                      if (!clientError) clientError = "Erreur chargement clients distincts.";

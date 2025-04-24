@@ -1,9 +1,9 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { getArchivedSapTickets } from "./sap-archive.loader"; // Utilisation d'un chemin relatif
 import type { SAPArchive } from "~/types/firestore.types"; // Utiliser SAPArchive
 import { Timestamp } from 'firebase/firestore'; // Importer Timestamp depuis firebase/firestore
+import { initializeFirebaseAdmin } from "~/services/firestore.service.server"; // Importer initializeFirebaseAdmin
 
 // Helper function to safely extract string values from { stringValue: string } or simple strings
 function getSafeStringValue(prop: { stringValue: string } | string | undefined | null, defaultValue: string = ''): string {
@@ -19,6 +19,39 @@ function getSafeStringValue(prop: { stringValue: string } | string | undefined |
   return defaultValue;
 }
 
+// Déplacer la fonction getArchivedSapTickets ici pour qu'elle soit locale à ce fichier
+async function getArchivedSapTickets(): Promise<SAPArchive[]> {
+  try {
+    const db = await initializeFirebaseAdmin(); // Utiliser la fonction exportée
+    const snapshot = await db.collection("sap-archive").get();
+
+    const archivedTickets: SAPArchive[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      archivedTickets.push({
+        originalTicketId: data.originalTicketId,
+        archivedDate: data.archivedDate instanceof Timestamp ? data.archivedDate.toDate() : data.archivedDate, // Convertir Timestamp en Date
+        closureReason: data.closureReason as 'resolved' | 'no-response', // Assurer le type correct
+        technicianNotes: getSafeStringValue(data.technicianNotes), // Utiliser la fonction helper
+        technician: getSafeStringValue(data.technician, 'Technicien inconnu'), // Utiliser la fonction helper, ajouter une valeur par défaut
+        // Extraire les valeurs des champs { stringValue: string }
+        client: { stringValue: getSafeStringValue(data.client) }, // Assurer le format { stringValue: string }
+        raisonSociale: { stringValue: getSafeStringValue(data.raisonSociale) }, // Assurer le format { stringValue: string }
+        description: { stringValue: getSafeStringValue(data.description) }, // Assurer le format { stringValue: string }
+        secteur: data.secteur as 'CHR' | 'HACCP' | 'Kezia' | 'Tabac', // Assurer le type correct
+        numeroSAP: { stringValue: getSafeStringValue(data.numeroSAP) }, // Assurer le format { stringValue: string }
+        mailId: getSafeStringValue(data.mailId), // Utiliser la fonction helper
+        documents: Array.isArray(data.documents) ? data.documents.map((doc: any) => getSafeStringValue(doc)) : [], // Assurer que documents est un tableau de strings
+      });
+    });
+
+    return archivedTickets;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des tickets archivés :", error);
+    return [];
+  }
+}
+
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const archivedTickets = await getArchivedSapTickets();
@@ -27,7 +60,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 
 export default function SapArchivePage() {
-  // Laisser TypeScript inférer le type des données du loader
+  // Utiliser useLoaderData pour accéder aux données du loader
   const { archivedTickets } = useLoaderData<typeof loader>();
 
   return (
@@ -37,15 +70,20 @@ export default function SapArchivePage() {
         <p>Aucun ticket archivé trouvé.</p>
       ) : (
         <ul className="space-y-4">
-          {archivedTickets.map((ticket) => { // Retirer l'annotation de type explicite
+          {archivedTickets.map((ticket: SAPArchive) => { // Ajouter l'annotation de type explicite
+            // Gérer l'affichage de la date archivée
             // Gérer l'affichage de la date archivée
             // Les Timestamps sont convertis en { seconds: number, nanoseconds: number } par Remix
             // Les Dates sont converties en string par Remix
-            const archivedDate = typeof ticket.archivedDate === 'object' && ticket.archivedDate !== null && 'seconds' in ticket.archivedDate
-              ? new Date(ticket.archivedDate.seconds * 1000) // Gère les Timestamps désérialisés
-              : typeof ticket.archivedDate === 'string'
-              ? new Date(ticket.archivedDate) // Gère les Dates désérialisées en string
-              : null; // Gère les autres cas (null, undefined, etc.)
+            let archivedDate: Date | null = null;
+            if (typeof ticket.archivedDate === 'object' && ticket.archivedDate !== null && 'seconds' in ticket.archivedDate) {
+              // Gère les Timestamps désérialisés
+              archivedDate = new Date(ticket.archivedDate.seconds * 1000);
+            } else if (typeof ticket.archivedDate === 'string') {
+              // Gère les Dates désérialisées en string
+              archivedDate = new Date(ticket.archivedDate);
+            }
+            // Gère les autres cas (null, undefined, etc.)
 
 
             return (

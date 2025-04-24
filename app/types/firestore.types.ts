@@ -146,7 +146,7 @@ export interface SapTicket {
  */
 export interface SAPArchive {
   originalTicketId: string;                   // ID original du ticket
-  archivedDate: Date | Timestamp;             // Date/heure d'archivage
+  archivedDate: Date | Timestamp | string | { seconds: number; nanoseconds: number }; // Date/heure d'archivage (inclut les formats désérialisés par Remix)
   closureReason: 'resolved' | 'no-response';  // Raison de la clôture
   technicianNotes: string;                    // Notes techniques obligatoires
   technician: string;                         // Nom du technicien responsable
