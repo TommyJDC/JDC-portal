@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSave } from "@fortawesome/free-solid-svg-icons";
+import { getStringValue } from '~/utils/firestoreUtils';
 
 interface InstallationTabacTileProps {
   installation: {
@@ -36,14 +37,14 @@ const InstallationTabacTile: React.FC<InstallationTabacTileProps> = ({ installat
       <div className="flex justify-between items-start mb-3">
         <div>
           <h3 className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-400">
-            {installation.nom}
+            {getStringValue(installation.nom)}
           </h3>
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <span className="px-2 py-1 rounded bg-jdc-gray/50 font-mono">
-              {installation.codeClient}
+              {getStringValue(installation.codeClient)}
             </span>
             <span className="text-gray-500">•</span>
-            <span>{installation.ville}</span>
+            <span>{getStringValue(installation.ville)}</span>
           </div>
         </div>
         {/* CTN Status Badge */}
@@ -57,33 +58,33 @@ const InstallationTabacTile: React.FC<InstallationTabacTileProps> = ({ installat
         <div className="space-y-2">
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm">Tél:</span>
-            <span className="font-medium text-sm">{installation.telephone}</span>
+            <span className="font-medium text-sm">{getStringValue(installation.telephone)}</span>
           </p>
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm">Commercial:</span>
-            <span className="font-medium text-sm">{installation.commercial}</span>
+            <span className="font-medium text-sm">{getStringValue(installation.commercial)}</span>
           </p>
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm">Tech:</span>
-            <span className="font-medium text-sm">{installation.tech || 'Non assigné'}</span>
+            <span className="font-medium text-sm">{getStringValue(installation.tech, 'Non assigné')}</span>
           </p>
         </div>
         <div className="space-y-2">
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm">Date Cde:</span>
             <span className="font-medium text-sm">
-              {installation.dateCdeMateriel || 'N/A'}
+              {getStringValue(installation.dateCdeMateriel, 'N/A')}
             </span>
           </p>
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm">Install.:</span>
             <span className="font-medium text-sm">
-              {installation.dateInstall || 'Non planifiée'}
+              {getStringValue(installation.dateInstall, 'Non planifiée')}
             </span>
           </p>
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm">Type:</span>
-            <span className="font-medium text-sm">{installation.nouvelleInstallRenouvellement || 'Non défini'}</span>
+            <span className="font-medium text-sm">{getStringValue(installation.nouvelleInstallRenouvellement, 'Non défini')}</span>
           </p>
         </div>
       </div>

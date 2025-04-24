@@ -1,4 +1,4 @@
-import { Timestamp, FieldValue } from 'firebase/firestore'; // Import necessary types
+import { Timestamp, FieldValue } from 'firebase-admin/firestore'; // Import necessary types for firebase-admin compatibility
 
 /**
  * Represents a notification in the system
@@ -40,6 +40,10 @@ export interface UserProfile {
   avatarUrl?: string;
   jobTitle?: string;
   department?: 'technique' | 'commercial' | 'admin';
+  // User-specific Gmail label configuration
+  labelSapClosed?: string; // Gmail label name for closed tickets
+  labelSapRma?: string; // Gmail label name for RMA/material requests
+  labelSapNoResponse?: string; // Gmail label name for no response cases
 }
 
 /**
@@ -78,37 +82,81 @@ export interface GmailProcessingConfig {
  * Ensure these fields match your actual Firestore data structure.
  */
 export interface SapTicket {
-  id: string; // Document ID from Firestore
-  // Allow null for date to handle parsing failures gracefully upstream
-  date: Date | Timestamp | null; // Date of the ticket (ensure consistency)
-  client: string; // Client name or identifier (used for grouping and searching - potentially legacy if raisonSociale is primary)
-  raisonSociale?: string; // Official client name for grouping/sorting
-  description: string; // Ticket description
-  statut: string; // Ticket status (e.g., 'Nouveau', 'En cours', 'Résolu')
-  secteur: string; // Added during fetch to indicate the source sector/collection
-  demandeSAP?: string; // Optional field used for automatic status correction
+  id: string;
+  date: Date | Timestamp | null;
+  client?: { stringValue: string };
+  raisonSociale?: { stringValue: string };
+  description?: { stringValue: string }; // Made properly optional
+  statut?: { stringValue: string }; // Also making status properly optional for consistency
+  secteur: 'CHR' | 'HACCP' | 'Kezia' | 'Tabac'; // Corrected type to strict union
+  demandeSAP?: { stringValue: string } | undefined; // Optional field used for automatic status correction
 
   // Fields inspired by TicketList reference
-  numeroSAP?: string; // Optional: SAP ticket number
+  numeroSAP?: { stringValue: string } | undefined; // Optional: SAP ticket number
   deducedSalesperson?: string; // Optional: Salesperson name
-  adresse?: string; // Optional: Client address associated with the ticket
-  telephone?: string; // Optional: Phone number(s), potentially comma-separated
+  adresse?: { stringValue: string } | undefined; // Optional: Client address associated with the ticket
+  telephone?: { stringValue: string } | undefined; // Optional: Phone number(s), potentially comma-separated
 
   // Add other relevant fields from your Firestore documents:
-  codeClient?: string; // Optional: If you have a separate client code
-  priorite?: string; // Example: 'Haute', 'Moyenne', 'Basse'
+  codeClient?: { stringValue: string } | undefined; // Optional: If you have a separate client code
+  priorite?: { stringValue: string } | undefined; // Example: 'Haute', 'Moyenne', 'Basse'
   // technicien?: string; // Example: Assigned technician's name or ID
   // resolution?: string; // Example: Details of the resolution
-  origine?: string; // Added origine based on usage
-  type?: string; // Added type based on usage
+  origine?: { stringValue: string } | undefined; // Added origine based on usage
+  type?: { stringValue: string } | undefined; // Added type based on usage
 
   // Fields for TicketSAPDetails component
-  descriptionProbleme?: string; // Main problem description (might overlap with 'description')
+  descriptionProbleme?: { stringValue: string } | undefined; // Main problem description (might overlap with 'description')
   statutSAP?: string; // Specific status used in the details modal (might overlap with 'statut')
   commentaires?: string[]; // Array of comments
   summary?: string; // AI Generated Summary
   solution?: string; // AI Generated Solution
+  technicianNotes?: string; // Added technician notes field
+  materialDetails?: string; // Added material details field
   // ... other ticket properties
+
+  // New fields for automatic response logic
+  mailId: string; // Gmail message ID for threading
+  status: 'open' | 'closed' | 'pending' | 'archived' | 'rma_request' | 'material_sent'; // Added new statuses
+  materialType?: 'RMA' | 'envoi-materiel'; // Type for RMA/material requests
+  contactAttempts?: Array<{ // History of contact attempts
+    date: Date | Timestamp | { seconds: number; nanoseconds: number } | string; // Added flexibility for deserialized dates
+    method: 'email' | 'phone';
+    success: boolean;
+  }>;
+  aiSummary?: string; // AI Generated summary for email
+  gmailLabels?: string[]; // Labels applied in Gmail
+
+  // Champs pour l'email et le threading
+  mailFrom?: string; // Adresse email de l'expéditeur original
+  mailTo?: string[]; // Liste des destinataires originaux
+  mailCc?: string[]; // Liste des destinataires en copie
+  mailSubject?: string; // Sujet original du mail
+  mailThreadId?: string; // ID du thread Gmail
+  mailMessageId?: string; // Message-ID pour le threading RFC822
+  mailReferences?: string; // Chaîne de références pour le threading
+  mailDate?: Date; // Date du mail original
+}
+
+/**
+ * Represents an archived SAP ticket document.
+ */
+/**
+ * Représente un ticket SAP archivé avec toutes les métadonnées nécessaires
+ */
+export interface SAPArchive {
+  originalTicketId: string;                   // ID original du ticket
+  archivedDate: Date | Timestamp;             // Date/heure d'archivage
+  closureReason: 'resolved' | 'no-response';  // Raison de la clôture
+  technicianNotes: string;                    // Notes techniques obligatoires
+  technician: string;                         // Nom du technicien responsable
+  client: { stringValue: string };            // Code client formaté
+  raisonSociale: { stringValue: string };     // Nom du client
+  description: { stringValue: string };       // Description complète
+  secteur: 'CHR' | 'HACCP' | 'Kezia' | 'Tabac'; // Secteur d'origine
+  numeroSAP: { stringValue: string };         // Numéro SAP complet
+  mailId: string;                             // ID du thread Gmail associé
+  documents?: string[];                       // URLs des documents joints
 }
 
 /**

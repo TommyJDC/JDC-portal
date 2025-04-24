@@ -2,6 +2,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { getStringValue } from '~/utils/firestoreUtils';
 
 interface StatsCardProps {
   title: string; // Title like "Tickets SAP (Total)"
@@ -37,13 +38,10 @@ export const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, isLoad
 
       {/* Title, Value, and Evolution */}
       <div className="flex-grow">
-        {/* Title */}
-        <p className="text-sm text-gray-400 font-medium">{title}</p> {/* Ajuster le style du titre */}
-
-        {/* Main Value */}
-        <p className={`text-3xl font-extrabold text-white mt-1 ${isLoading ? 'animate-pulse' : ''}`}> {/* Ajuster le style de la valeur principale */}
-          {isLoading ? <FontAwesomeIcon icon={faSpinner} spin /> : value}
-        </p>
+        <div className="space-y-1"> 
+          <p className="text-sm text-gray-400 font-medium">{getStringValue(title)}</p>
+          <p className="text-2xl font-bold">{value}</p>
+        </div>
 
         {/* Evolution Display (Text format, below value, smaller) */}
         {!isLoading && showEvolution && (

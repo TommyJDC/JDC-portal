@@ -82,7 +82,8 @@ export function formatFirestoreDate(
 
   console.log('formatFirestoreDate: Input received:', date, 'Type:', typeof date);
 
-  if (!date) {
+  // Explicitly check for null or undefined
+  if (date == null) {
     console.log('formatFirestoreDate: Input is null/undefined, returning default value:', defaultValue);
     return returnDateObject ? new Date(0) : defaultValue;
   }
@@ -166,17 +167,10 @@ export function formatFirestoreDate(
       return dateObj;
     }
 
-    const dateYear = dateObj.getFullYear();
-
     const options: Intl.DateTimeFormatOptions = {
       day: '2-digit',
       month: '2-digit',
     };
-
-    // Only show year if it's not the current year (after potentially updating it)
-    if (dateYear !== currentYear) {
-      options.year = 'numeric';
-    }
 
     const formatted = dateObj.toLocaleDateString('fr-FR', options);
 

@@ -27,6 +27,8 @@ const ticketStatusStyles = {
   EN_ATTENTE: { bgColor: 'bg-purple-600', textColor: 'text-purple-100' },
   DEMANDE_DE_RMA: { bgColor: 'bg-purple-700', textColor: 'text-purple-100' }, // Added style for RMA
   A_CLOTUREE: { bgColor: 'bg-teal-600', textColor: 'text-teal-100' }, // Added style for A Cloturee
+  MATERIAL_SENT: { bgColor: 'bg-orange-600', textColor: 'text-orange-100' }, // Added style for Material Sent
+  NA: { bgColor: 'bg-jdc-gray-700', textColor: 'text-jdc-gray-200' }, // Added style for N/A
   DEFAULT: { bgColor: 'bg-jdc-gray-700', textColor: 'text-jdc-gray-200' },
 };
 
@@ -36,11 +38,24 @@ const ticketStatusStyles = {
  * @returns Object containing bgColor and textColor classes.
  */
 export function getTicketStatusStyle(status: string | undefined | null): { bgColor: string; textColor: string } {
-  const upperStatus = status?.toUpperCase().replace(/\s+/g, '_'); // Normalize status (e.g., "En Cours" -> "EN_COURS")
+  // Use the status directly, converting to uppercase for case-insensitivity
+  const upperStatus = status?.toUpperCase();
 
   switch (upperStatus) {
+    // Map French display statuses from dropdown
+    case 'OUVERT':
+      return ticketStatusStyles.NOUVEAU;
+    case 'EN ATTENTE (PAS DE RÉPONSE)': // Match the exact string from the dropdown
+      return ticketStatusStyles.EN_ATTENTE;
+    case 'CLÔTURÉ': // Match the exact string from the dropdown (with accent)
+      return ticketStatusStyles.FERME;
+    case 'DEMANDE DE RMA': // Match the exact string from the dropdown
+      return ticketStatusStyles.DEMANDE_DE_RMA;
+    case 'DEMANDE D\'ENVOI MATERIEL': // Match the exact string from the dropdown
+      return ticketStatusStyles.MATERIAL_SENT;
+
+    // Keep existing SAP statuses as fallbacks/synonyms if they might still appear
     case 'NOUVEAU':
-    case 'OUVERT': // Add synonyms if needed
       return ticketStatusStyles.NOUVEAU;
     case 'EN_COURS':
     case 'EN_TRAITEMENT':
@@ -56,11 +71,13 @@ export function getTicketStatusStyle(status: string | undefined | null): { bgCol
     case 'EN_ATTENTE':
     case 'ATTENTE_CLIENT':
       return ticketStatusStyles.EN_ATTENTE;
-    case 'DEMANDE_DE_RMA': // Added case
+    case 'DEMANDE_DE_RMA':
       return ticketStatusStyles.DEMANDE_DE_RMA;
     case 'A_CLOTUREE':
-    case 'A_CLÔTURÉE': // Ajout de la variante avec accents
+    case 'A_CLÔTURÉE':
       return ticketStatusStyles.A_CLOTUREE;
+    case 'N/A':
+      return ticketStatusStyles.NA;
     default:
       // Log unknown statuses for potential addition
       if (status) {

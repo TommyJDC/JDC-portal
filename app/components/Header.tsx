@@ -41,7 +41,8 @@ const navItems = [
 // Technique menu items
 const techniqueItems = [
   { name: 'Tickets SAP', to: '/tickets-sap', icon: FaTicketAlt },
-  { 
+  { name: 'Archive SAP', to: '/sap-archive', icon: FaFileAlt }, // Ajout du lien vers l'archive
+  {
     name: 'Installations',
     subItems: [
       { name: 'Kezia', to: '/installations/kezia-firestore', icon: FaFileAlt },

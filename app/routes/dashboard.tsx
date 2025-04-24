@@ -75,14 +75,16 @@ const parseSerializedDateNullable = (
 };
 
 const MapLoadingFallback = () => (
-  <div className="bg-jdc-card p-4 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[450px]">
+  // Added w-full to ensure fallback takes full width
+  <div className="bg-jdc-card p-4 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[450px] w-full">
     <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-3xl mb-4" />
     <p className="text-jdc-gray-400 text-center">Chargement de la carte...</p>
   </div>
 );
 
 const MapLoginPrompt = () => (
-  <div className="bg-jdc-card p-4 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[450px]">
+  // Added w-full to ensure login prompt takes full width
+  <div className="bg-jdc-card p-4 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[450px] w-full">
     <FontAwesomeIcon icon={faMapMarkedAlt} className="text-jdc-gray-500 text-4xl mb-4" />
     <p className="text-jdc-gray-400 text-center">Connectez-vous pour voir la carte des tickets.</p>
   </div>
@@ -104,6 +106,7 @@ const WeeklyAgendaFallback = () => (
 export default function Dashboard() {
   const { user } = useOutletContext<OutletContextType>();
   const {
+    userProfile, // Déstructurer userProfile depuis les données chargées
     calendarEvents,
     calendarError,
     stats,
@@ -111,7 +114,8 @@ export default function Dashboard() {
     recentShipments: serializedShipments,
     installationsStats,
     allInstallations, // Récupérer allInstallations
-    clientError
+    clientError,
+    sapTicketCountsBySector // Inclure les comptes par secteur
   } = useLoaderData<typeof loader>();
 
   const recentTickets: SapTicket[] = (serializedTickets ?? []).map(ticket => ({
@@ -134,28 +138,52 @@ export default function Dashboard() {
     // Les autres champs de date spécifiques aux secteurs seront gérés si nécessaire.
   }));
 
-  const formatStatValue = (value: number | string | null): string => 
+  const formatStatValue = (value: number | string | null): string =>
     value?.toString() ?? "N/A";
 
-  const statsData = [
-    { 
-      title: "Tickets SAP (Total)", 
-      valueState: stats.liveTicketCount, 
-      icon: faTicket, 
-      evolutionKey: 'ticketCount' 
+  const allSapTicketStats = [
+    {
+      sector: 'CHR',
+      title: "Tickets SAP CHR",
+      valueState: sapTicketCountsBySector?.['CHR'] ?? 0,
+      icon: faTicket,
+      evolutionKey: 'chrTicketCount' // Clé d'évolution à définir si nécessaire
     },
-    { 
-      title: "Clients CTN (Distincts)", 
-      valueState: stats.liveDistinctClientCountFromEnvoi, 
-      icon: faUsers, 
-      evolutionKey: 'distinctClientCountFromEnvoi' 
+    {
+      sector: 'HACCP',
+      title: "Tickets SAP HACCP",
+      valueState: sapTicketCountsBySector?.['HACCP'] ?? 0,
+      icon: faTicket,
+      evolutionKey: 'haccpTicketCount' // Clé d'évolution à définir si nécessaire
+    },
+    {
+      sector: 'Kezia',
+      title: "Tickets SAP Kezia",
+      valueState: sapTicketCountsBySector?.['Kezia'] ?? 0,
+      icon: faTicket,
+      evolutionKey: 'keziaTicketCount' // Clé d'évolution à définir si nécessaire
+    },
+    {
+      sector: 'Tabac',
+      title: "Tickets SAP Tabac",
+      valueState: sapTicketCountsBySector?.['Tabac'] ?? 0,
+      icon: faTicket,
+      evolutionKey: 'tabacTicketCount' // Clé d'évolution à définir si nécessaire
     },
   ];
 
+  // Filtrer les tuiles en fonction des secteurs de l'utilisateur
+  const statsData = userProfile?.role === 'Admin'
+    ? allSapTicketStats // Si admin, afficher toutes les tuiles
+    : allSapTicketStats.filter(stat => userProfile?.secteurs?.includes(stat.sector)); // Sinon, filtrer par secteurs de l'utilisateur
+
+
   return (
     <div className="space-y-6">
+      {/* Page Title */}
       <h1 className="text-3xl font-semibold text-white">Tableau de Bord</h1>
       
+      {/* Client Error Message */}
       {clientError && (
         <div className="flex items-center p-4 bg-red-800 text-white rounded-lg mb-4">
           <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
@@ -163,11 +191,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {statsData.map((stat) => (
-            <StatsCard
-              key={stat.title}
+      {/* Stats Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {statsData.map((stat) => (
+          <StatsCard
+            key={stat.title}
               title={stat.title}
               value={formatStatValue(stat.valueState)}
               icon={stat.icon}
@@ -175,20 +203,21 @@ export default function Dashboard() {
               evolutionValue={stats.evolution[stat.evolutionKey as keyof typeof stats.evolution]}
             />
           ))}
-        </div>
-
-        <div>
-          <h2 className="text-xl font-semibold text-white mb-4">État des Installations</h2>
-          <InstallationsSnapshot
-            allInstallations={installations} // Passer la liste désérialisée des installations
-            isLoading={false}
-            // Vous pouvez supprimer la prop stats ici si vous utilisez allInstallations
-            // ou la laisser pour une compatibilité descendante si nécessaire.
-            // stats={installationsStats} 
-          />
-        </div>
       </div>
 
+      {/* Installations Snapshot Section */}
+      <div>
+        <h2 className="text-xl font-semibold text-white mb-4">État des Installations</h2>
+        <InstallationsSnapshot
+          allInstallations={installations} // Passer la liste désérialisée des installations
+          isLoading={false}
+          // Vous pouvez supprimer la prop stats ici si vous utilisez allInstallations
+          // ou la laisser pour une compatibilité descendante si nécessaire.
+          // stats={installationsStats}
+        />
+      </div>
+
+      {/* Weekly Agenda Section */}
       <ClientOnly fallback={<WeeklyAgendaFallback />}>
         <WeeklyAgenda
           events={calendarEvents ?? []}
@@ -197,10 +226,12 @@ export default function Dashboard() {
         />
       </ClientOnly>
 
-      <ClientOnly fallback={<div className="w-full mb-6 h-[500px] bg-jdc-card animate-pulse rounded-lg" />}>
-        {() => (
-          <div className="w-full mb-6" key={user?.userId}>
-            <ClientOnly fallback={<MapLoadingFallback />}>
+      {/* Map, Recent Tickets, and Recent Shipments Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+        {/* Interactive Map Section */}
+        <div className="w-full">
+          <ClientOnly fallback={<div className="w-full h-[600px] bg-jdc-card animate-pulse rounded-lg" />}>
+            <div className="w-full h-[600px]" key={user?.userId}>
               {user ? (
                 <Suspense fallback={<MapLoadingFallback />}>
                   <InteractiveMap
@@ -211,22 +242,28 @@ export default function Dashboard() {
               ) : (
                 <MapLoginPrompt />
               )}
-            </ClientOnly>
-          </div>
-        )}
-      </ClientOnly>
+            </div>
+          </ClientOnly>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <RecentTickets
-          tickets={recentTickets.slice(0, 5)}
-          isLoading={false}
-        />
-        <RecentShipments
-          shipments={recentShipments}
-          isLoading={false}
-        />
+        {/* Recent Tickets and Shipments Stack */}
+        <div className="flex flex-col gap-6 w-full min-h-[600px]">
+          <div className="flex-1">
+            <RecentTickets
+              tickets={recentTickets.slice(0, 5)}
+              isLoading={false}
+            />
+          </div>
+          <div className="flex-1">
+            <RecentShipments
+              shipments={recentShipments}
+              isLoading={false}
+            />
+          </div>
+        </div>
       </div>
 
+      {/* Login Prompt */}
       {!user && !clientError && (
         <div className="p-4 bg-jdc-card rounded-lg text-center text-jdc-gray-300 mt-6">
           Veuillez vous connecter pour voir le tableau de bord.

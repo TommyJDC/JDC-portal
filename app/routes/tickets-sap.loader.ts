@@ -41,7 +41,24 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
                 const fetchedTickets = await getAllTicketsForSectorsSdk(sectorsToQuery);
                 // Filter out tickets without raisonSociale on the server
                 allTickets = fetchedTickets.filter(t => t.raisonSociale);
-                console.log(`Tickets SAP Loader: Fetched ${allTickets.length} tickets with raisonSociale.`);
+                console.log(`Tickets SAP Loader: Fetched ${fetchedTickets.length} tickets.`);
+                // Filter out tickets without raisonSociale and ensure dates in contactAttempts are Date objects
+                allTickets = fetchedTickets
+                    .filter(t => t.raisonSociale)
+                    .map(ticket => {
+                        const processedTicket: SapTicket = {
+                            ...ticket,
+                            // Ensure date is a Date object
+                            date: ticket.date instanceof Date || ticket.date === null ? ticket.date : new Date((ticket.date as any).seconds * 1000),
+                            // Ensure dates in contactAttempts are Date objects
+                            contactAttempts: ticket.contactAttempts?.map(attempt => ({
+                                ...attempt,
+                                date: attempt.date instanceof Date ? attempt.date : new Date((attempt.date as any).seconds * 1000)
+                            }))
+                        };
+                        return processedTicket;
+                    });
+                console.log(`Tickets SAP Loader: Processed ${allTickets.length} tickets with raisonSociale.`);
                 console.log('Sample ticket dates (value and type):');
                 allTickets.slice(0, 5).forEach((ticket, index) => {
                     console.log(`  Ticket ${index}: value =`, ticket.date, `, type =`, typeof ticket.date, `, instanceof Date =`, ticket.date instanceof Date);

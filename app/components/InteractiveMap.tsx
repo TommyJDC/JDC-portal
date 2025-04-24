@@ -116,12 +116,20 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
   const mapRef = React.useRef<MapRef>(null);
 
   // --- Geocoding Logic ---
+  // Helper function to get string value from field
+  const getStringValue = (field: { stringValue: string } | string | undefined): string => {
+    if (!field) return '';
+    if (typeof field === 'string') return field;
+    return field.stringValue || '';
+  };
+
+  // --- Prepare Markers ---
   const uniqueAddresses = useMemo(() => {
     console.log("[InteractiveMap] Recalculating unique addresses...");
     if (!Array.isArray(tickets)) return [];
     const addresses = tickets
-      .map(ticket => ticket.adresse)
-      .filter((addr): addr is string => typeof addr === 'string' && addr.trim() !== '');
+      .map(ticket => getStringValue(ticket.adresse))
+      .filter(addr => addr !== '');
     const uniqueSet = new Set(addresses);
     console.log(`[InteractiveMap] Found ${uniqueSet.size} unique addresses.`);
     return Array.from(uniqueSet);
@@ -226,30 +234,27 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
     console.log(`[InteractiveMap] Rendering ${tickets.length} tickets, ${geocodedCoordinates.size} geocoded.`);
 
     return tickets.map((ticket) => {
-      const originalAddress = ticket.adresse;
-      if (!originalAddress || typeof originalAddress !== 'string' || originalAddress.trim() === '') return null;
+      const address = getStringValue(ticket.adresse);
+      if (!address) return null;
 
-      const normalizedAddr = normalizeAddress(originalAddress);
+      const normalizedAddr = normalizeAddress(address);
       const coordinates = geocodedCoordinates.get(normalizedAddr);
 
       if (coordinates) {
-        const markerColor = getMarkerColor(ticket.statut);
+        const markerColor = getMarkerColor(getStringValue(ticket.statut));
         return (
           <Marker
             key={ticket.id}
             longitude={coordinates.lng}
             latitude={coordinates.lat}
             anchor="center"
-            // Let TypeScript infer the event type, access originalEvent
             onClick={(e) => {
-              // Prevent map click event when clicking marker
-              if (e.originalEvent) { // Check for originalEvent
+              if (e.originalEvent) {
                 e.originalEvent.stopPropagation();
               }
               setSelectedTicket(ticket);
             }}
           >
-            {/* Custom Marker Style */}
             <div style={{
                 backgroundColor: markerColor,
                 width: '15px',
@@ -262,102 +267,78 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
           </Marker>
         );
       }
-      return null; // Skip tickets without coordinates
+      return null;
     }).filter(Boolean); // Remove null entries
 
   }, [tickets, geocodedCoordinates]);
   // --- End Render Markers ---
 
+  // --- Popup Content ---
+  const renderPopupContent = (ticket: SapTicket) => (
+    <div>
+      <b>{getStringValue(ticket.raisonSociale) || 'Client inconnu'}</b><br/>
+      {getStringValue(ticket.adresse)}<br/>
+      Statut: {getStringValue(ticket.statut) || 'Non défini'}<br/>
+      ID: {ticket.id}
+    </div>
+  );
+
+
 
   return (
-    <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 relative min-h-[450px]">
-      <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-        <FontAwesomeIcon icon={faMapMarkedAlt} className="mr-2 text-jdc-yellow" />
-        Carte des Tickets Récents (Mapbox)
-      </h2>
+    <div className="bg-jdc-card rounded-lg shadow-lg h-full w-full">
+        <div className="h-full w-full">
+          <Map
+            ref={mapRef}
+            // Pass individual viewport props for v7
+            latitude={viewport.latitude}
+            longitude={viewport.longitude}
+            zoom={viewport.zoom}
+            // Use onMove for viewport updates
+            onMove={handleMove}
+            onLoad={handleMapLoad}
+            mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
+            mapStyle="mapbox://styles/mapbox/streets-v11" // Standard Mapbox street style
+            style={{ width: '100%', height: '600px' }}
+            onMouseEnter={handleMouseEnterZone} // Attach hover listener to map for zones layer
+            onMouseLeave={handleMouseLeaveZone}
+            interactiveLayerIds={['zones-fill-layer']} // Make the zones fill layer interactive for hover
+          >
+            {/* Zones Layer */}
+            <Source id="zones-source" type="geojson" data={zonesGeoJson} generateId={true}>
+              <Layer
+                  id="zones-fill-layer"
+                  type="fill"
+                  source="zones-source"
+                  paint={zoneFillPaint}
+              />
+              <Layer
+                  id="zones-line-layer"
+                  type="line"
+                  source="zones-source"
+                  paint={zoneLinePaint}
+              />
+            </Source>
 
-      {/* Loading and Error Overlays */}
-      {(isLoadingTickets || (isGeocoding && geocodedCoordinates.size === 0 && uniqueAddresses.length > 0)) && (
-        <div className="absolute inset-0 z-[500] flex items-center justify-center bg-gray-800 bg-opacity-75 rounded-xl">
-          <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-3xl mr-2" />
-          <span className="text-white">
-            {isLoadingTickets ? "Chargement des tickets..." : "Géocodage des adresses..."}
-          </span>
+            {/* Ticket Markers */}
+            {ticketMarkers}
+
+            {/* Popup for Selected Ticket */}
+            {selectedTicket && geocodedCoordinates.get(normalizeAddress(getStringValue(selectedTicket.adresse))) && (
+              <Popup
+                longitude={geocodedCoordinates.get(normalizeAddress(getStringValue(selectedTicket.adresse)))!.lng}
+                latitude={geocodedCoordinates.get(normalizeAddress(getStringValue(selectedTicket.adresse)))!.lat}
+                anchor="bottom"
+                onClose={() => setSelectedTicket(null)}
+                closeOnClick={false}
+                offset={15}
+              >
+                {renderPopupContent(selectedTicket)}
+              </Popup>
+            )}
+          </Map>
         </div>
-      )}
-      {isGeocoding && !isLoadingTickets && (
-        <div className="absolute top-16 right-4 z-[1000] text-jdc-yellow" title="Géocodage en cours...">
-          <FontAwesomeIcon icon={faSpinner} spin />
-        </div>
-      )}
-      {mapError && !isLoadingTickets && !isGeocoding && (
-        <div className="absolute top-12 left-1/2 transform -translate-x-1/2 z-[1000] bg-red-800 text-white px-4 py-2 rounded text-sm shadow-lg flex items-center">
-          <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
-          {mapError}
-        </div>
-      )}
-
-      {/* Map Container */}
-      <div
-        className={`w-full h-[450px] rounded-lg overflow-hidden ${ (isLoadingTickets || (isGeocoding && geocodedCoordinates.size === 0 && uniqueAddresses.length > 0)) ? 'opacity-50' : ''}`}
-        style={{ backgroundColor: '#4a4a4a' }}
-      >
-        <Map
-          ref={mapRef}
-          // Pass individual viewport props for v7
-          latitude={viewport.latitude}
-          longitude={viewport.longitude}
-          zoom={viewport.zoom}
-          // Use onMove for viewport updates
-          onMove={handleMove}
-          onLoad={handleMapLoad}
-          mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
-          mapStyle="mapbox://styles/mapbox/streets-v11" // Standard Mapbox street style
-          style={{ width: '100%', height: '100%' }}
-          onMouseEnter={handleMouseEnterZone} // Attach hover listener to map for zones layer
-          onMouseLeave={handleMouseLeaveZone}
-          interactiveLayerIds={['zones-fill-layer']} // Make the zones fill layer interactive for hover
-        >
-          {/* Zones Layer */}
-          <Source id="zones-source" type="geojson" data={zonesGeoJson} generateId={true}>
-            <Layer
-                id="zones-fill-layer"
-                type="fill"
-                source="zones-source"
-                paint={zoneFillPaint}
-            />
-            <Layer
-                id="zones-line-layer"
-                type="line"
-                source="zones-source"
-                paint={zoneLinePaint}
-            />
-          </Source>
-
-          {/* Ticket Markers */}
-          {ticketMarkers}
-
-          {/* Popup for Selected Ticket */}
-          {selectedTicket && geocodedCoordinates.get(normalizeAddress(selectedTicket.adresse || '')) && (
-            <Popup
-              longitude={geocodedCoordinates.get(normalizeAddress(selectedTicket.adresse || ''))!.lng}
-              latitude={geocodedCoordinates.get(normalizeAddress(selectedTicket.adresse || ''))!.lat}
-              anchor="bottom"
-              onClose={() => setSelectedTicket(null)}
-              closeOnClick={false} // Keep popup open when map is clicked
-              offset={15} // Offset from marker center
-            >
-              <div>
-                <b>{selectedTicket.raisonSociale || 'Client inconnu'}</b><br/>
-                {selectedTicket.adresse}<br/>
-                Statut: {selectedTicket.statut || 'Non défini'}<br/>
-                ID: {selectedTicket.id}
-              </div>
-            </Popup>
-          )}
-        </Map>
       </div>
-    </div>
   );
 };
 

@@ -143,7 +143,8 @@ function App({ children }: { children: ReactNode }) {
         loadingAuth={navigation.state !== 'idle'}
       />
       <AuthModal isOpen={isAuthModalOpen} onClose={closeAuthModal} />
-      <main className={`container mx-auto px-4 py-6 ${isDashboard ? 'mt-0' : 'mt-16 md:mt-20'}`}>
+      {/* Removed container and mx-auto to allow full width */}
+      <main className={`px-4 py-6 ${isDashboard ? 'mt-0' : 'mt-16 md:mt-20'}`}>
         {/* Pass casted profile to Outlet context */}
         <Outlet context={{ user, profile: profileForComponents }} />
       </main>

@@ -1,5 +1,5 @@
 import { json, redirect } from "@remix-run/node";
-import { Form, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useLoaderData, useNavigation, Link } from "@remix-run/react"; // Import Link
 import { useEffect, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { authenticator } from "~/services/auth.server";
@@ -254,6 +254,13 @@ export default function UserProfilePage() {
            <div>
             <label className="block text-sm font-medium text-jdc-gray-300 mb-1">Rôle</label>
             <p className="text-sm text-white bg-jdc-gray-800 px-3 py-2 rounded">{formData.role}</p>
+          </div>
+
+          {/* Link to Gmail Configuration */}
+          <div className="pt-4">
+            <Link to="/gmail-config" className="text-jdc-blue hover:text-jdc-blue-dark text-sm font-medium">
+              Gérer la configuration Gmail
+            </Link>
           </div>
 
 

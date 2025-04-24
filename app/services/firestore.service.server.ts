@@ -1,16 +1,17 @@
 import { initializeApp, cert, getApps } from "firebase-admin/app";
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import type { 
-  UserProfile, 
-  SapTicket, 
-  Shipment, 
-  StatsSnapshot, 
-  Installation, 
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'; // Import Timestamp here
+import type {
+  UserProfile,
+  SapTicket,
+  Shipment,
+  StatsSnapshot,
+  Installation,
   InstallationStatus,
   InstallationFilters,
   Notification,
   Article,
-  InstallationsSnapshot
+  InstallationsSnapshot,
+  SAPArchive // Import SAPArchive here
 } from "~/types/firestore.types";
 import type * as admin from 'firebase-admin';
 import fetch from 'node-fetch';
@@ -28,7 +29,7 @@ export async function initializeFirebaseAdmin() {
         privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       })
     });
-    
+
     db = getFirestore(app);
     installationsCollection = db.collection('installations');
     return db;
@@ -107,7 +108,7 @@ export async function getInstallationsBySector(sector: string, filters?: Install
       ...data, // Inclure toutes les données brutes de Firestore
       id: doc.id, // Surcharger avec l'ID du document
       secteur: sector, // Surcharger avec le secteur
-      
+
       // Surcharger les champs principaux pour assurer leur présence et leur type
       codeClient: data.codeClient || '',
       nom: data.nom || '',
@@ -119,29 +120,28 @@ export async function getInstallationsBySector(sector: string, filters?: Install
       tech: data.tech || '',
       status: (data.status as InstallationStatus) || 'rendez-vous à prendre', // Assurer le type correct et une valeur par défaut
       commentaire: data.commentaire || '',
-      
+
       // Les autres champs spécifiques aux secteurs seront inclus via le spread ...data
     };
-
     return installation;
   }) as Installation[];
 }
 
 export async function getClientCodesWithShipment(sector: string): Promise<Set<string>> {
   if (!db) await initializeFirebaseAdmin();
-  
+
   // Récupérer tous les envois
   const shipments = await getAllShipments();
-  
+
   // Créer un Set des codeClient/secteur uniques
   const clientCodes = new Set<string>();
-  
+
   shipments.forEach(shipment => {
     if (shipment.secteur && shipment.secteur === sector && shipment.codeClient) {
       clientCodes.add(shipment.codeClient);
     }
   });
-  
+
   return clientCodes;
 }
 
@@ -155,11 +155,11 @@ export async function getAllTicketsForSectorsSdk() {
     const data = doc.data();
     // Convert Firestore Timestamp to Date if needed
     const date = data.date?.toDate ? data.date.toDate() : data.date;
-    return { 
-      id: doc.id, 
-      ...data, 
+    return {
+      id: doc.id,
+      ...data,
       date,
-      secteur: sector 
+      secteur: sector
     } as SapTicket;
   });
     allTickets = [...allTickets, ...sectorTickets];
@@ -188,7 +188,7 @@ export async function deleteShipmentSdk(shipmentId: string): Promise<void> {
 export async function getAllUserProfilesSdk(): Promise<UserProfile[]> {
   if (!db) await initializeFirebaseAdmin();
   const snapshot = await db.collection('users').get();
-  return snapshot.docs.map(doc => ({ 
+  return snapshot.docs.map(doc => ({
     uid: doc.id, // Use document ID as fallback uid
     ...doc.data(),
     // Ensure required fields have defaults
@@ -201,28 +201,38 @@ export async function getAllUserProfilesSdk(): Promise<UserProfile[]> {
   })) as UserProfile[];
 }
 
-export async function getTotalTicketCountSdk(sectors: string[]): Promise<number> {
+/**
+ * Gets the total count of SAP tickets for each specified sector.
+ * @param sectors - An array of sector names (e.g., ['CHR', 'HACCP']).
+ * @returns A promise that resolves to an object with sector names as keys and ticket counts as values.
+ */
+export async function getSapTicketCountBySectorSdk(sectors: string[]): Promise<Record<string, number>> {
   if (!db) await initializeFirebaseAdmin();
-  let totalCount = 0;
-  
+  const ticketCounts: Record<string, number> = {};
+
   for (const sector of sectors) {
-    const snapshot = await db.collection(sector).count().get();
-    totalCount += snapshot.data().count;
+    try {
+      const snapshot = await db.collection(sector).count().get();
+      ticketCounts[sector] = snapshot.data().count;
+    } catch (error) {
+      console.error(`Error fetching ticket count for sector ${sector}:`, error);
+      ticketCounts[sector] = 0; // Default to 0 in case of error
+    }
   }
-  
-  return totalCount;
+
+  return ticketCounts;
 }
 
 export async function getRecentTicketsForSectors(sectors: string[], limit: number): Promise<SapTicket[]> {
   if (!db) await initializeFirebaseAdmin();
   let allTickets: SapTicket[] = [];
-  
+
   for (const sector of sectors) {
     const snapshot = await db.collection(sector)
       .orderBy('date', 'desc')
       .limit(limit)
       .get();
-      
+
     const sectorTickets = snapshot.docs.map(doc => {
       const data = doc.data();
       // Convert Firestore Timestamp to Date if needed
@@ -234,16 +244,16 @@ export async function getRecentTicketsForSectors(sectors: string[], limit: numbe
         secteur: sector
       } as SapTicket;
     });
-    
+
     allTickets = [...allTickets, ...sectorTickets];
   }
-  
+
   // Sort all tickets by date and return top N
   return allTickets
     .sort((a, b) => {
-      const dateA = a.date instanceof Date ? a.date.getTime() : 
+      const dateA = a.date instanceof Date ? a.date.getTime() :
                    a.date?.seconds ? a.date.seconds * 1000 : 0;
-      const dateB = b.date instanceof Date ? b.date.getTime() : 
+      const dateB = b.date instanceof Date ? b.date.getTime() :
                    b.date?.seconds ? b.date.seconds * 1000 : 0;
       return dateB - dateA;
     })
@@ -252,18 +262,18 @@ export async function getRecentTicketsForSectors(sectors: string[], limit: numbe
 
 export async function getDistinctClientCountFromEnvoiSdk(userProfile: UserProfile): Promise<number> {
   if (!db) await initializeFirebaseAdmin();
-  
-  const sectors = userProfile.role === 'Admin' 
+
+  const sectors = userProfile.role === 'Admin'
     ? ['CHR', 'HACCP', 'Kezia', 'Tabac']
     : userProfile.secteurs;
-  
+
   const clientCodes = new Set<string>();
-  
+
   for (const sector of sectors) {
     const snapshot = await db.collection('Envoi')
       .where('secteur', '==', sector)
       .get();
-      
+
     snapshot.docs.forEach(doc => {
       const shipment = doc.data() as Shipment;
       if (shipment.codeClient) {
@@ -271,22 +281,22 @@ export async function getDistinctClientCountFromEnvoiSdk(userProfile: UserProfil
       }
     });
   }
-  
+
   return clientCodes.size;
 }
 
 export async function getInstallationsSnapshot(userProfile: UserProfile): Promise<InstallationsSnapshot> {
   if (!db) await initializeFirebaseAdmin();
-  
-  const sectors = userProfile.role === 'Admin' 
+
+  const sectors = userProfile.role === 'Admin'
     ? ['CHR', 'HACCP', 'Kezia', 'Tabac']
     : userProfile.secteurs;
-  
+
   const snapshot: InstallationsSnapshot = {
     total: 0,
     byStatus: {
       'rendez-vous à prendre': 0,
-      'rendez-vous pris': 0, 
+      'rendez-vous pris': 0,
       'installation terminée': 0
     },
     bySector: {}
@@ -301,21 +311,21 @@ export async function getInstallationsSnapshot(userProfile: UserProfile): Promis
         'installation terminée': 0
       }
     };
-    
+
     const statusSnapshot = await db.collection(sector)
       .select('status')
       .get();
-      
+
     statusSnapshot.docs.forEach(doc => {
       const status = doc.get('status') as InstallationStatus;
       snapshot.total++;
       snapshot.byStatus[status]++;
-      
+
       snapshot.bySector[sector].total++;
       snapshot.bySector[sector].byStatus[status]++;
     });
   }
-  
+
   return snapshot;
 }
 
@@ -325,7 +335,7 @@ export async function getLatestStatsSnapshotsSdk(): Promise<StatsSnapshot[]> {
     .orderBy('timestamp', 'desc')
     .limit(30) // Retourne les 30 derniers snapshots
     .get();
-    
+
   return snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
@@ -440,7 +450,7 @@ export async function deleteArticleImageUrl(articleId: string, imageUrl: string)
  */
 export async function searchArticles({ code, nom }: { code: string; nom: string }): Promise<Article[]> {
   if (!db) await initializeFirebaseAdmin();
-  
+
   let query: FirebaseFirestore.Query = db.collection('articles');
   let articles: Article[] = [];
 
@@ -470,4 +480,116 @@ export async function searchArticles({ code, nom }: { code: string; nom: string 
   return articles;
 }
 
-// ... [le reste du fichier existant reste inchangé]
+/**
+ * Safely extracts the string value from a ticket property, handling both { stringValue: string } and simple string formats.
+ * @param prop The ticket property.
+ * @param defaultValue The default value to return if the property is null, undefined, or not in the expected format.
+ * @returns The string value of the property or the default value.
+ */
+function getSafeStringValue(prop: { stringValue: string } | string | undefined | null, defaultValue: string = ''): string {
+  if (prop === undefined || prop === null) {
+    return defaultValue;
+  }
+  if (typeof prop === 'string') {
+    return prop;
+  }
+  if (typeof prop === 'object' && prop !== null && 'stringValue' in prop && typeof prop.stringValue === 'string') {
+    return prop.stringValue;
+  }
+  return defaultValue;
+}
+
+/**
+ * Archives a SAP ticket by moving it to the 'sap-archive' collection and deleting the original.
+ * @param ticket - The SapTicket object to archive.
+ * @param technicianNotes - Optional notes from the technician regarding the closure.
+ * @param technicianName - The name of the technician performing the archive.
+ */
+export async function archiveSapTicket(ticket: SapTicket, technicianNotes: string | undefined, technicianName: string): Promise<void> {
+  if (!db) await initializeFirebaseAdmin();
+
+  // Safely extract string values from the ticket object
+  const clientValue = getSafeStringValue(ticket.client, getSafeStringValue(ticket.raisonSociale, 'Client inconnu'));
+  const raisonSocialeValue = getSafeStringValue(ticket.raisonSociale);
+  const descriptionValue = getSafeStringValue(ticket.description, getSafeStringValue(ticket.descriptionProbleme));
+  const numeroSAPValue = getSafeStringValue(ticket.numeroSAP);
+
+  // Prepare archive data, ensuring fields are in { stringValue: string } format or simple strings as per SAPArchive type
+  // Based on SAPArchive type, some fields are { stringValue: string } | undefined, others are string.
+  const archiveData: SAPArchive = {
+    originalTicketId: ticket.id,
+    archivedDate: FieldValue.serverTimestamp() as any, // Firestore handles Timestamp
+    closureReason: ticket.status === 'closed' ? 'resolved' : 'no-response', // Corrected type
+    technicianNotes: technicianNotes || 'Aucune note fournie', // Ensure string, add default
+    technician: technicianName, // Use the actual technician name
+    // Store as { stringValue: string } if the type expects it, using extracted values
+    client: { stringValue: clientValue },
+    raisonSociale: { stringValue: raisonSocialeValue },
+    description: { stringValue: descriptionValue },
+    secteur: ticket.secteur as 'CHR' | 'HACCP' | 'Kezia' | 'Tabac', // Assurer le type correct
+    numeroSAP: { stringValue: numeroSAPValue },
+    mailId: ticket.mailId, // mailId is a simple string
+    documents: [], // Add documents field
+  };
+
+  try {
+    // First create the archive document
+    const archiveRef = await db.collection('sap-archive').add(archiveData);
+    console.log(`Ticket ${ticket.id} archived successfully to ${archiveRef.id}`);
+
+    // Then delete the original ticket
+    await db.collection(ticket.secteur).doc(ticket.id).delete();
+    console.log(`Original ticket ${ticket.id} deleted from ${ticket.secteur}`);
+  } catch (error) {
+    console.error(`Error archiving ticket ${ticket.id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Supprime définitivement un ticket SAP de Firestore
+ * @param sectorId - Secteur du ticket (ex: 'CHR', 'HACCP', 'Kezia', 'Tabac')
+ * @param ticketId - ID du ticket à supprimer
+ * @returns Promise<{ success: boolean; message: string }>
+ */
+export async function deleteSapTicket(
+  sectorId: string, 
+  ticketId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    if (!sectorId || !ticketId) {
+      throw new Error('Paramètres sectorId et ticketId requis');
+    }
+    
+    if (!db) await initializeFirebaseAdmin();
+    
+    const validSectors = ['CHR', 'HACCP', 'Kezia', 'Tabac'];
+    if (!validSectors.includes(sectorId)) {
+      throw new Error(`Secteur invalide: ${sectorId}`);
+    }
+
+    const docRef = db.collection(sectorId).doc(ticketId);
+    const docExists = (await docRef.get()).exists;
+
+    if (!docExists) {
+      return { 
+        success: false,
+        message: `Ticket ${ticketId} introuvable dans le secteur ${sectorId}`
+      };
+    }
+
+    await docRef.delete();
+    
+    return {
+      success: true,
+      message: `Ticket ${ticketId} supprimé avec succès du secteur ${sectorId}`
+    };
+    
+  } catch (error) {
+    console.error(`Erreur suppression ticket ${ticketId} (${sectorId}) :`, error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Erreur inconnue lors de la suppression'
+    };
+  }
+}

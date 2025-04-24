@@ -6,6 +6,7 @@ import {
   FaExclamationTriangle as ErrorIcon
 } from 'react-icons/fa';
 import { formatFirestoreDate } from '~/utils/dateUtils';
+import { getStringValue } from '~/utils/firestoreUtils';
 
 interface RecentTicketsProps {
   tickets: SapTicket[];
@@ -16,7 +17,7 @@ interface RecentTicketsProps {
 export const RecentTickets: React.FC<RecentTicketsProps> = ({ tickets, isLoading = false, error = null }) => {
 
   const getClientDisplay = (ticket: SapTicket): string => {
-    return ticket.raisonSociale || ticket.codeClient || 'Client inconnu';
+    return getStringValue(ticket.raisonSociale) || getStringValue(ticket.codeClient) || 'Client inconnu';
   };
 
   const getStatusClasses = (status?: string): string => {
@@ -44,7 +45,7 @@ export const RecentTickets: React.FC<RecentTicketsProps> = ({ tickets, isLoading
   };
 
   return (
-    <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+    <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-full">
       <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
         <TicketIcon className="mr-2 text-jdc-yellow" />
         Tickets SAP Récents
@@ -65,28 +66,18 @@ export const RecentTickets: React.FC<RecentTicketsProps> = ({ tickets, isLoading
         <p className="text-gray-400 text-center py-4">Aucun ticket récent à afficher.</p>
       )}
       {!isLoading && !error && tickets.length > 0 && (
-        <ul className="space-y-3 max-h-60 overflow-y-auto pr-2">
-          {tickets.map((ticket) => (
-            <li key={ticket.id} className="flex justify-between items-start text-sm p-3 bg-gray-700/30 rounded-md hover:bg-gray-700 transition-colors duration-150">
-              <div className="flex-grow mr-3">
-                <span className="font-medium text-yellow-400 block">{getClientDisplay(ticket)}</span>
-                {ticket.telephone && (
-                  <span className="text-gray-400 block text-xs mt-0.5">
-                    Tel: {ticket.telephone}
-                  </span>
-                )}
-                {ticket.date && (
-                  <span className="text-gray-500 block text-xs italic mt-0.5">
-                    {formatFirestoreDate(ticket.date, { 
-                      defaultValue: 'Date non spécifiée'
-                    }) as string}
-                  </span>
-                )}
-              </div>
-              <div className="flex-shrink-0 text-right">
-                <span className={getStatusClasses(ticket.statut)}>
-                  {ticket.statut || 'N/A'}
-                </span>
+        <ul className="space-y-3 max-h-[calc(100%-4rem)] overflow-y-auto pr-2">
+          {tickets && tickets.map((ticket, index) => (
+            <li key={ticket.id} className="text-sm p-3 bg-gray-700/30 rounded-md hover:bg-gray-700 transition-colors duration-150">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-yellow-400 truncate">{getStringValue(ticket.raisonSociale)}</p>
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <span>SAP #{getStringValue(ticket.numeroSAP)}</span>
+                    <span>•</span>
+                    <span>{getStringValue(ticket.secteur)}</span>
+                  </div>
+                </div>
               </div>
             </li>
           ))}

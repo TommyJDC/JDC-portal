@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react'; // Importer useMemo
+// DEBUG PATCH: Log all props received by InstallationsSnapshot
+import React, { useEffect, useMemo } from 'react'; // Importer useMemo
 import { Link } from '@remix-run/react';
 import { Button } from '~/components/ui/Button';
 import { format } from 'date-fns';
@@ -80,7 +81,13 @@ const InstallationCard = ({
   </Link>
 );
 
-export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = ({ stats, allInstallations, isLoading = false, lastUpdate, onRefresh }) => {
+export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = (props) => {
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[InstallationsSnapshot][DEBUG] props:', JSON.stringify(props));
+  }, [props]);
+
+  const { stats, allInstallations, isLoading = false, lastUpdate, onRefresh } = props;
 
   const calculatedStats = useMemo(() => {
     if (!allInstallations) {
@@ -106,7 +113,7 @@ export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = ({ st
       kezia: { ...initialStats },
     };
 
-    allInstallations.forEach(installation => {
+    allInstallations.forEach((installation: Installation) => {
       const sectorKey = installation.secteur?.toLowerCase() as keyof typeof sectorStats;
       if (sectorKey && sectorStats[sectorKey]) {
         sectorStats[sectorKey].total++;

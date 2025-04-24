@@ -11,9 +11,10 @@ import {
   getDistinctClientCountFromEnvoiSdk,
   getLatestStatsSnapshotsSdk,
   getInstallationsSnapshot,
-  getAllInstallations // Importer la nouvelle fonction
+  getAllInstallations,
+  getSapTicketCountBySectorSdk // Importer la nouvelle fonction
 } from "~/services/firestore.service.server";
-    import type { SapTicket, Shipment, StatsSnapshot, UserProfile, InstallationsDashboardStats, Installation } from "~/types/firestore.types"; // Ajouter Installation
+    import type { SapTicket, Shipment, StatsSnapshot, UserProfile, InstallationsDashboardStats, Installation } from "~/types/firestore.types";
     import type { UserSession } from "~/services/session.server";
 
     interface CalendarEvent {
@@ -37,10 +38,11 @@ export interface DashboardLoaderData {
     };
   };
   installationsStats: InstallationsDashboardStats | null;
-  allInstallations: Installation[]; // Ajouter le champ pour toutes les installations
+  allInstallations: Installation[];
   recentTickets: SapTicket[];
   recentShipments: Shipment[];
   clientError: string | null;
+  sapTicketCountsBySector: Record<string, number> | null; // Ajouter le champ pour les comptes par secteur
 }
 
     export const loader = async ({ request }: LoaderFunctionArgs): Promise<ReturnType<typeof json<DashboardLoaderData>>> => {
@@ -54,8 +56,9 @@ export interface DashboardLoaderData {
       let recentTickets: SapTicket[] = [];
       let recentShipments: Shipment[] = [];
       let installationsStats: InstallationsDashboardStats | null = null;
-      let allInstallations: Installation[] = []; // Initialiser la liste des installations
+      let allInstallations: Installation[] = [];
       let clientError: string | null = null;
+      let sapTicketCountsBySector: Record<string, number> | null = null; // Initialiser le champ
 
       if (session?.userId) {
         console.log(`Dashboard Loader: User authenticated (UserID: ${session.userId}), fetching profile and data...`);
@@ -104,6 +107,7 @@ export interface DashboardLoaderData {
                 const recentTicketsPromise = getRecentTicketsForSectors(sectorsForTickets, 20);
                 const allShipmentsPromise = getAllShipments(sectorsForShipments);
                 const allInstallationsPromise = getAllInstallations();
+                const sapTicketCountBySectorPromise = getSapTicketCountBySectorSdk(sectorsForTickets); // Appeler la nouvelle fonction
 
                 // Définir les promesses dépendantes de userProfile
                 const distinctClientCountPromise = userProfile ? getDistinctClientCountFromEnvoiSdk(userProfile) : Promise.resolve(0);
@@ -119,6 +123,7 @@ export interface DashboardLoaderData {
                   allShipmentsPromise,
                   installationsSnapshotPromise,
                   allInstallationsPromise,
+                  sapTicketCountBySectorPromise, // Inclure la nouvelle promesse
                 ]);
 
                 // Accéder aux résultats en vérifiant le statut et la valeur
@@ -129,11 +134,13 @@ export interface DashboardLoaderData {
                 const recentShipmentsResult = results[4];
                 const installationsSnapshotResult = results[5];
                 const allInstallationsResult = results[6];
+                const sapTicketCountBySectorResult = results[7]; // Récupérer le résultat
 
                 const latestSnapshot = snapshotResult.status === 'fulfilled' && snapshotResult.value && snapshotResult.value.length > 0 ? snapshotResult.value[0] : null;
 
                 stats.liveTicketCount = ticketCountResult.status === 'fulfilled' ? ticketCountResult.value : null;
                 stats.liveDistinctClientCountFromEnvoi = distinctClientCountResult.status === 'fulfilled' ? distinctClientCountResult.value : null;
+                sapTicketCountsBySector = sapTicketCountBySectorResult.status === 'fulfilled' ? sapTicketCountBySectorResult.value : null; // Assigner le résultat
 
 
                 if (latestSnapshot) {
@@ -156,10 +163,37 @@ export interface DashboardLoaderData {
                      console.error("Dashboard Loader: Error fetching distinct client count:", distinctClientCountResult.reason);
                      if (!clientError) clientError = "Erreur chargement clients distincts.";
                  }
+                 if (sapTicketCountBySectorResult.status === 'rejected') {
+                     console.error("Dashboard Loader: Error fetching SAP ticket count by sector:", sapTicketCountBySectorResult.reason);
+                     if (!clientError) clientError = "Erreur chargement tickets SAP par secteur.";
+                 }
 
-                recentTickets = recentTicketsResult.status === 'fulfilled' ? recentTicketsResult.value : [];
+
+                // Ensure dates in contactAttempts for recentTickets are Date objects
+                recentTickets = recentTicketsResult.status === 'fulfilled'
+                    ? recentTicketsResult.value.map(ticket => {
+                         const processedTicket: SapTicket = {
+                            ...ticket,
+                            // Ensure date is a Date object
+                            date: ticket.date instanceof Date || ticket.date === null ? ticket.date : new Date((ticket.date as any).seconds * 1000),
+                            // Ensure dates in contactAttempts are Date objects
+                            contactAttempts: ticket.contactAttempts?.map(attempt => ({
+                                ...attempt,
+                                date: attempt.date instanceof Date ? attempt.date : new Date((attempt.date as any).seconds * 1000)
+                            }))
+                        };
+                        return processedTicket;
+                    })
+                    : [];
+
                 recentShipments = recentShipmentsResult.status === 'fulfilled' ? recentShipmentsResult.value.slice(0, 20) : [];
-                allInstallations = allInstallationsResult.status === 'fulfilled' ? allInstallationsResult.value : []; // Assigner les installations
+
+                // Filtrer allInstallations par secteurs de l'utilisateur si non-admin
+                const rawAllInstallations = allInstallationsResult.status === 'fulfilled' ? allInstallationsResult.value : [];
+                allInstallations = userProfile?.role === 'Admin'
+                  ? rawAllInstallations
+                  : rawAllInstallations.filter(inst => userProfile?.secteurs?.includes(inst.secteur));
+
 
                 // Transform installations data to match component expectations
                 const rawInstallationsStats = installationsSnapshotResult.status === 'fulfilled' ? installationsSnapshotResult.value : null;
@@ -231,7 +265,8 @@ export interface DashboardLoaderData {
           recentTickets = [];
           recentShipments = [];
           installationsStats = null;
-          allInstallations = []; // Réinitialiser en cas d'erreur
+          allInstallations = [];
+          sapTicketCountsBySector = null; // Réinitialiser en cas d'erreur
         }
       } else {
           console.log("Dashboard Loader: User not authenticated.");
@@ -243,9 +278,10 @@ export interface DashboardLoaderData {
         calendarError,
         stats,
         installationsStats,
-        allInstallations, // Inclure la liste complète des installations
+        allInstallations,
         recentTickets,
         recentShipments,
-        clientError
+        clientError,
+        sapTicketCountsBySector, // Inclure les comptes par secteur dans les données retournées
       });
     };

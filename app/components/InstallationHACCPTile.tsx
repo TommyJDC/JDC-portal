@@ -4,6 +4,7 @@ import { faSave } from "@fortawesome/free-solid-svg-icons";
 import type { Installation } from "~/types/firestore.types";
 import { formatFirestoreDate } from "~/utils/dateUtils";
 import { Timestamp } from 'firebase/firestore';
+import { getStringValue } from '~/utils/firestoreUtils';
 
 interface InstallationHACCPTileProps {
   installation: {
@@ -45,14 +46,14 @@ const InstallationHACCPTile: React.FC<InstallationHACCPTileProps> = ({ installat
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="font-extrabold text-2xl text-yellow-400"> {/* Changer la couleur en jaune */}
-            {installation.nom}
+            {getStringValue(installation.nom)}
           </h3>
           <div className="flex items-center gap-2 text-sm text-gray-400 mt-1">
             <span className="px-2 py-0.5 rounded bg-gray-700 font-mono text-gray-300">
-              {installation.codeClient}
+              {getStringValue(installation.codeClient)}
             </span>
             <span className="text-gray-500">•</span>
-            <span>{installation.ville}</span>
+            <span>{getStringValue(installation.ville)}</span>
           </div>
         </div>
       </div>
@@ -62,33 +63,33 @@ const InstallationHACCPTile: React.FC<InstallationHACCPTileProps> = ({ installat
         <div className="space-y-2">
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm font-medium">Contact:</span>
-            <span className="text-sm">{installation.contact || 'N/A'}</span>
+            <span className="text-sm">{getStringValue(installation.contact, 'N/A')}</span>
           </p>
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm font-medium">Tél:</span>
-            <span className="text-sm">{installation.telephone || 'N/A'}</span>
+            <span className="text-sm">{getStringValue(installation.telephone, 'N/A')}</span>
           </p>
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm font-medium">Commercial:</span>
-            <span className="text-sm">{installation.commercial || 'N/A'}</span>
+            <span className="text-sm">{getStringValue(installation.commercial, 'N/A')}</span>
           </p>
         </div>
         <div className="space-y-2">
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm font-medium">Date Cde:</span>
             <span className="text-sm">
-              {String(formatFirestoreDate(installation.dateCdeMateriel))} {/* Convertir explicitement en chaîne */}
+              {String(getStringValue(installation.dateCdeMateriel, '')) || 'N/A'}
             </span>
           </p>
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm font-medium">Install.:</span>
             <span className="text-sm">
-              {installation.dateInstall ? String(formatFirestoreDate(installation.dateInstall)) : 'Non planifiée'} {/* Convertir explicitement en chaîne */}
+              {installation.dateInstall ? String(getStringValue(installation.dateInstall, 'Non planifiée')) : 'Non planifiée'}
             </span>
           </p>
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm font-medium">Tech:</span>
-            <span className="text-sm">{installation.tech || 'Non assigné'}</span>
+            <span className="text-sm">{getStringValue(installation.tech, 'Non assigné')}</span>
           </p>
         </div>
       </div>
