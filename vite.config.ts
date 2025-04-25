@@ -8,7 +8,6 @@ export default defineConfig({
   build: {
     rollupOptions: {
       external: [
-        'react-device-detect',
         'exceljs', 
         '@fullcalendar/react', 
         '@radix-ui/react-label', 
