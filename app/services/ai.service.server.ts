@@ -106,7 +106,22 @@ export async function generateAISummary(
     content: '',
   };
 
-  let prompt = template || `
+  // Construction conditionnelle du prompt
+  let prompt = template;
+
+  if (!prompt) {
+    let ticketDetails = '';
+    const numeroSAP = getTicketStringValue(ticket.numeroSAP, '');
+    const client = getTicketStringValue(ticket.client, getTicketStringValue(ticket.raisonSociale, ''));
+    const descriptionProbleme = getTicketStringValue(ticket.descriptionProbleme, getTicketStringValue(ticket.description, ''));
+
+    if (numeroSAP) ticketDetails += `Numéro SAP: ${numeroSAP}\n`;
+    if (client) ticketDetails += `Client: ${client}\n`;
+    if (descriptionProbleme) ticketDetails += `Description du problème: ${descriptionProbleme}\n`;
+    if (technicianNotes) ticketDetails += `Notes du technicien: ${technicianNotes}\n`;
+
+    if (ticketDetails) {
+      prompt = `
 ${selectedTemplate.subject}
 
 ${selectedTemplate.greeting}
@@ -114,21 +129,49 @@ ${selectedTemplate.greeting}
 ${selectedTemplate.content}
 
 --- Détails du Ticket ---
-Numéro SAP: ${getTicketStringValue(ticket.numeroSAP)}
-Client: ${getTicketStringValue(ticket.client, getTicketStringValue(ticket.raisonSociale))}
-Description du problème: ${getTicketStringValue(ticket.descriptionProbleme, getTicketStringValue(ticket.description))}
-${technicianNotes ? `Notes du technicien: ${technicianNotes}` : ''}
+${ticketDetails}
 
 --- Instructions pour la réponse ---
 - Rédigez une réponse claire et professionnelle en français.
-- Utilisez un format HTML simple et bien structuré (<p>, <br>, <strong>, <ul>, <li>).
+- Ce mail est destiné à une équipe interne (par exemple, l'équipe commerciale ou administrative), PAS au client final.
+- L'expéditeur du mail est un technicien de l'entreprise.
+- Utilisez un format HTML pour la mise en page. Structurez le contenu avec des balises comme <h1>, <h2>, <p>, <strong>, <ul>, <li>, <br>. Assurez-vous que la mise en page est claire et facile à lire.
 - Incluez des emojis pertinents pour rendre le message convivial.
 - NE PAS inclure d'informations de contact du service d'assistance ou de numéro de téléphone.
 - Adaptez le contenu en fonction du type de cas (${caseType}).
 - Pour les cas RMA/MATERIAL, mentionnez "@Pascal THOMINET" au début du corps de l'email.
-- Pour les cas NO_RESPONSE, proposez 2 créneaux de rappel et demandez une confirmation sous 48h.
-- Pour les cas CLOSURE, demandez confirmation au client et mentionnez la résolution.
+- Commencez le mail par la salutation "Bonjour,".
+- Terminez le mail par "Cordialement,". NE PAS inclure de nom ou de signature après "Cordialement,".
 `;
+    } else {
+      // Prompt alternatif si toutes les informations clés sont manquantes
+      prompt = `
+${selectedTemplate.subject}
+
+${selectedTemplate.greeting}
+
+${selectedTemplate.content}
+
+--- Informations disponibles ---
+${technicianNotes ? `Notes du technicien: ${technicianNotes}\n` : 'Aucune information détaillée disponible pour ce ticket.'}
+
+--- Instructions pour la réponse ---
+- Rédigez un résumé en français basé uniquement sur les informations disponibles ci-dessus (principalement les notes du technicien si présentes).
+- Ce mail est destiné à une équipe interne (par exemple, l'équipe commerciale ou administrative), PAS au client final.
+- L'expéditeur du mail est un technicien de l'entreprise.
+- Utilisez un format HTML pour la mise en page. Structurez le contenu avec des balises comme <h1>, <h2>, <p>, <strong>, <ul>, <li>, <br>. Assurez-vous que la mise en page est claire et facile à lire.
+- Incluez des emojis pertinents.
+- NE PAS inclure d'informations de contact du service d'assistance ou de numéro de téléphone.
+- Adaptez le contenu en fonction du type de cas (${caseType}).
+- Pour les cas RMA/MATERIAL, mentionnez "@Pascal THOMINET" au début du corps de l'email.
+- Évitez de mentionner explicitement que des informations sont manquantes. Concentrez-vous sur ce qui peut être déduit des notes du technicien.
+- Commencez le mail par la salutation "Bonjour,".
+- Terminez le mail par "Cordialement,". NE PAS inclure de nom ou de signature après "Cordialement,".
+`;
+    }
+  }
+
+  console.log("[ai.service.server] Prompt sent to AI:", prompt);
 
   // Add other relevant fields as needed based on caseType
 
@@ -147,16 +190,8 @@ ${technicianNotes ? `Notes du technicien: ${technicianNotes}` : ''}
     if (response?.candidates?.[0]?.content?.parts?.[0]?.text) {
       const generatedText = response.candidates[0].content.parts[0]?.text || '';
       console.log("[ai.service.server] Generated text:", generatedText);
-      
-      // Appel de la fonction d'envoi avec le type de cas
-      await sendSAPResponseEmail(
-        authClient,
-        ticket, // Passer l'objet ticket complet
-        selectedTemplate.subject,
-        generatedText,
-        caseType
-      );
-      
+
+      // Retourner le texte généré pour que l'action de la route puisse l'utiliser pour l'envoi d'e-mail
       return generatedText;
     } else {
       const blockReason = response?.promptFeedback?.blockReason;

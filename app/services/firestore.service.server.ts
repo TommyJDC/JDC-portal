@@ -546,6 +546,49 @@ export async function archiveSapTicket(ticket: SapTicket, technicianNotes: strin
   }
 }
 
+// Définition du type pour les brouillons de déclaration d'heures
+export interface HeuresDraft {
+  userId: string;
+  fileId: string; // ID du fichier Google Sheet
+  data: any; // Données du formulaire
+  createdAt: Timestamp; // Utiliser Timestamp de firebase-admin
+}
+
+/**
+ * Sauvegarde un brouillon de déclaration d'heures dans Firestore.
+ * @param draftData - Les données du brouillon à sauvegarder.
+ * @returns Promise<void>
+ */
+export async function saveHeuresDraft(draftData: Omit<HeuresDraft, 'createdAt'>): Promise<void> {
+  if (!db) await initializeFirebaseAdmin();
+  // Utiliser l'ID utilisateur et l'ID fichier comme identifiant unique pour le brouillon
+  const docId = `${draftData.userId}_${draftData.fileId}`;
+  await db.collection('heuresDrafts').doc(docId).set({
+    ...draftData,
+    createdAt: FieldValue.serverTimestamp() // Utiliser le timestamp du serveur
+  });
+}
+
+/**
+ * Récupère un brouillon de déclaration d'heures depuis Firestore.
+ * @param userId - L'ID de l'utilisateur.
+ * @param fileId - L'ID du fichier Google Sheet.
+ * @returns Promise<HeuresDraft | undefined>
+ */
+export async function getHeuresDraft(userId: string, fileId: string): Promise<HeuresDraft | undefined> {
+  if (!db) await initializeFirebaseAdmin();
+  const docId = `${userId}_${fileId}`;
+  const doc = await db.collection('heuresDrafts').doc(docId).get();
+  if (!doc.exists) {
+    return undefined;
+  }
+  const data = doc.data() as HeuresDraft;
+  // Convertir le Timestamp en Date si nécessaire côté client,
+  // mais ici on retourne le type Firestore tel quel.
+  return data;
+}
+
+
 /**
  * Supprime définitivement un ticket SAP de Firestore
  * @param sectorId - Secteur du ticket (ex: 'CHR', 'HACCP', 'Kezia', 'Tabac')

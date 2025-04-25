@@ -1,6 +1,15 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+import { useState } from "react";
+import { Input } from "~/components/ui/Input";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "~/components/ui/Select";
 import type { SAPArchive } from "~/types/firestore.types"; // Utiliser SAPArchive
 import { Timestamp } from 'firebase/firestore'; // Importer Timestamp depuis firebase/firestore
 import { initializeFirebaseAdmin } from "~/services/firestore.service.server"; // Importer initializeFirebaseAdmin
@@ -60,17 +69,57 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 
 export default function SapArchivePage() {
-  // Utiliser useLoaderData pour accéder aux données du loader
   const { archivedTickets } = useLoaderData<typeof loader>();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedSector, setSelectedSector] = useState<string>("all");
+
+  const filteredTickets = archivedTickets.filter((ticket) => {
+    // Filtre par secteur
+    if (selectedSector !== "all" && ticket.secteur !== selectedSector) {
+      return false;
+    }
+    
+    // Filtre par recherche
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      getSafeStringValue(ticket.client).toLowerCase().includes(searchLower) ||
+      getSafeStringValue(ticket.raisonSociale).toLowerCase().includes(searchLower) ||
+      getSafeStringValue(ticket.description).toLowerCase().includes(searchLower) ||
+      getSafeStringValue(ticket.numeroSAP).toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Tickets SAP Archivés</h1>
-      {archivedTickets.length === 0 ? (
+      
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <Input
+          placeholder="Rechercher par client, raison sociale ou description..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1"
+        />
+        
+        <Select value={selectedSector} onValueChange={setSelectedSector}>
+          <SelectTrigger className="w-full md:w-48">
+            <SelectValue placeholder="Secteur" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les secteurs</SelectItem>
+            <SelectItem value="CHR">CHR</SelectItem>
+            <SelectItem value="HACCP">HACCP</SelectItem>
+            <SelectItem value="Kezia">Kezia</SelectItem>
+            <SelectItem value="Tabac">Tabac</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {filteredTickets.length === 0 ? (
         <p>Aucun ticket archivé trouvé.</p>
       ) : (
         <ul className="space-y-4">
-          {archivedTickets.map((ticket: SAPArchive) => { // Ajouter l'annotation de type explicite
+          {filteredTickets.map((ticket: SAPArchive) => { // Ajouter l'annotation de type explicite
             // Gérer l'affichage de la date archivée
             // Gérer l'affichage de la date archivée
             // Les Timestamps sont convertis en { seconds: number, nanoseconds: number } par Remix

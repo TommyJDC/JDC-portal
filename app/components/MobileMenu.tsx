@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, NavLink } from '@remix-run/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
- import { faTimes, faUserCircle, faSignOutAlt, faSignInAlt, faTachometerAlt, faTicketAlt, faTruck, faCog, faBug, faSearch, faSheetPlastic } from '@fortawesome/free-solid-svg-icons'; // Added faCog, faBug, faSheetPlastic
+import { faTimes, faUserCircle, faSignOutAlt, faSignInAlt, faTachometerAlt, faTicketAlt, faTruck, faCog, faSearch, faFileAlt } from '@fortawesome/free-solid-svg-icons'; // Updated icons
  import { Button } from './ui/Button';
  // Use UserSession from server loader instead of AppUser from client-side auth
  // import type { AppUser } from '~/services/auth.service';
@@ -18,26 +18,34 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
    loadingAuth: boolean; // Add loadingAuth prop
  }
 
+// Main navigation items
 const navItems = [
   { name: 'Tableau de Bord', to: '/dashboard', icon: faTachometerAlt },
+];
+
+// Technique menu items
+const techniqueItems = [
   { name: 'Tickets SAP', to: '/tickets-sap', icon: faTicketAlt },
+  { name: 'Archive SAP', to: '/sap-archive', icon: faFileAlt }, // Ajout du lien vers l'archive
+  { name: 'Installations Kezia', to: '/installations/kezia-firestore', icon: faFileAlt },
+  { name: 'Installations CHR', to: '/installations/chr-firestore', icon: faFileAlt },
+  { name: 'Installations HACCP', to: '/installations/haccp-firestore', icon: faFileAlt },
+  { name: 'Installations Tabac', to: '/installations/tabac-firestore', icon: faFileAlt },
+];
+
+// Logistique menu items
+const logistiqueItems = [
   { name: 'Envois CTN', to: '/envois-ctn', icon: faTruck },
   { name: 'Recherche Articles', to: '/articles', icon: faSearch },
 ];
 
-// Installation items (now part of Technique section)
-const techniqueInstallationItems = [
-  { name: 'Kezia', to: '/installations/kezia', icon: faSheetPlastic },
-  { name: 'CHR', to: '/installations/chr', icon: faSheetPlastic },
-  { name: 'HACCP', to: '/installations/haccp', icon: faSheetPlastic },
-  { name: 'Tabac', to: '/installations/tabac', icon: faSheetPlastic },
+// Commercial menu items
+const commercialItems = [
+  { name: 'Upload Menus', to: '/commercial/upload', icon: faFileAlt }
 ];
 
 // Define Admin item separately
 const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
-
-// Debug item - always visible
-const debugItem = { name: 'Diagnostic', to: '/debug-index', icon: faBug };
 
  const JDC_LOGO_URL = "https://www.jdc.fr/images/logo_jdc_blanc.svg"; // Re-add logo URL if needed
 
@@ -81,23 +89,24 @@ const debugItem = { name: 'Diagnostic', to: '/debug-index', icon: faBug };
              <div className="px-3 py-2 text-jdc-gray-400">Chargement...</div>
           ) : user ? (
             <>
+              {/* Regular Nav Items */}
               {navItems.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   onClick={onClose} // Close menu on link click
                   className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
-                  prefetch="intent" // Keep prefetch for other items
+                  prefetch="intent"
                 >
                   <FontAwesomeIcon icon={item.icon} className="mr-3 h-5 w-5" />
                   {item.name}
                 </NavLink>
               ))}
 
-              {/* Technique Section with Installations */}
+              {/* Technique Section */}
               <div className="pt-2 mt-2 border-t border-jdc-gray-700/50">
-                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Technique - Installations</span>
-                {techniqueInstallationItems.map((item) => (
+                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Technique</span>
+                {techniqueItems.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
@@ -111,28 +120,57 @@ const debugItem = { name: 'Diagnostic', to: '/debug-index', icon: faBug };
                 ))}
               </div>
 
+              {/* Logistique Section */}
+              <div className="pt-2 mt-2 border-t border-jdc-gray-700/50">
+                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Logistique</span>
+                {logistiqueItems.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={onClose}
+                    className={({ isActive }) => `${linkBaseClass} pl-6 ${isActive ? linkActiveClass : linkInactiveClass}`}
+                    prefetch="intent"
+                  >
+                    <FontAwesomeIcon icon={item.icon} className="mr-3 h-5 w-5" />
+                    {item.name}
+                  </NavLink>
+                ))}
+              </div>
+
+              {/* Commercial Section */}
+              <div className="pt-2 mt-2 border-t border-jdc-gray-700/50">
+                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Commercial</span>
+                {commercialItems.length === 0 ? (
+                   <div className="px-3 py-2 text-sm text-jdc-gray-400">
+                     Aucun élément disponible
+                   </div>
+                ) : (
+                  commercialItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={onClose}
+                      className={({ isActive }) => `${linkBaseClass} pl-6 ${isActive ? linkActiveClass : linkInactiveClass}`}
+                      prefetch="intent"
+                    >
+                      <FontAwesomeIcon icon={item.icon} className="mr-3 h-5 w-5" />
+                      {item.name}
+                    </NavLink>
+                  ))
+                )}
+              </div>
+
+
               {/* Conditionally render Admin link */}
               {showAdminLink && (
                 <NavLink
                   to={adminItem.to}
                   onClick={onClose}
                   className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
-                  // Removed prefetch="intent" for Admin link
+                  prefetch="intent"
                 >
                   <FontAwesomeIcon icon={adminItem.icon} className="mr-3 h-5 w-5" />
                   {adminItem.name}
-                </NavLink>
-              )}
-              
-              {/* Debug Link - Only visible for admins */}
-              {showAdminLink && (
-                <NavLink
-                  to={debugItem.to}
-                  onClick={onClose}
-                  className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
-                >
-                  <FontAwesomeIcon icon={debugItem.icon} className="mr-3 h-5 w-5" />
-                  {debugItem.name}
                 </NavLink>
               )}
             </>

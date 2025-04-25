@@ -561,9 +561,63 @@ export async function applyGmailLabel(
   }
 }
 
+/**
+ * Sends an email with the hours declaration.
+ * @param authClient - The authenticated OAuth2 client.
+ * @param to - The recipient email address.
+ * @param subject - The subject of the email.
+ * @param body - The plain text or HTML body of the email.
+ * @returns The ID of the sent message.
+ */
+export async function sendHeuresEmail(
+  accessToken: string, // Utiliser le token d'accès directement
+  to: string,
+  subject: string,
+  body: string // Peut être HTML ou texte brut
+): Promise<string | null | undefined> {
+  // Initialiser le client Google API avec le token d'accès
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: accessToken });
+  const gmail = google.gmail({ version: 'v1', auth });
+
+  try {
+    // Créer le contenu de l'email au format RFC 2822
+    const emailLines = [
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8', // Utiliser text/html si le corps est HTML
+      '',
+      body // Le corps de l'email
+    ];
+
+    // Encoder en base64url
+    const raw = Buffer.from(emailLines.join('\r\n'))
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    // Envoyer l'email
+    const response = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: raw,
+      },
+    });
+
+    console.log(`Email de déclaration d'heures envoyé avec succès à ${to}. Message ID: ${response.data.id}`);
+
+    return response.data.id;
+  } catch (error) {
+    console.error(`Erreur lors de l'envoi de l'email de déclaration d'heures à ${to}:`, error);
+    throw new Error(`Échec de l'envoi de l'email de déclaration d'heures: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 
 /**
- * Ajoute le label "Traité" à un email
+ * Adds the "Processed" label to an email
  */
 async function addProcessedLabel(
   gmail: any,

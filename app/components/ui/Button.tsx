@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link, type LinkProps } from '@remix-run/react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
-type ButtonSize = 'sm' | 'md' | 'lg';
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'link' | 'outline';
+type ButtonSize = 'sm' | 'md' | 'lg' | 'icon'; // Ajout de la taille 'icon' si nécessaire
 
 interface ButtonBaseProps {
   variant?: ButtonVariant;
@@ -38,12 +38,15 @@ const variantStyles: Record<ButtonVariant, string> = {
   secondary: "bg-jdc-card text-jdc-gray-300 border border-jdc-gray-800 hover:bg-jdc-gray-800 focus:ring-jdc-gray-400",
   danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
   ghost: "bg-transparent text-jdc-gray-300 hover:bg-jdc-gray-800 focus:ring-jdc-gray-400",
+  link: "text-primary underline-offset-4 hover:underline", // Style pour la variante 'link'
+  outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground", // Style pour la variante 'outline'
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: "px-3 py-1.5 text-sm",
-  md: "px-4 py-2 text-base",
-  lg: "px-6 py-3 text-lg",
+  sm: "h-9 px-3", // Ajusté pour inclure la hauteur
+  md: "h-10 px-4 py-2", // Ajusté pour inclure la hauteur
+  lg: "h-11 px-8", // Ajusté pour inclure la hauteur
+  icon: "h-10 w-10", // Style pour la taille 'icon'
 };
 
 export const Button: React.FC<ButtonProps> = ({

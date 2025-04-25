@@ -155,8 +155,8 @@ export default function UploadMenuPage() {
                     file:mr-4 file:py-2 file:px-4
                     file:rounded-md file:border-0
                     file:text-sm file:font-semibold
-                    file:bg-jdc-blue file:text-white
-                    hover:file:bg-jdc-blue-dark"
+                    file:bg-jdc-green file:text-white
+                    hover:file:bg-jdc-green-dark"
                   required
                 />
                 {fileName && (

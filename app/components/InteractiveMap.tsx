@@ -164,12 +164,28 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
     console.log("[InteractiveMap] Map loaded.");
     // Fit bounds to zones once map and zones data are ready
     if (mapRef.current && zonesGeoJson.features.length > 0) {
-        // Calculate bounds from GeoJSON (requires a helper or library like @turf/bbox)
-        // For simplicity, we'll keep the initial view for now.
-        // A more robust solution would calculate the bounding box of zonesGeoJson.
-        console.log("[InteractiveMap] Map loaded, zones ready (bounds fitting skipped for simplicity).");
+      try {
+        const bounds = new mapboxgl.LngLatBounds();
+        zonesGeoJson.features.forEach(feature => {
+          if (feature.geometry.type === 'Polygon') {
+            feature.geometry.coordinates[0].forEach(coord => {
+              bounds.extend([coord[0], coord[1]]);
+            });
+          }
+        });
+        
+        if (!bounds.isEmpty()) {
+          mapRef.current.fitBounds(bounds, {
+            padding: 50,
+            maxZoom: 12,
+            duration: 1000
+          });
+        }
+      } catch (error) {
+        console.error("Error fitting bounds:", error);
+      }
     }
-  }, [zonesGeoJson]); // Re-run if zonesGeoJson changes (shouldn't often)
+  }, [zonesGeoJson]);
 
   const handleMouseEnterZone = useCallback((e: mapboxgl.MapLayerMouseEvent) => {
     if (e.features && e.features.length > 0) {
@@ -286,8 +302,8 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
 
 
   return (
-    <div className="bg-jdc-card rounded-lg shadow-lg h-full w-full">
-        <div className="h-full w-full">
+    <div className="bg-jdc-card rounded-xl shadow-lg h-full w-full overflow-hidden">
+        <div className="h-full w-full rounded-xl overflow-hidden">
           <Map
             ref={mapRef}
             // Pass individual viewport props for v7
@@ -299,7 +315,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
             onLoad={handleMapLoad}
             mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
             mapStyle="mapbox://styles/mapbox/streets-v11" // Standard Mapbox street style
-            style={{ width: '100%', height: '600px' }}
+            style={{ width: '100%', height: '100%' }}
             onMouseEnter={handleMouseEnterZone} // Attach hover listener to map for zones layer
             onMouseLeave={handleMouseLeaveZone}
             interactiveLayerIds={['zones-fill-layer']} // Make the zones fill layer interactive for hover

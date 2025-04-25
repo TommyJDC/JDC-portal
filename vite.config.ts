@@ -100,4 +100,14 @@ export default defineConfig({
       external: ['exceljs']
     }
   },
+  optimizeDeps: {
+    include: [
+      '@fullcalendar/react',
+      '@fullcalendar/core',
+      '@fullcalendar/daygrid',
+      '@fullcalendar/timegrid',
+      '@fullcalendar/interaction',
+      '@fullcalendar/core/locales/fr',
+    ],
+  },
 });

@@ -1,3 +1,10 @@
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
 // Existing styles for shipment status
 const shipmentStatusStyles = {
   OUI: { bgColor: 'bg-green-700', textColor: 'text-green-100' },

@@ -93,9 +93,8 @@ export async function action({ request }: ActionFunctionArgs) {
                         return json({ success: false, error: "Notes du technicien manquantes pour clôture." }, { status: 400 });
                     }
                     try {
-                        const closurePrompt = `Generate a summary for ticket ${ticket.numeroSAP?.stringValue} (Closure).
-Veuillez structurer la réponse en utilisant le format HTML. Utilisez des balises HTML pour structurer le contenu (par exemple, <p>, <br>, <strong>, <ul>, <li>). Incluez des emojis pertinents pour rendre le message plus convivial. Soignez la mise en page pour une meilleure lisibilité.`;
-                        updateData.aiSummary = await generateAISummaryService(authClient, ticket, technicianNotes, 'CLOSURE', closurePrompt);
+                        // Ne pas passer de template fixe, laisser le service AI le construire
+                        updateData.aiSummary = await generateAISummaryService(authClient, ticket, technicianNotes, 'CLOSURE');
                         emailContent = updateData.aiSummary;
                         gmailLabel = userProfile?.labelSapClosed || '';
                     } catch (aiError: any) {
@@ -103,7 +102,6 @@ Veuillez structurer la réponse en utilisant le format HTML. Utilisez des balise
                         updateData.aiSummary = `[Échec de la génération du résumé AI pour clôture] ${technicianNotes}`;
                         emailContent = updateData.aiSummary;
                         gmailLabel = userProfile?.labelSapClosed || '';
-                        // archiveTicket = true; // Variable non utilisée, supprimée
                     }
                     break;
 
@@ -116,9 +114,8 @@ Veuillez structurer la réponse en utilisant le format HTML. Utilisez des balise
                     updateData.contactAttempts = Array.isArray(ticket.contactAttempts) ? [...ticket.contactAttempts, newAttempt] : [newAttempt];
 
                     try {
-                        const noResponsePrompt = `Generate a summary for ticket ${ticket.numeroSAP?.stringValue} (No Response).
-Veuillez structurer la réponse en utilisant le format HTML. Utilisez des balises HTML pour structurer le contenu (par exemple, <p>, <br>, <strong>, <ul>, <li>). Incluez des emojis pertinents pour rendre le message plus convivial. Soignez la mise en page pour une meilleure lisibilité.`;
-                        updateData.aiSummary = await generateAISummaryService(authClient, ticket, technicianNotes, 'NO_RESPONSE', noResponsePrompt);
+                        // Ne pas passer de template fixe, laisser le service AI le construire
+                        updateData.aiSummary = await generateAISummaryService(authClient, ticket, technicianNotes, 'NO_RESPONSE');
                         emailContent = updateData.aiSummary;
                         gmailLabel = userProfile?.labelSapNoResponse || '';
                     } catch (aiError: any) {
@@ -134,10 +131,8 @@ Veuillez structurer la réponse en utilisant le format HTML. Utilisez des balise
                         return json({ success: false, error: "Type de matériel, détails du matériel ou notes du technicien manquants pour une demande de RMA." }, { status: 400 });
                     }
                     try {
-                        const prompt = `Generate a summary for ticket ${ticket.numeroSAP?.stringValue} (RMA Request).`;
-                        const fullPrompt = `${prompt}\nTechnician notes: ${technicianNotes}\nMaterial details: ${materialDetails}
-Veuillez structurer la réponse en utilisant le format HTML. Utilisez des balises HTML pour structurer le contenu (par exemple, <p>, <br>, <strong>, <ul>, <li>). Incluez des emojis pertinents pour rendre le message plus convivial. Soignez la mise en page pour une meilleure lisibilité.`;
-                        updateData.aiSummary = await generateAISummaryService(authClient, ticket, technicianNotes, 'RMA', fullPrompt);
+                        // Ne pas passer de template fixe, laisser le service AI le construire
+                        updateData.aiSummary = await generateAISummaryService(authClient, ticket, technicianNotes, 'RMA');
                         emailContent = updateData.aiSummary;
                         gmailLabel = userProfile?.labelSapRma || '';
                     } catch (aiError: any) {
@@ -153,12 +148,10 @@ Veuillez structurer la réponse en utilisant le format HTML. Utilisez des balise
                         return json({ success: false, error: "Type de matériel, détails du matériel ou notes du technicien manquants pour un envoi de matériel." }, { status: 400 });
                     }
                     try {
-                        const prompt = `Generate a summary for ticket ${ticket.numeroSAP?.stringValue} (Material Sent).`;
-                        const fullPrompt = `${prompt}\nTechnician notes: ${technicianNotes}\nMaterial details: ${materialDetails}
-Veuillez structurer la réponse en utilisant le format HTML. Utilisez des balises HTML pour structurer le contenu (par exemple, <p>, <br>, <strong>, <ul>, <li>). Incluez des emojis pertinents pour rendre le message plus convivial. Soignez la mise en page pour une meilleure lisibilité.`;
-                        updateData.aiSummary = await generateAISummaryService(authClient, ticket, technicianNotes, 'RMA', fullPrompt);
+                        // Ne pas passer de template fixe, laisser le service AI le construire
+                        updateData.aiSummary = await generateAISummaryService(authClient, ticket, technicianNotes, 'RMA'); // Utiliser 'RMA' caseType
                         emailContent = updateData.aiSummary;
-                        gmailLabel = userProfile?.labelSapRma || '';
+                        gmailLabel = userProfile?.labelSapRma || ''; // Assumer le même label que RMA pour l'instant
                     } catch (aiError: any) {
                         console.error(`Error generating AI summary for Material Sent ticket ${ticketId}:`, aiError);
                         updateData.aiSummary = `[Échec de la génération du résumé AI pour Envoi Matériel] Notes: ${technicianNotes}, Matériel: ${materialDetails}`;
