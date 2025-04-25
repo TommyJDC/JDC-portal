@@ -265,7 +265,7 @@ export default function Dashboard() {
     ? allSapTicketStats
     : allSapTicketStats.filter(stat => userProfile?.secteurs?.includes(stat.sector));
 
-  if (isMobile) {
+  if (typeof window !== 'undefined' && isMobile) {
     return (
       <MobileDashboard
         statsData={statsData}
