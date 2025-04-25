@@ -5,6 +5,17 @@ import { netlifyPlugin } from "@netlify/remix-adapter/plugin";
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      external: [
+        'react-device-detect',
+        'exceljs', 
+        '@fullcalendar/react', 
+        '@radix-ui/react-label', 
+        'class-variance-authority'
+      ]
+    }
+  },
   plugins: [
     remix(),
     netlifyPlugin(),
@@ -95,11 +106,6 @@ export default defineConfig({
       }
     })
   ],
-  build: {
-    rollupOptions: {
-      external: ['exceljs', '@fullcalendar/react', '@radix-ui/react-label', 'class-variance-authority']
-    }
-  },
   optimizeDeps: {
     include: [
       '@fullcalendar/react',
