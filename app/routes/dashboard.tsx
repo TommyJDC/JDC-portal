@@ -1,6 +1,7 @@
 import type { MetaFunction } from "@remix-run/node";
 import { useOutletContext, useLoaderData } from "@remix-run/react";
-import React, { lazy, Suspense, useState } from "react"; // Importer useState
+import React, { lazy, Suspense, useState } from "react";
+import { isMobile } from 'react-device-detect';
 import { Timestamp } from 'firebase/firestore';
 
 import { loader } from "./dashboard.loader";
@@ -23,9 +24,9 @@ import {
   faCalendarDays
 } from "@fortawesome/free-solid-svg-icons";
 
-import type { SapTicket, Shipment, Installation } from "~/types/firestore.types"; // Importer Installation
+import type { SapTicket, Shipment, Installation } from "~/types/firestore.types";
 import type { UserSession } from "~/services/session.server";
-import { Drawer } from "~/components/ui/Drawer"; // Importer le composant Drawer
+import { Drawer } from "~/components/ui/Drawer";
 
 interface CalendarEvent {
   id: string;
@@ -76,30 +77,116 @@ const parseSerializedDateNullable = (
 };
 
 const MapLoadingFallback = () => (
-  // Added w-full to ensure fallback takes full width
-  <div className="bg-jdc-card p-2 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[150px] w-full"> {/* Adjusted height and padding */}
-    <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-xl mb-2" /> {/* Adjusted icon size and margin */}
-    <p className="text-jdc-gray-400 text-center text-xs">Chargement de la carte...</p> {/* Adjusted text size */}
+  <div className="bg-jdc-card p-2 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[150px] w-full">
+    <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-xl mb-2" />
+    <p className="text-jdc-gray-400 text-center text-xs">Chargement de la carte...</p>
   </div>
 );
 
 const MapLoginPrompt = () => (
-  // Added w-full to ensure login prompt takes full width
-  <div className="bg-jdc-card p-2 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[150px] w-full"> {/* Adjusted height and padding */}
-    <FontAwesomeIcon icon={faMapMarkedAlt} className="text-jdc-gray-500 text-2xl mb-2" /> {/* Adjusted icon size and margin */}
-    <p className="text-jdc-gray-400 text-center text-xs">Connectez-vous pour voir la carte des tickets.</p> {/* Adjusted text size */}
+  <div className="bg-jdc-card p-2 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[150px] w-full">
+    <FontAwesomeIcon icon={faMapMarkedAlt} className="text-jdc-gray-500 text-2xl mb-2" />
+    <p className="text-jdc-gray-400 text-center text-xs">Connectez-vous pour voir la carte des tickets.</p>
   </div>
 );
 
 const WeeklyAgendaFallback = () => (
-  <div className="bg-jdc-card p-2 rounded-lg shadow-lg min-h-[80px]"> {/* Adjusted height and padding */}
-    <h3 className="text-sm font-semibold text-white mb-1 flex items-center"> {/* Adjusted text size and margin */}
-      <FontAwesomeIcon icon={faCalendarDays} className="mr-1 text-jdc-blue text-xs" /> {/* Adjusted icon size and margin */}
+  <div className="bg-jdc-card p-2 rounded-lg shadow-lg min-h-[80px]">
+    <h3 className="text-sm font-semibold text-white mb-1 flex items-center">
+      <FontAwesomeIcon icon={faCalendarDays} className="mr-1 text-jdc-blue text-xs" />
       Agenda de la semaine
     </h3>
-    <div className="flex items-center justify-center h-[100px]"> {/* Adjusted height */}
+    <div className="flex items-center justify-center h-[100px]">
       <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-xl mr-2" />
-      <span className="text-jdc-gray-400 text-sm">Chargement de l'agenda...</span> {/* Adjusted text size */}
+      <span className="text-jdc-gray-400 text-sm">Chargement de l'agenda...</span>
+    </div>
+  </div>
+);
+
+interface MobileDashboardProps {
+  statsData: Array<{
+    title: string;
+    valueState: number | string | null;
+    icon: any;
+    evolutionKey: string;
+    sector: string;
+  }>;
+  formatStatValue: (value: number | string | null) => string;
+  stats: {
+    evolution: Record<string, number | null>;
+  };
+  recentTickets: SapTicket[];
+  recentShipments: Shipment[];
+  installations: Installation[];
+  calendarEvents?: CalendarEvent[] | null;
+  calendarError?: string | null;
+  user: UserSession | null;
+  clientError?: string | null;
+}
+
+const MobileDashboard = ({ 
+  statsData,
+  formatStatValue,
+  stats,
+  recentTickets,
+  recentShipments,
+  installations,
+  calendarEvents,
+  calendarError,
+  user,
+  clientError
+}: MobileDashboardProps) => (
+  <div className="space-y-2 p-2">
+    <h1 className="text-lg font-semibold text-white">Tableau de Bord</h1>
+
+    {clientError && (
+      <div className="p-2 bg-red-800 text-white rounded-lg mb-2 text-xs">
+        <FontAwesomeIcon icon={faExclamationTriangle} className="mr-1" />
+        {clientError}
+      </div>
+    )}
+
+    <div className="flex overflow-x-auto gap-2 pb-2">
+          {statsData.map((stat: {
+            title: string;
+            valueState: number | string | null;
+            icon: any;
+            evolutionKey: string;
+          }) => (
+        <div key={stat.title} className="min-w-[120px]">
+          <StatsCard
+            title={stat.title}
+            value={formatStatValue(stat.valueState)}
+            icon={stat.icon}
+            isLoading={false}
+            evolutionValue={stats.evolution[stat.evolutionKey as keyof typeof stats.evolution]}
+          />
+        </div>
+      ))}
+    </div>
+
+    <div className="bg-jdc-card p-2 rounded-lg">
+      <h3 className="text-sm font-semibold text-white mb-2">Derniers Tickets</h3>
+      <RecentTickets
+        tickets={recentTickets.slice(0, 3)}
+        isLoading={false}
+      />
+    </div>
+
+    <div className="bg-jdc-card p-2 rounded-lg">
+      <h3 className="text-sm font-semibold text-white mb-2">Derniers Envois</h3>
+      <RecentShipments
+        shipments={recentShipments.slice(0, 3)}
+        isLoading={false}
+      />
+    </div>
+
+    <div className="bg-jdc-card p-2 rounded-lg">
+      <h3 className="text-sm font-semibold text-white mb-2">Installations</h3>
+      <InstallationsSnapshot
+        allInstallations={installations}
+        isLoading={false}
+      />
     </div>
   </div>
 );
@@ -107,25 +194,25 @@ const WeeklyAgendaFallback = () => (
 export default function Dashboard() {
   const { user } = useOutletContext<OutletContextType>();
   const {
-    userProfile, // Déstructurer userProfile depuis les données chargées
+    userProfile,
     calendarEvents,
     calendarError,
     stats,
     recentTickets: serializedTickets,
     recentShipments: serializedShipments,
     installationsStats,
-    allInstallations, // Récupérer allInstallations
+    allInstallations,
     clientError,
-    sapTicketCountsBySector // Inclure les comptes par secteur
+    sapTicketCountsBySector
   } = useLoaderData<typeof loader>();
 
-  const [isTicketsDrawerOpen, setIsTicketsDrawerOpen] = useState(false); // État pour le tiroir des tickets
-  const [isShipmentsDrawerOpen, setIsShipmentsDrawerOpen] = useState(false); // État pour le tiroir des envois
+  const [isTicketsDrawerOpen, setIsTicketsDrawerOpen] = useState(false);
+  const [isShipmentsDrawerOpen, setIsShipmentsDrawerOpen] = useState(false);
 
   const recentTickets: SapTicket[] = (serializedTickets ?? []).map(ticket => ({
     ...ticket,
     date: parseSerializedDateNullable(ticket.date),
-    mailDate: parseSerializedDateOptional(ticket.mailDate), // Explicitly parse mailDate
+    mailDate: parseSerializedDateOptional(ticket.mailDate),
   }));
 
   const recentShipments: Shipment[] = (serializedShipments ?? []).map(shipment => ({
@@ -133,14 +220,11 @@ export default function Dashboard() {
     dateCreation: parseSerializedDateOptional(shipment.dateCreation),
   }));
 
-  // Désérialiser les dates dans allInstallations
   const installations: Installation[] = (allInstallations ?? []).map(installation => ({
     ...installation,
     dateInstall: parseSerializedDateOptional(installation.dateInstall),
     createdAt: parseSerializedDateOptional(installation.createdAt),
     updatedAt: parseSerializedDateOptional(installation.updatedAt),
-    // Désérialiser uniquement les champs de date qui sont susceptibles d'exister et de causer des problèmes de type
-    // Les autres champs de date spécifiques aux secteurs seront gérés si nécessaire.
   }));
 
   const formatStatValue = (value: number | string | null): string =>
@@ -152,54 +236,65 @@ export default function Dashboard() {
       title: "Tickets SAP CHR",
       valueState: sapTicketCountsBySector?.['CHR'] ?? 0,
       icon: faTicket,
-      evolutionKey: 'chrTicketCount' // Clé d'évolution à définir si nécessaire
+      evolutionKey: 'chrTicketCount'
     },
     {
       sector: 'HACCP',
       title: "Tickets SAP HACCP",
       valueState: sapTicketCountsBySector?.['HACCP'] ?? 0,
       icon: faTicket,
-      evolutionKey: 'haccpTicketCount' // Clé d'évolution à définir si nécessaire
+      evolutionKey: 'haccpTicketCount'
     },
     {
       sector: 'Kezia',
       title: "Tickets SAP Kezia",
       valueState: sapTicketCountsBySector?.['Kezia'] ?? 0,
       icon: faTicket,
-      evolutionKey: 'keziaTicketCount' // Clé d'évolution à définir si nécessaire
+      evolutionKey: 'keziaTicketCount'
     },
     {
       sector: 'Tabac',
       title: "Tickets SAP Tabac",
       valueState: sapTicketCountsBySector?.['Tabac'] ?? 0,
       icon: faTicket,
-      evolutionKey: 'tabacTicketCount' // Clé d'évolution à définir si nécessaire
+      evolutionKey: 'tabacTicketCount'
     },
   ];
 
-  // Filtrer les tuiles en fonction des secteurs de l'utilisateur
   const statsData = userProfile?.role === 'Admin'
-    ? allSapTicketStats // Si admin, afficher toutes les tuiles
-    : allSapTicketStats.filter(stat => userProfile?.secteurs?.includes(stat.sector)); // Sinon, filtrer par secteurs de l'utilisateur
+    ? allSapTicketStats
+    : allSapTicketStats.filter(stat => userProfile?.secteurs?.includes(stat.sector));
 
+  if (isMobile) {
+    return (
+      <MobileDashboard
+        statsData={statsData}
+        formatStatValue={formatStatValue}
+        stats={stats}
+        recentTickets={recentTickets}
+        recentShipments={recentShipments}
+        installations={installations}
+        calendarEvents={calendarEvents}
+        calendarError={calendarError}
+        user={user}
+        clientError={clientError}
+      />
+    );
+  }
 
   return (
-    <div className="space-y-1"> {/* Further reduced space-y */}
-      {/* Page Title */}
-      <h1 className="text-xl font-semibold text-white mb-2">Tableau de Bord</h1> {/* Reduced title size and margin */}
+    <div className="space-y-1">
+      <h1 className="text-xl font-semibold text-white mb-2">Tableau de Bord</h1>
 
-      {/* Client Error Message */}
       {clientError && (
-        <div className="flex items-center p-1 bg-red-800 text-white rounded-lg mb-1 text-xs"> {/* Reduced padding and margin, smaller text */}
-          <FontAwesomeIcon icon={faExclamationTriangle} className="mr-1" /> {/* Reduced icon margin */}
+        <div className="flex items-center p-1 bg-red-800 text-white rounded-lg mb-1 text-xs">
+          <FontAwesomeIcon icon={faExclamationTriangle} className="mr-1" />
           {clientError}
         </div>
       )}
 
-      {/* Main Dashboard Grid - Compact layout */}
-      <div className="flex gap-2"> {/* Flex container with gap */}
-        {/* Left Column: Stats Cards - More compact */}
-        <div className="w-[10%] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-1 auto-rows-min min-h-[234px]"> {/* Colonne 1 - 25% fixe avec hauteur augmentée */}
+      <div className="flex gap-2">
+        <div className="w-[10%] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-1 auto-rows-min min-h-[234px]">
           {statsData.map((stat) => (
             <StatsCard
               key={stat.title}
@@ -212,24 +307,20 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Middle Column (Recent Activity & Installations) */}
-        <div className="w-[65%] space-y-1"> {/* Colonne 2 - 45% */}
-            {/* Recent Activity - More compact */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-2"> {/* Gap remains 2 */}
-              {/* Recent Tickets - Clickable to open drawer */}
+        <div className="w-[65%] space-y-1">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
               <div
-                className="h-[80px] cursor-pointer" // Added cursor-pointer
-                onClick={() => setIsTicketsDrawerOpen(true)} // Added onClick handler
+                className="h-[80px] cursor-pointer"
+                onClick={() => setIsTicketsDrawerOpen(true)}
               >
                 <RecentTickets
                   tickets={recentTickets.slice(0, 5)}
                   isLoading={false}
                 />
               </div>
-              {/* Recent Shipments - Clickable to open drawer */}
               <div
-                className="h-[80px] cursor-pointer" // Added cursor-pointer
-                onClick={() => setIsShipmentsDrawerOpen(true)} // Added onClick handler
+                className="h-[80px] cursor-pointer"
+                onClick={() => setIsShipmentsDrawerOpen(true)}
               >
                 <RecentShipments
                   shipments={recentShipments}
@@ -238,7 +329,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Installations Snapshot */}
             <div className="h-[300px] mb-4">
               <InstallationsSnapshot
                 allInstallations={installations}
@@ -246,7 +336,6 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Weekly Agenda */}
             <div className="h-[175px]">
               <ClientOnly fallback={<WeeklyAgendaFallback />}>
                 <WeeklyAgenda
@@ -258,10 +347,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Right Column (Map only) */}
-          <div className="w-[45%]"> {/* Colonne 3 - 45% */}
-            {/* Map Section */}
-            <div className="h-[850px]"> {/* Increased height to fill space */}
+          <div className="w-[45%]">
+            <div className="h-[850px]">
               <ClientOnly fallback={<div className="w-full h-full bg-jdc-card animate-pulse rounded-lg" />}>
                 <div className="w-full h-full" key={user?.userId}>
                   {user ? (
@@ -277,35 +364,27 @@ export default function Dashboard() {
                 </div>
               </ClientOnly>
             </div>
-
           </div>
 
-          {/* Login Prompt (outside the grid for consistent placement) */}
           {!user && !clientError && (
-            <div className="p-1 bg-jdc-card rounded-lg text-center text-jdc-gray-300 text-xs w-full"> {/* Modified to span full width */}
+            <div className="p-1 bg-jdc-card rounded-lg text-center text-jdc-gray-300 text-xs w-full">
               Veuillez vous connecter pour voir le tableau de bord.
             </div>
           )}
         </div>
 
-      {/* Tickets Drawer */}
       <Drawer isOpen={isTicketsDrawerOpen} onClose={() => setIsTicketsDrawerOpen(false)} side="right">
         <h2 className="text-xl font-semibold text-white mb-4">Tickets SAP</h2>
-        {/* Full list of tickets will go here */}
-        {/* For now, just show the RecentTickets component */}
         <RecentTickets
-          tickets={recentTickets} // Pass all tickets
+          tickets={recentTickets}
           isLoading={false}
         />
       </Drawer>
 
-      {/* Shipments Drawer */}
       <Drawer isOpen={isShipmentsDrawerOpen} onClose={() => setIsShipmentsDrawerOpen(false)} side="right">
         <h2 className="text-xl font-semibold text-white mb-4">Envois CTN</h2>
-        {/* Full list of shipments will go here */}
-        {/* For now, just show the RecentShipments component */}
         <RecentShipments
-          shipments={recentShipments} // Pass all shipments
+          shipments={recentShipments}
           isLoading={false}
         />
       </Drawer>
