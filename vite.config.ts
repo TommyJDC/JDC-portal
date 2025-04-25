@@ -97,7 +97,7 @@ export default defineConfig({
   ],
   build: {
     rollupOptions: {
-      external: ['exceljs', '@fullcalendar/react', '@radix-ui/react-label']
+      external: ['exceljs', '@fullcalendar/react', '@radix-ui/react-label', 'class-variance-authority']
     }
   },
   optimizeDeps: {
