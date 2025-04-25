@@ -97,7 +97,7 @@ export default defineConfig({
   ],
   build: {
     rollupOptions: {
-      external: ['exceljs']
+      external: ['exceljs', '@fullcalendar/react']
     }
   },
   optimizeDeps: {
