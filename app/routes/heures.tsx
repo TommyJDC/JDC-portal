@@ -9,7 +9,7 @@ import { Switch } from "~/components/ui/Switch"; // Ajout du Switch
 import { DriveFilePicker } from "~/components/DriveFilePicker"; // Import du composant Picker
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node"; // Import pour les actions/loaders Remix
 import { saveHeuresDraft, getHeuresDraft } from "~/services/firestore.service.server";
-import { getISOWeeekNumber } from "~/utils/dateUtils";
+import { getISOWeekNumber } from "~/utils/dateUtils";
 import { authenticator } from "~/services/auth.server"; // Pour obtenir l'utilisateur connecté
 import { useLoaderData } from "@remix-run/react"; // Pour récupérer les données du loader
 import { updateHeuresSheet } from "~/services/sheets.service.server"; // Import de la fonction de mise à jour Sheets
@@ -110,7 +110,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
       if (sendEmail) {
         // TODO: Formater le contenu de l'email (par exemple, en HTML)
-      const weekNumber = getISOWeeekNumber();
+      const weekNumber = getISOWeekNumber(new Date());
       const emailSubject = `SEMAINE N°${weekNumber} - ${data.nom} ${data.prenom} - ${data.etablissement}`;
       const emailBody = `
         <h1>SEMAINE N°${weekNumber}</h1>

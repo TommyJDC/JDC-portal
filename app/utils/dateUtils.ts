@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, getISOWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export function convertFirestoreDate(date: any): Date | null {
@@ -94,4 +94,9 @@ export function getWeekDateRangeForAgenda(date: Date): { start: Date; end: Date 
     endOfWeek.setHours(23, 59, 59, 999);
 
     return { start: startOfWeek, end: endOfWeek };
+}
+
+// Nouvelle fonction pour obtenir le numéro de semaine ISO
+export function getISOWeekNumber(date: Date): number {
+    return getISOWeek(date);
 }
