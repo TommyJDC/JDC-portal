@@ -16,7 +16,6 @@ import tailwindStylesHref from "~/tailwind.css?url";
 import globalStylesHref from "~/styles/global.css?url";
 import nProgressStylesHref from "nprogress/nprogress.css?url";
 import mapboxStylesHref from 'mapbox-gl/dist/mapbox-gl.css?url';
-import fontAwesomeStylesHref from '@fortawesome/fontawesome-svg-core/styles.css?url';
 import { config } from '@fortawesome/fontawesome-svg-core';
 
 // Tell Font Awesome to skip adding the CSS automatically since it's being added manually via Remix links
@@ -47,7 +46,6 @@ export const links: LinksFunction = () => [
   { rel: "stylesheet", href: globalStylesHref },
   { rel: "stylesheet", href: nProgressStylesHref },
   { rel: "stylesheet", href: mapboxStylesHref },
-  { rel: "stylesheet", href: fontAwesomeStylesHref },
   { rel: "manifest", href: "/manifest.json" },
   { rel: "apple-touch-icon", href: "/icons/ios/180.png" },
 ];
