@@ -4,7 +4,7 @@ publish = "build/client" # ✅ pour servir correctement les assets
 
 [functions]
   [functions.timeout]
-    default = 30 # Augmentation du timeout à 30 secondes
+    default = 120 # Augmentation du timeout à 30 secondes
   
   [functions.framework]
   name = "vite"
