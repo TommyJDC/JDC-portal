@@ -103,6 +103,11 @@ const normalizeAddress = (address: string): string => {
 
 // --- Component ---
 const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTickets }) => {
+  // Limiter davantage le nombre de tickets sur mobile
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const displayedTickets = useMemo(() => 
+    isMobile ? tickets.slice(0, 15) : tickets.slice(0, 50),
+  [tickets, isMobile]);
   // v7 typically uses individual state pieces or a single viewport object
   const [viewport, setViewport] = useState({
     longitude: 2.2137,

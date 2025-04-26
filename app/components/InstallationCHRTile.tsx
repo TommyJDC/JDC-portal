@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSave } from "@fortawesome/free-solid-svg-icons";
+import { convertFirestoreDate, formatFirestoreDate } from "~/utils/dateUtils"; // Import ajouté
 import { getStringValue } from '~/utils/firestoreUtils';
 
 interface InstallationCHRTileProps {

@@ -5,7 +5,7 @@ import {
   FaSpinner as SpinnerIcon,
   FaExclamationTriangle as ErrorIcon
 } from 'react-icons/fa';
-import { formatFirestoreDate } from '~/utils/dateUtils';
+import { convertFirestoreDate, formatFirestoreDate } from '~/utils/dateUtils';
 import { getStringValue } from '~/utils/firestoreUtils';
 
 interface RecentTicketsProps {

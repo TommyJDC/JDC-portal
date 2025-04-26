@@ -19,10 +19,25 @@ import {
   faCalendarAlt, faChevronUp
 } from "@fortawesome/free-solid-svg-icons"; // Removed faCircleNodes
 import { getTicketStatusStyle } from "~/utils/styleUtils";
-import { parseFrenchDate, formatDateForDisplay } from "~/utils/dateUtils";
+import { formatFirestoreDate, convertFirestoreDate } from "~/utils/dateUtils"; // Corrected import
 
 export const meta: MetaFunction = () => {
   return [{ title: "Tickets SAP | JDC Dashboard" }];
+};
+
+// Helper function to parse dates in the ticket data structure
+const parseSapTicketDates = (ticket: any): SapTicket => {
+    const parsedTicket: SapTicket = {
+        ...ticket,
+        // Parse the main ticket date
+        date: convertFirestoreDate(ticket.date), // Use convertFirestoreDate directly
+        // Parse dates within contactAttempts
+        contactAttempts: ticket.contactAttempts?.map((attempt: any) => ({
+            ...attempt,
+            date: convertFirestoreDate(attempt.date) // Use convertFirestoreDate here too
+        }))
+    };
+    return parsedTicket;
 };
 
 // Export loader and action
@@ -112,6 +127,8 @@ export default function TicketsSap() {
   const { userProfile, allTickets: serializedTickets, error: loaderError } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator(); // Hook to trigger revalidation
 
+  console.log("TicketsSap component loaded. Raw loader data:", { userProfile, serializedTickets, loaderError });
+
   // State for client-side filtering and UI
   const [selectedSector, setSelectedSector] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -119,11 +136,14 @@ export default function TicketsSap() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<SapTicket | null>(null);
 
-  // Parse tickets dates from loader data
-  const allTickets: SapTicket[] = useMemo(() => (serializedTickets ?? []).map(ticket => ({
-      ...ticket,
-      date: parseSerializedDateNullable(ticket.date),
-  })), [serializedTickets]);
+  // Parse tickets dates from loader data immediately
+  const allTickets: SapTicket[] = useMemo(() => {
+      if (!serializedTickets) {
+          return [];
+      }
+      // Map over serialized tickets and parse dates using the helper function
+      return serializedTickets.map(parseSapTicketDates);
+  }, [serializedTickets]);
 
 
   const availableSectors = useMemo(() => {
@@ -343,7 +363,11 @@ export default function TicketsSap() {
                     };
                     
                     const statusStyle = getTicketStatusStyle(getStringValueOrDefault(ticket.statut));
-                    const displayDate = formatDateForDisplay(ticket.date instanceof Date ? ticket.date : null);
+                    
+                    // Log the date value and type before formatting for display
+                    console.log(`Ticket ID: ${ticket.id}, Date value:`, ticket.date, `, Date type:`, typeof ticket.date, `, instanceof Date:`, ticket.date instanceof Date);
+
+                    const displayDate = formatFirestoreDate(ticket.date instanceof Date ? ticket.date : null); // Use formatFirestoreDate
                     const phoneNumbersArray = (typeof ticket.telephone === 'string' ? ticket.telephone : ticket.telephone?.stringValue)?.split(',').map(num => num.trim()).filter(num => num) || [];
 
                     return (

@@ -1,121 +1,97 @@
-import { Timestamp } from 'firebase/firestore';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
-export function formatDateForDisplay(date: Date | string | null | undefined): string {
-  if (!date) return 'N/A';
-  
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
-  return dateObj.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-}
+export function convertFirestoreDate(date: any): Date | null {
+    if (!date) return null;
 
-export function getWeekDateRangeForAgenda() {
-  const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 (dimanche) à 6 (samedi)
-  const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Ajuste pour lundi comme premier jour
-  const startOfWeek = new Date(today.setDate(diff));
-  startOfWeek.setHours(0, 0, 0, 0);
-  
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6); // Ajoute 6 jours pour avoir dimanche
-  endOfWeek.setHours(23, 59, 59, 999);
+    let convertedDate: Date | null = null;
 
-  return { startOfWeek, endOfWeek };
-}
-
-// Calcul du numéro de semaine ISO 8601
-export function getISOWeeekNumber(date: Date = new Date()): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-}
-
-export function formatFirestoreDate(
-  date: Date | Timestamp | string | { seconds: number; nanoseconds: number } | null | undefined,
-  options?: {
-    defaultValue?: string
-    returnDateObject?: boolean
-  }
-): string | Date {
-  const { defaultValue = 'N/A', returnDateObject = false } = options || {};
-
-  console.log('formatFirestoreDate: Input received:', date, 'Type:', typeof date);
-
-  // Explicitly check for null or undefined
-  if (date == null) {
-    console.log('formatFirestoreDate: Input is null/undefined, returning default value:', defaultValue);
-    return returnDateObject ? new Date(0) : defaultValue;
-  }
-  
-  let dateObj: Date;
-  
-  try {
-    if (date instanceof Timestamp) {
-      console.log('formatFirestoreDate: Input is Timestamp, converting to Date:', date);
-      dateObj = date.toDate();
-    } else if (typeof date === 'string') {
-      console.log('formatFirestoreDate: Input is string:', date);
-      const trimmedDate = date.trim();
-      // Try to parse if it's an ISO string
-      if (trimmedDate.includes('T')) {
-        console.log('formatFirestoreDate: Trying to parse as ISO string');
-        dateObj = new Date(trimmedDate);
-        if (isNaN(dateObj.getTime())) {
-          console.log('formatFirestoreDate: ISO string parsing failed, returning original string');
-          return date; // Return original if invalid
+    try {
+        // Si c'est déjà un objet Date valide
+        if (date instanceof Date && !isNaN(date.getTime())) {
+            convertedDate = date;
         }
-      }
-       else {
-        console.log('formatFirestoreDate: String format not recognized, returning original string');
-        return date; // Already formatted or unrecognized string
-      }
-    } else if (date instanceof Date) {
-      console.log('formatFirestoreDate: Input is Date object:', date);
-      dateObj = date;
-    } else if (date && typeof date === 'object' && 'seconds' in date && 'nanoseconds' in date) {
-       console.log('formatFirestoreDate: Input is { seconds, nanoseconds } object:', date);
-      dateObj = new Date(date.seconds * 1000 + date.nanoseconds / 1000000);
+        // Si c'est un Timestamp Firestore
+        else if (date?.toDate) {
+            const firestoreDate = date.toDate();
+            if (firestoreDate instanceof Date && !isNaN(firestoreDate.getTime())) {
+                convertedDate = firestoreDate;
+            }
+        }
+        // Si c'est un objet avec des secondes/nanosecondes (format potentiel de sérialisation)
+        else if (typeof date === 'object' && date.seconds !== undefined) {
+            const dateFromSeconds = new Date(date.seconds * 1000 + (date.nanoseconds || 0) / 1000000);
+            if (!isNaN(dateFromSeconds.getTime())) {
+                convertedDate = dateFromSeconds;
+            }
+        }
+        // Si c'est un objet avec _seconds/_nanoseconds (format Timestamp direct)
+        else if (typeof date === 'object' && date._seconds !== undefined) {
+            const dateFrom_seconds = new Date(date._seconds * 1000 + (date._nanoseconds || 0) / 1000000);
+             if (!isNaN(dateFrom_seconds.getTime())) {
+                convertedDate = dateFrom_seconds;
+            }
+        }
+        // Si c'est une string ISO ou autre format parsable par Date
+        else if (typeof date === 'string') {
+            const parsedDate = new Date(date);
+            if (!isNaN(parsedDate.getTime())) {
+                convertedDate = parsedDate;
+            }
+        }
+
+        // Appliquer la correction de l'année 2001 si nécessaire
+        if (convertedDate instanceof Date && !isNaN(convertedDate.getTime())) {
+             // Vérifier si l'année est 2001 et si la date est dans le passé
+            if (convertedDate.getFullYear() === 2001 && convertedDate < new Date()) {
+                convertedDate.setFullYear(2025);
+            }
+        }
+
+        return convertedDate;
+
+    } catch (error) {
+        console.error('Error converting date:', date, error);
+        return null;
     }
-     else {
-      console.log('formatFirestoreDate: Unrecognized date format or type', date, typeof date);
-      return defaultValue; // Return default for unrecognized types
+}
+
+export function parseSerializedDateNullable(date: any, defaultValue: string = '', returnDateObject: boolean = false): Date | string | null {
+    if (date === null || date === undefined) {
+        return returnDateObject ? new Date(0) : defaultValue;
     }
 
-    if (isNaN(dateObj.getTime())) {
-      console.log('formatFirestoreDate: Resulting Date object is Invalid Date', dateObj);
-      return defaultValue; // Return default if the resulting Date object is invalid
+    const convertedDate = convertFirestoreDate(date);
+
+    if (!convertedDate || isNaN(convertedDate.getTime())) {
+        return returnDateObject ? new Date(0) : defaultValue;
     }
 
-    // Check if the year is in the past (e.g., 2001) and update to current year if necessary
-    const currentYear = new Date().getFullYear();
-    if (dateObj.getFullYear() < currentYear) {
-        console.log(`formatFirestoreDate: Detected past year ${dateObj.getFullYear()}, updating to current year ${currentYear}`);
-        dateObj.setFullYear(currentYear);
+    return returnDateObject ? convertedDate : convertedDate.toISOString();
+}
+
+// Nouvelle fonction pour formater les dates
+export function formatFirestoreDate(date: Date | null | undefined, formatString: string = 'dd/MM/yyyy'): string {
+    if (!date) {
+        return '';
     }
-
-
-    if (returnDateObject) {
-      console.log('formatFirestoreDate: returnDateObject is true, returning Date object:', dateObj);
-      return dateObj;
+    try {
+        return format(date, formatString, { locale: fr });
+    } catch (error) {
+        console.error('Error formatting date:', date, error);
+        return '';
     }
+}
 
-    const options: Intl.DateTimeFormatOptions = {
-      day: '2-digit',
-      month: '2-digit',
-    };
+// Nouvelle fonction pour obtenir la plage de dates de la semaine
+export function getWeekDateRangeForAgenda(date: Date): { start: Date; end: Date } {
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1)); // Lundi
+    startOfWeek.setHours(0, 0, 0, 0);
 
-    const formatted = dateObj.toLocaleDateString('fr-FR', options);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // Dimanche
+    endOfWeek.setHours(23, 59, 59, 999);
 
-    console.log('formatFirestoreDate: Successfully formatted date:', formatted);
-    return formatted || defaultValue;
-  } catch (error) {
-    console.error('formatFirestoreDate error during processing:', error, 'Input was:', date);
-    return defaultValue; // Return default on any error during processing
-  }
+    return { start: startOfWeek, end: endOfWeek };
 }

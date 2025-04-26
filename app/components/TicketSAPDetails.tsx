@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import { FaSpinner, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import type { SapTicket } from '~/types/firestore.types';
 import { Timestamp } from 'firebase/firestore';
-import { formatFirestoreDate } from '~/utils/dateUtils';
+import { convertFirestoreDate, formatFirestoreDate } from '~/utils/dateUtils'; // Import ajouté
 import { AnimatedTicketSummary } from '~/components/AnimatedTicketSummary';
 import { AnimatedSolution } from '~/components/AnimatedSolution';
 import { AnimatedComments } from '~/components/AnimatedComments';
@@ -181,14 +181,9 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
     useEffect(() => { setIsClient(true); }, []);
 
     const formatTicketDate = (date: Date | Timestamp | string | null | undefined): string => {
-        if (!date) return 'Non spécifiée';
-        if (typeof date === 'string' && date.match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-            return date;
-        }
-        const formatted = formatFirestoreDate(date, {
-            defaultValue: 'Non spécifiée'
-        }) as string;
-        return formatted;
+        const convertedDate = convertFirestoreDate(date);
+        if (!convertedDate) return 'Non spécifiée';
+        return formatFirestoreDate(convertedDate);
     };
 
     const getTicketDateForSorting = (date: Date | Timestamp | string | null | undefined): Date => {
@@ -512,6 +507,25 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
                         )}
                     </div>
 
+                    {/* Contact Attempts Section */}
+                    {ticket.contactAttempts && ticket.contactAttempts.length > 0 && (
+                        <div className="mb-6 p-4 bg-gray-700/30 rounded-xl border border-gray-700">
+                            <h4 className="font-bold text-lg mb-3 text-jdc-yellow">Tentatives de Contact</h4>
+                            <ul className="space-y-2 text-sm text-gray-300">
+                                {(ticket.contactAttempts || []).map((attempt: { date: Date | null; method: 'email' | 'phone'; success: boolean; }, index: number) => (
+                                    <li key={index} className="flex items-center gap-2">
+                                        <span className="font-medium">{attempt.date ? formatFirestoreDate(attempt.date) : 'N/A'}</span>
+                                        <span>•</span>
+                                        <span>{attempt.method}</span>
+                                        <span>•</span>
+                                        <span className={`font-bold ${attempt.success ? 'text-green-400' : 'text-red-400'}`}>
+                                            {attempt.success ? 'Succès' : 'Échec'}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
 
                     {/* Comments Section - Removed as per user request */}

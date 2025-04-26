@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSave } from "@fortawesome/free-solid-svg-icons";
 import type { Installation } from "~/types/firestore.types";
-import { formatFirestoreDate } from "~/utils/dateUtils";
+import { convertFirestoreDate } from "~/utils/dateUtils";
 import { Timestamp } from 'firebase/firestore';
 import { getStringValue } from '~/utils/firestoreUtils';
 

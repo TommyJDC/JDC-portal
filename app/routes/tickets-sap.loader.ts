@@ -2,8 +2,9 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
     import { json } from "@remix-run/node";
     import { authenticator } from "~/services/auth.server";
     import { getUserProfileSdk, getAllTicketsForSectorsSdk } from "~/services/firestore.service.server";
-    import type { SapTicket, UserProfile } from "~/types/firestore.types";
+import type { SapTicket, UserProfile } from "~/types/firestore.types";
     import type { UserSession } from "~/services/session.server";
+    import { convertFirestoreDate } from "~/utils/dateUtils";
 
     export interface TicketsSapLoaderData {
         userProfile: UserProfile | null;
@@ -49,11 +50,11 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
                         const processedTicket: SapTicket = {
                             ...ticket,
                             // Ensure date is a Date object
-                            date: ticket.date instanceof Date || ticket.date === null ? ticket.date : new Date((ticket.date as any).seconds * 1000),
+                            date: convertFirestoreDate(ticket.date),
                             // Ensure dates in contactAttempts are Date objects
                             contactAttempts: ticket.contactAttempts?.map(attempt => ({
                                 ...attempt,
-                                date: attempt.date instanceof Date ? attempt.date : new Date((attempt.date as any).seconds * 1000)
+                                date: convertFirestoreDate(attempt.date)
                             }))
                         };
                         return processedTicket;

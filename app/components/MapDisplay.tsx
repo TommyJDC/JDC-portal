@@ -78,11 +78,25 @@ export const MapDisplay: React.FC<MapDisplayProps> = ({
       }
     };
     // Re-run effect only when Leaflet loading state changes
-  }, [isLeafletLoaded]); // Corrected dependency array
+  }, [isLeafletLoaded]);
+
+  // Add a separate effect to invalidate size after initial render
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      // Invalidate size after a short delay to ensure container has correct dimensions
+      const timer = setTimeout(() => {
+        console.log("MapDisplay: Initial mount invalidateSize triggered");
+        mapInstanceRef.current?.invalidateSize();
+      }, 100); // Adjust delay if needed
+
+      return () => clearTimeout(timer);
+    }
+  }, []); // Empty dependency array means this effect runs once after initial render
+
 
   // Update map view and markers if props change after initial render
   useEffect(() => {
-     if (mapInstanceRef.current && L) {
+     if (isLeafletLoaded && L && mapInstanceRef.current) { // Ensure Leaflet is loaded and map instance exists
        mapInstanceRef.current.setView(position, zoom);
 
        // Clear existing markers (simple approach, might need optimization for many markers)
@@ -101,12 +115,14 @@ export const MapDisplay: React.FC<MapDisplayProps> = ({
        });
 
        // Also invalidate size when props change, after view/markers are updated
+       // This is already handled in the first effect, but keeping it here for robustness
+       // if the map container size changes dynamically after initial load.
        setTimeout(() => {
           console.log("MapDisplay: Prop change invalidateSize triggered");
           mapInstanceRef.current?.invalidateSize();
        }, 50); // Shorter delay here might be okay
      }
-  }, [position, zoom, markers, isLeafletLoaded]);
+  }, [position, zoom, markers, isLeafletLoaded]); // Keep dependencies to react to prop changes
 
 
   return (

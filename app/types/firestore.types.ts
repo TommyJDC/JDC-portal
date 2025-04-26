@@ -2,7 +2,7 @@ import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 export interface SapTicket {
   id: string;
-  date: string | null; // Changement déjà effectué
+  date: Date | null; // Correction du type
   client?: { stringValue: string };
   raisonSociale?: { stringValue: string };
   description?: { stringValue: string };
@@ -28,7 +28,7 @@ export interface SapTicket {
   status: 'open' | 'closed' | 'pending' | 'archived' | 'rma_request' | 'material_sent';
   materialType?: 'RMA' | 'envoi-materiel';
   contactAttempts?: Array<{
-    date: string; // Conversion finale en string ISO
+    date: Date | null; // Correction du type pour permettre null
     method: 'email' | 'phone';
     success: boolean;
   }>;
@@ -44,29 +44,28 @@ export interface SapTicket {
   mailDate?: string;
 }
 
-export type NotificationType = 
-  | 'ticket_created' 
-  | 'ticket_closed' 
-  | 'shipment' 
-  | 'installation' 
+export type NotificationType =
+  | 'ticket_created'
+  | 'ticket_closed'
+  | 'shipment'
+  | 'installation'
   | 'installation_closed';
 
-export type UserRole = 'Admin' | 'Technician' | 'Logistics' | 'Client' | string; // Ajout de string pour flexibilité
+export type UserRole = 'Admin' | 'Technician' | 'Logistics' | 'Client' | string;
 
 export interface Notification {
   id: string;
-  userId?: string; // Rendre optionnel si la notification est globale ou par rôle/secteur
+  userId?: string;
   type: NotificationType;
-  sector?: string[]; // Peut être vide si non applicable
-  targetRoles?: UserRole[]; // Peut être vide si ciblé par userId
+  sector?: string[];
+  targetRoles?: UserRole[];
   message: string;
-  metadata?: Record<string, any>; // Pour stocker des infos supplémentaires (ticketId, etc.)
-  createdAt: Timestamp | Date; // Utiliser Timestamp pour Firestore
+  metadata?: Record<string, any>;
+  createdAt: Timestamp | Date;
   read: boolean;
   link?: string;
 }
 
-// Restauration des interfaces critiques
 export interface UserProfile {
   uid: string;
   email: string;
@@ -94,7 +93,18 @@ export interface Shipment {
   codePostal: string;
   statutExpedition: 'OUI' | 'NON' | string;
   secteur: string;
-  dateCreation?: string; // Conversion en string
+  dateCreation?: string;
+}
+
+export type InstallationStatus = 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';
+
+export interface InstallationFilters { // Exportation ajoutée
+  status?: InstallationStatus;
+  dateRange?: { start: Date; end: Date };
+  commercial?: string;
+  technicien?: string;
+  ville?: string;
+  searchTerm?: string;
 }
 
 export interface Installation {
@@ -102,8 +112,25 @@ export interface Installation {
   secteur: 'CHR' | 'HACCP' | 'Tabac' | 'Kezia' | string;
   codeClient: string;
   nom: string;
-  status: 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';
-  dateInstall?: string; // Conversion en string
+  ville: string;
+  contact: string;
+  telephone: string;
+  commercial: string;
+  tech: string;
+  status: InstallationStatus;
+  dateInstall?: string;
+  commentaire: string;
+  adresse?: string;
+  codePostal?: string;
+}
+
+export interface InstallationsSnapshot { // Exportation ajoutée
+  total: number;
+  byStatus: Record<InstallationStatus, number>;
+  bySector: Record<string, {
+    total: number;
+    byStatus: Record<InstallationStatus, number>;
+  }>;
 }
 
 export interface GmailProcessingConfig {
@@ -119,7 +146,7 @@ export interface GmailProcessingConfig {
 
 export interface StatsSnapshot {
   id: string;
-  timestamp: string; // Conversion en string
+  timestamp: string;
   totalTickets: number;
   activeClients: number;
 }
@@ -149,4 +176,26 @@ export interface InstallationsDashboardStats {
     planifiees: number;
     terminees: number;
   };
+}
+
+export interface Article { // Exportation ajoutée
+  id: string;
+  Code: string; // Utiliser le nom de champ correct
+  Désignation: string; // Utiliser le nom de champ correct
+  imageUrls?: string[];
+}
+
+export interface SAPArchive { // Exportation ajoutée
+  originalTicketId: string;
+  archivedDate: Timestamp;
+  closureReason: 'resolved' | 'no-response' | string;
+  technicianNotes: string;
+  technician: string;
+  client: { stringValue: string };
+  raisonSociale: { stringValue: string };
+  description: { stringValue: string };
+  secteur: 'CHR' | 'HACCP' | 'Kezia' | 'Tabac';
+  numeroSAP: { stringValue: string };
+  mailId?: string;
+  documents?: string[];
 }

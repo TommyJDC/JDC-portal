@@ -1,5 +1,6 @@
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'; // Import Timestamp here
+import { convertFirestoreDate } from "~/utils/dateUtils"; // Import ajouté
 import type {
   UserProfile,
   SapTicket,
@@ -153,8 +154,8 @@ export async function getAllTicketsForSectorsSdk() {
     const snapshot = await db.collection(sector).get();
   const sectorTickets = snapshot.docs.map(doc => {
     const data = doc.data();
-    // Convert Firestore Timestamp to Date if needed
-    const date = data.date?.toDate ? data.date.toDate() : data.date;
+    // Convertir la date en utilisant la fonction utilitaire
+    const date = convertFirestoreDate(data.date);
     return {
       id: doc.id,
       ...data,
@@ -235,8 +236,8 @@ export async function getRecentTicketsForSectors(sectors: string[], limit: numbe
 
     const sectorTickets = snapshot.docs.map(doc => {
       const data = doc.data();
-      // Convert Firestore Timestamp to Date if needed
-      const date = data.date?.toDate ? data.date.toDate() : data.date;
+      // Convertir la date en utilisant la fonction utilitaire
+      const date = convertFirestoreDate(data.date);
       return {
         id: doc.id,
         ...data,
@@ -251,10 +252,8 @@ export async function getRecentTicketsForSectors(sectors: string[], limit: numbe
   // Sort all tickets by date and return top N
   return allTickets
     .sort((a, b) => {
-      const dateA = a.date instanceof Date ? a.date.getTime() :
-                   a.date?.seconds ? a.date.seconds * 1000 : 0;
-      const dateB = b.date instanceof Date ? b.date.getTime() :
-                   b.date?.seconds ? b.date.seconds * 1000 : 0;
+      const dateA = a.date?.getTime() || 0;
+      const dateB = b.date?.getTime() || 0;
       return dateB - dateA;
     })
     .slice(0, limit);
