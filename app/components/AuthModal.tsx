@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { FcGoogle } from 'react-icons/fc';
-import { Button } from './ui/Button';
 import { signInWithGoogle } from '~/services/auth.service';
 import { useToast } from '~/context/ToastContext'; // Use our toast hook
 
@@ -10,33 +9,28 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false); // Separate loading for Google
-  const [error, setError] = useState<string | null>(null);
   const { addToast } = useToast(); // Get addToast function
 
   if (!isOpen) return null;
 
   const handleClose = () => {
-    setError(null);
-    setIsLoading(false);
-    setIsGoogleLoading(false);
     onClose();
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      handleClose();
+    }
+  };
+
   const handleGoogleSignIn = async () => {
-    setIsGoogleLoading(true);
-    setError(null);
     try {
         const user = await signInWithGoogle();
         addToast({ type: 'success', message: `Connecté avec Google: ${user.displayName || user.email}` });
         handleClose(); // Close modal on success
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Erreur de connexion Google.';
-        setError(message);
         addToast({ type: 'error', message: message });
-    } finally {
-        setIsGoogleLoading(false);
     }
   };
 
@@ -44,16 +38,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     <div
       className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
       onClick={handleClose}
-      role="dialog"
+      onKeyDown={handleKeyDown} // Added onKeyDown
       aria-modal="true"
       aria-labelledby="auth-modal-title"
     >
       <div
-        className="bg-jdc-card rounded-lg shadow-xl p-6 w-full max-w-md transform transition-all duration-300 ease-in-out scale-100"
+        className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out w-full max-w-md transform scale-100"
         onClick={(e) => e.stopPropagation()}
+        role="dialog" // Added role="dialog"
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-white">Se connecter</h2>
+          <h2 id="auth-modal-title" className="text-xl font-semibold text-white">Se connecter</h2> {/* Added id for aria-labelledby */}
           <button onClick={onClose} className="text-jdc-gray-400 hover:text-jdc-yellow">
             &times;
           </button>

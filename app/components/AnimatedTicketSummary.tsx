@@ -1,20 +1,16 @@
 import { motion } from 'framer-motion';
-import { TypeAnimation } from 'react-type-animation'; // Import TypeAnimation
-import { useEffect } from 'react'; // Keep useEffect for logging if needed later
-import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
 import { ClientOnly } from './ClientOnly';
 import type { SapTicket } from '~/types/firestore.types';
 import { FaBrain, FaSpinner } from 'react-icons/fa'; // Added FaSpinner
 
 interface AnimatedTicketSummaryProps {
-  ticketContent: string;
   ticket?: SapTicket | null;
   summary: string;
   isLoading: boolean;
   error: string | null;
 }
 
-export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoading, error }: AnimatedTicketSummaryProps) {
+export function AnimatedTicketSummary({ ticket, summary, isLoading, error }: AnimatedTicketSummaryProps) {
 
   // Determine content to display
   const contentToDisplay = ticket?.summary || summary;
@@ -28,7 +24,7 @@ export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoadin
       >
         <div className="flex items-center space-x-2">
           <FaSpinner className="animate-spin h-4 w-4 text-blue-400" /> {/* Use FaSpinner */}
-          <span className="text-gray-300">Analyse en cours...</span>
+          <span className="text-gray-300">Analyse en cours&hellip;</span>
         </div>
       </motion.div>
     );
@@ -41,7 +37,7 @@ export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoadin
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
-        Une erreur est survenue lors de l'analyse: {error} {/* Display error message */}
+        Une erreur est survenue pendant l&#39;analyse: {error} {/* Display error message */}
       </motion.div>
     );
   }
@@ -55,7 +51,7 @@ export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoadin
       >
         <div className="flex items-center space-x-2">
           <FaBrain className="text-green-500" />
-          <span className="text-gray-300">Aucun résumé IA disponible pour ce ticket.</span>
+          <span className="text-gray-300">Aucun résumé IA disponible pour ce ticket</span>
         </div>
       </motion.div>
     );
@@ -70,11 +66,13 @@ export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoadin
         animate={{ opacity: 1 }}
       >
         <div className="relative">
-          <div className="flex items-center text-green-500 mb-2">
-            <FaBrain className="mr-2 text-green-500" />
-            <h3 className="font-semibold">Résumé IA</h3>
+          <div className="flex items-center gap-3 mb-4 px-3 py-2 bg-green-900/10 rounded-lg border border-green-800/30">
+            <FaBrain className="flex-shrink-0 text-green-400 text-lg" />
+            <h3 className="text-green-100 font-medium text-lg">Résumé IA</h3>
             {ticket?.summary && (
-              <span className="ml-auto text-green-500/50">(Sauvegardé)</span>
+              <span className="ml-auto text-xs text-green-400/80 bg-green-900/20 px-2 py-1 rounded-full">
+                Sauvegardé
+              </span>
             )}
           </div>
           {/* Changed saved text color */}
@@ -83,14 +81,9 @@ export function AnimatedTicketSummary({ ticketContent, ticket, summary, isLoadin
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            {/* Use TypeAnimation for the typing effect */}
-            <TypeAnimation
-              sequence={[contentToDisplay]} // Animate the content
-              wrapper="p"
-              speed={95} // Accelerated speed
-              className="text-gray-300 leading-relaxed"
-              key={contentToDisplay} // Add key to force re-render on content change
-            />
+            <p className="text-gray-300 leading-relaxed">
+              {contentToDisplay}
+            </p>
           </motion.div>
 
           {/* Display keywords from the currently displayed content */}

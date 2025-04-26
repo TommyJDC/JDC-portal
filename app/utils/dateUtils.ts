@@ -1,48 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
 
-export function parseFrenchDateFromString(dateString: string): Date | null {
-  if (!dateString) return null;
-  
-  // Format: "mardi 22 avril 2025"
-  const trimmedDateString = dateString.trim(); // Supprimer les espaces blancs en début et fin
-  const parts = trimmedDateString.split(' ');
-  if (parts.length !== 4) {
-    console.error(`parseFrenchDateFromString: Invalid parts length for "${dateString}". Expected 4, got ${parts.length}. Parts:`, parts);
-    return null;
-  }
-  
-  const day = parseInt(parts[1]);
-  const month = getMonthNumber(parts[2]);
-  const year = parseInt(parts[3]);
-  
-  if (isNaN(day)) return null;
-  if (month === -1) return null;
-  if (isNaN(year)) return null;
-  
-  return new Date(year, month, day);
-}
-
-function getMonthNumber(monthName: string): number {
-  const months = [
-    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
-  ];
-  return months.findIndex(m => m === monthName.toLowerCase());
-}
-
-export function parseFrenchDate(dateString: string): Date | null {
-  if (!dateString) return null;
-  
-  // Format français : JJ/MM/AAAA
-  const parts = dateString.split('/');
-  if (parts.length !== 3) return null;
-  
-  const day = parseInt(parts[0]);
-  const month = parseInt(parts[1]) - 1;
-  const year = parseInt(parts[2]);
-  return new Date(year, month, day);
-}
-
 export function formatDateForDisplay(date: Date | string | null | undefined): string {
   if (!date) return 'N/A';
   
@@ -112,33 +69,6 @@ export function formatFirestoreDate(
         if (isNaN(dateObj.getTime())) {
           console.log('formatFirestoreDate: ISO string parsing failed, returning original string');
           return date; // Return original if invalid
-        }
-      }
-      // Try to parse French date string (e.g., "mardi 22 avril 2025")
-      else if (/[a-z]+ \d{1,2} [a-z]+ \d{4}/i.test(trimmedDate)) {
-        console.log('formatFirestoreDate: Trying to parse as full French date string');
-        const parsed = parseFrenchDateFromString(trimmedDate);
-        if (parsed) {
-          console.log('formatFirestoreDate: Full French date string parsed successfully:', parsed);
-          dateObj = parsed;
-        }
-        else {
-          console.log('formatFirestoreDate: Full French date string parsing failed, returning original string');
-          return date; // Return original if can't parse
-        }
-      }
-      // Try to parse French date string without year (e.g., "05/06") and add current year
-      else if (/^\d{1,2}\/\d{1,2}$/.test(trimmedDate)) {
-        console.log('formatFirestoreDate: Trying to parse as JJ/MM string and add current year');
-        const currentYear = new Date().getFullYear();
-        const dateWithYear = `${trimmedDate}/${currentYear}`;
-        const parsed = parseFrenchDate(dateWithYear); // Use parseFrenchDate for JJ/MM/AAAA
-         if (parsed) {
-          console.log('formatFirestoreDate: JJ/MM string parsed successfully with current year:', parsed);
-          dateObj = parsed;
-        } else {
-           console.log('formatFirestoreDate: JJ/MM string parsing failed, returning original string');
-           return date; // Return original if can't parse even with year
         }
       }
        else {

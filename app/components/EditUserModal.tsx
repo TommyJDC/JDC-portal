@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { UserProfile } from '~/types/firestore.types';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { Select } from './ui/Select';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/Select'; // Import des sous-composants
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -35,7 +35,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
         uid: user.uid,
         email: user.email,
         displayName: user.displayName || '',
-        role: user.role || 'Technician',
+        role: formData.role || user.role || 'Technician', // Use formData.role if set, otherwise user.role, fallback to Technician
         secteurs: user.secteurs || [], // Initialize with current sectors
       });
       setError(null);
@@ -44,7 +44,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       setIsSaving(false);
       setError(null);
     }
-  }, [user, isOpen]);
+  }, [user, isOpen]); // formData.role is intentionally not a dependency here to prevent infinite loops on state updates
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -82,7 +82,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     const updatedUserData: UserProfile = {
       ...user, // Start with original user data
       displayName: formData.displayName || user.displayName,
-      role: formData.role || user.role,
+      role: formData.role || user.role, // Use formData.role if set, otherwise user.role
       secteurs: formData.secteurs || [], // Use the updated sectors array
       uid: user.uid,
       email: user.email,
@@ -91,7 +91,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     try {
       await onSave(updatedUserData);
       // Parent component (admin.tsx) handles closing on success
-    } catch (err: any) {
+    } catch (err: any) { // Using 'any' for error type as it can be varied
       console.error("Error saving user:", err);
       setError(err.message || "Erreur lors de la sauvegarde.");
     } finally {
@@ -108,7 +108,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 transition-opacity duration-300 ease-in-out">
-      <div className="bg-jdc-card rounded-lg shadow-xl p-6 w-full max-w-md transform transition-all duration-300 ease-in-out scale-100">
+      <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out w-full max-w-md transform scale-100">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-white">Modifier l'utilisateur</h2>
           <button onClick={onClose} className="text-jdc-gray-400 hover:text-white" disabled={isSaving}>
@@ -135,16 +135,27 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           />
 
           {/* Role */}
-          <Select
-            label="Rôle"
-            id="role"
-            name="role"
-            options={roleOptions}
-            value={formData.role || ''}
-            onChange={handleChange}
-            disabled={isSaving}
-            required
-          />
+          <div> {/* Wrap Select with a div for label */}
+            <label htmlFor="role" className="block text-sm font-medium text-jdc-gray-300 mb-1">Rôle</label>
+            <Select
+              value={formData.role || ''}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}
+              disabled={isSaving}
+              required
+            >
+              <SelectTrigger id="role" name="role" className="w-full bg-gray-900 text-white rounded-md px-3 py-2 text-sm border border-gray-700 focus:ring-jdc-blue focus:border-jdc-blue">
+                <SelectValue placeholder="Sélectionner un rôle" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border border-gray-700">
+                {roleOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value} className="text-white hover:bg-gray-700">
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
 
           {/* Sector Buttons */}
           <div>
@@ -161,9 +172,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                     onClick={() => handleSectorToggle(sector)}
                     disabled={isSaving}
                     className={`transition-colors duration-150 ${
-                      isSelected 
-                        ? 'bg-jdc-yellow text-black hover:bg-yellow-300' 
-                        : 'bg-jdc-gray-800 text-jdc-gray-300 hover:bg-jdc-gray-700'
+                      isSelected
+                        ? 'bg-jdc-yellow text-black hover:bg-yellow-300'
+                        : 'bg-jdc-800 text-jdc-gray-300 hover:bg-jdc-gray-700 border border-gray-700' // Added border for consistency
                     } px-3 py-1.5 rounded-md text-sm font-medium ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     {sector}

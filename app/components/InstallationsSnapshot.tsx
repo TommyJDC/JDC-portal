@@ -12,7 +12,7 @@ import {
   FaSync
 } from 'react-icons/fa';
 
-import type { Installation, InstallationStatus } from "~/types/firestore.types"; // Importer Installation et InstallationStatus
+import type { Installation } from "~/types/firestore.types"; // Importer Installation
 
 interface InstallationStats {
   total: number;

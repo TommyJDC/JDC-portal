@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react'; // Added useCallback
 import { Button } from '~/components/ui/Button';
 import { useFetcher } from '@remix-run/react'; // Pour appeler une action/loader pour obtenir le token
 
@@ -6,10 +6,10 @@ interface DriveFilePickerProps {
   onSelect: (fileId: string) => void;
 }
 
-// Déclarer les variables globales pour les API Google
+// Déclarer les variables globales pour les API Google (définies par le script externe)
 declare global {
-  const gapi: any;
-  const google: any;
+  const gapi: any; // Utilisation de 'any' car le type précis de gapi est complexe et défini globalement
+  const google: any; // Utilisation de 'any' car le type précis de google est complexe et défini globalement
 }
 
 export function DriveFilePicker({ onSelect }: DriveFilePickerProps) {
@@ -47,12 +47,12 @@ export function DriveFilePicker({ onSelect }: DriveFilePickerProps) {
   }, []);
 
   // Fonction de callback du Picker
-  const pickerCallback = (data: any) => {
+  const pickerCallback = useCallback((data: any) => { // Utilisation de 'any' pour le type de data car il dépend de l'API Google Picker
     if (data.action === google.picker.Action.PICKED) {
       const fileId = data.docs[0].id;
       onSelect(fileId);
     }
-  };
+  }, [onSelect]); // Added onSelect dependency
 
   // Ouvrir le Google Picker
   const openPicker = async () => {
@@ -85,7 +85,7 @@ export function DriveFilePicker({ onSelect }: DriveFilePickerProps) {
        alert(`Erreur lors de l'obtention du token Google: ${fetcher.data.error}`);
        // TODO: Gérer la redirection vers la page de connexion si nécessaire
     }
-  }, [fetcher.data]);
+  }, [fetcher.data, pickerCallback]); // Added pickerCallback dependency
 
 
   return (

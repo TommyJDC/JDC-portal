@@ -66,11 +66,11 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
       aria-hidden="true"
     >
       <div
-        className="fixed inset-y-0 left-0 w-72 bg-jdc-blue-darker/95 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out"
+        className="fixed inset-y-0 left-0 w-72 bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out z-50 flex flex-col transform"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Menu Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-jdc-gray-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
            <Link to={user ? "/dashboard" : "/"} onClick={onClose}>
              <img src={JDC_LOGO_URL} alt="JDC Logo" className="h-8 w-auto" />
            </Link>

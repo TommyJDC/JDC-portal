@@ -1,7 +1,6 @@
 import type { MetaFunction } from "@remix-run/node";
 import { useOutletContext, useLoaderData } from "@remix-run/react";
 import React, { lazy, Suspense, useState } from "react";
-import { isMobile } from 'react-device-detect';
 import { Timestamp } from 'firebase/firestore';
 
 import { loader } from "./dashboard.loader";
@@ -21,7 +20,11 @@ import {
   faMapMarkedAlt,
   faSpinner,
   faExclamationTriangle,
-  faCalendarDays
+  faCalendarDays,
+  faUtensils, // Added for CHR
+  faShieldAlt, // Added for HACCP
+  faBurger, // Added for Kezia
+  faSmoking // Added for Tabac
 } from "@fortawesome/free-solid-svg-icons";
 
 import type { SapTicket, Shipment, Installation } from "~/types/firestore.types";
@@ -103,93 +106,6 @@ const WeeklyAgendaFallback = () => (
   </div>
 );
 
-interface MobileDashboardProps {
-  statsData: Array<{
-    title: string;
-    valueState: number | string | null;
-    icon: any;
-    evolutionKey: string;
-    sector: string;
-  }>;
-  formatStatValue: (value: number | string | null) => string;
-  stats: {
-    evolution: Record<string, number | null>;
-  };
-  recentTickets: SapTicket[];
-  recentShipments: Shipment[];
-  installations: Installation[];
-  calendarEvents?: CalendarEvent[] | null;
-  calendarError?: string | null;
-  user: UserSession | null;
-  clientError?: string | null;
-}
-
-const MobileDashboard = ({ 
-  statsData,
-  formatStatValue,
-  stats,
-  recentTickets,
-  recentShipments,
-  installations,
-  calendarEvents,
-  calendarError,
-  user,
-  clientError
-}: MobileDashboardProps) => (
-  <div className="space-y-2 p-2">
-    <h1 className="text-lg font-semibold text-white">Tableau de Bord</h1>
-
-    {clientError && (
-      <div className="p-2 bg-red-800 text-white rounded-lg mb-2 text-xs">
-        <FontAwesomeIcon icon={faExclamationTriangle} className="mr-1" />
-        {clientError}
-      </div>
-    )}
-
-    <div className="flex overflow-x-auto gap-2 pb-2">
-          {statsData.map((stat: {
-            title: string;
-            valueState: number | string | null;
-            icon: any;
-            evolutionKey: string;
-          }) => (
-        <div key={stat.title} className="min-w-[120px]">
-          <StatsCard
-            title={stat.title}
-            value={formatStatValue(stat.valueState)}
-            icon={stat.icon}
-            isLoading={false}
-            evolutionValue={stats.evolution[stat.evolutionKey as keyof typeof stats.evolution]}
-          />
-        </div>
-      ))}
-    </div>
-
-    <div className="bg-jdc-card p-2 rounded-lg">
-      <h3 className="text-sm font-semibold text-white mb-2">Derniers Tickets</h3>
-      <RecentTickets
-        tickets={recentTickets.slice(0, 3)}
-        isLoading={false}
-      />
-    </div>
-
-    <div className="bg-jdc-card p-2 rounded-lg">
-      <h3 className="text-sm font-semibold text-white mb-2">Derniers Envois</h3>
-      <RecentShipments
-        shipments={recentShipments.slice(0, 3)}
-        isLoading={false}
-      />
-    </div>
-
-    <div className="bg-jdc-card p-2 rounded-lg">
-      <h3 className="text-sm font-semibold text-white mb-2">Installations</h3>
-      <InstallationsSnapshot
-        allInstallations={installations}
-        isLoading={false}
-      />
-    </div>
-  </div>
-);
 
 export default function Dashboard() {
   const { user } = useOutletContext<OutletContextType>();
@@ -209,23 +125,10 @@ export default function Dashboard() {
   const [isTicketsDrawerOpen, setIsTicketsDrawerOpen] = useState(false);
   const [isShipmentsDrawerOpen, setIsShipmentsDrawerOpen] = useState(false);
 
-  const recentTickets: SapTicket[] = (serializedTickets ?? []).map(ticket => ({
-    ...ticket,
-    date: parseSerializedDateNullable(ticket.date),
-    mailDate: parseSerializedDateOptional(ticket.mailDate),
-  }));
-
-  const recentShipments: Shipment[] = (serializedShipments ?? []).map(shipment => ({
-    ...shipment,
-    dateCreation: parseSerializedDateOptional(shipment.dateCreation),
-  }));
-
-  const installations: Installation[] = (allInstallations ?? []).map(installation => ({
-    ...installation,
-    dateInstall: parseSerializedDateOptional(installation.dateInstall),
-    createdAt: parseSerializedDateOptional(installation.createdAt),
-    updatedAt: parseSerializedDateOptional(installation.updatedAt),
-  }));
+  // Données déjà parsées côté serveur dans le loader
+  const recentTickets: SapTicket[] = serializedTickets ?? [];
+  const recentShipments: Shipment[] = serializedShipments ?? [];
+  const installations: Installation[] = allInstallations ?? [];
 
   const formatStatValue = (value: number | string | null): string =>
     value?.toString() ?? "N/A";
@@ -233,30 +136,30 @@ export default function Dashboard() {
   const allSapTicketStats = [
     {
       sector: 'CHR',
-      title: "Tickets SAP CHR",
+      title: "Tickets CHR", // Modified title
       valueState: sapTicketCountsBySector?.['CHR'] ?? 0,
-      icon: faTicket,
+      icon: faUtensils, // Modified icon
       evolutionKey: 'chrTicketCount'
     },
     {
       sector: 'HACCP',
-      title: "Tickets SAP HACCP",
+      title: "Tickets HACCP", // Modified title
       valueState: sapTicketCountsBySector?.['HACCP'] ?? 0,
-      icon: faTicket,
+      icon: faShieldAlt, // Modified icon
       evolutionKey: 'haccpTicketCount'
     },
     {
       sector: 'Kezia',
-      title: "Tickets SAP Kezia",
+      title: "Tickets Kezia", // Modified title
       valueState: sapTicketCountsBySector?.['Kezia'] ?? 0,
-      icon: faTicket,
+      icon: faBurger, // Modified icon
       evolutionKey: 'keziaTicketCount'
     },
     {
       sector: 'Tabac',
-      title: "Tickets SAP Tabac",
+      title: "Tickets Tabac", // Modified title
       valueState: sapTicketCountsBySector?.['Tabac'] ?? 0,
-      icon: faTicket,
+      icon: faSmoking, // Modified icon
       evolutionKey: 'tabacTicketCount'
     },
   ];
@@ -265,26 +168,10 @@ export default function Dashboard() {
     ? allSapTicketStats
     : allSapTicketStats.filter(stat => userProfile?.secteurs?.includes(stat.sector));
 
-  if (typeof window !== 'undefined' && isMobile) {
-    return (
-      <MobileDashboard
-        statsData={statsData}
-        formatStatValue={formatStatValue}
-        stats={stats}
-        recentTickets={recentTickets}
-        recentShipments={recentShipments}
-        installations={installations}
-        calendarEvents={calendarEvents}
-        calendarError={calendarError}
-        user={user}
-        clientError={clientError}
-      />
-    );
-  }
 
   return (
-    <div className="space-y-1">
-      <h1 className="text-xl font-semibold text-white mb-2">Tableau de Bord</h1>
+    <div className="space-y-4 px-2 sm:px-4">
+      <h1 className="text-xl font-semibold text-white mb-4 px-2">Tableau de Bord</h1>
 
       {clientError && (
         <div className="flex items-center p-1 bg-red-800 text-white rounded-lg mb-1 text-xs">
@@ -293,8 +180,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="flex gap-2">
-        <div className="w-[10%] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-1 auto-rows-min min-h-[234px]">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-2 sm:px-4 pb-4">
+        <div className="lg:col-span-1 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-1 gap-4">
           {statsData.map((stat) => (
             <StatsCard
               key={stat.title}
@@ -307,62 +194,50 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="w-[65%] space-y-1">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-              <div
-                className="h-[80px] cursor-pointer"
-                onClick={() => setIsTicketsDrawerOpen(true)}
-              >
-                <RecentTickets
-                  tickets={recentTickets.slice(0, 5)}
-                  isLoading={false}
-                />
+        <div className="lg:col-span-2 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-800 p-4 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 cursor-pointer" onClick={() => setIsTicketsDrawerOpen(true)}>
+                <h3 className="font-extrabold text-xl text-yellow-400 mb-2">Tickets SAP Récents</h3>
+                <p className="text-sm text-gray-400">Cliquez pour voir la liste</p>
               </div>
-              <div
-                className="h-[80px] cursor-pointer"
-                onClick={() => setIsShipmentsDrawerOpen(true)}
-              >
-                <RecentShipments
-                  shipments={recentShipments}
-                  isLoading={false}
-                />
+              <div className="bg-gray-800 p-4 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 cursor-pointer" onClick={() => setIsShipmentsDrawerOpen(true)}>
+                <h3 className="font-extrabold text-xl text-yellow-400 mb-2">Envois CTN Récents</h3>
+                <p className="text-sm text-gray-400">Cliquez pour voir la liste</p>
               </div>
             </div>
 
-            <div className="h-[300px] mb-4">
+            <div className="min-h-[300px]">
               <InstallationsSnapshot
                 allInstallations={installations}
                 isLoading={false}
               />
             </div>
 
-            <div className="h-[175px]">
-              <ClientOnly fallback={<WeeklyAgendaFallback />}>
+            <div className="min-h-[175px]">
+              <Suspense fallback={<WeeklyAgendaFallback />}>
                 <WeeklyAgenda
                   events={calendarEvents ?? []}
                   error={calendarError}
                   isLoading={false}
                 />
-              </ClientOnly>
+              </Suspense>
             </div>
           </div>
 
-          <div className="w-[45%]">
-            <div className="h-[850px]">
-              <ClientOnly fallback={<div className="w-full h-full bg-jdc-card animate-pulse rounded-lg" />}>
-                <div className="w-full h-full" key={user?.userId}>
+          <div className="lg:col-span-3">
+            <div className="min-h-[500px] lg:h-[600px] w-full">
+              <Suspense fallback={<MapLoadingFallback />}>
+                <ClientOnly fallback={<div className="w-full h-full bg-jdc-card animate-pulse rounded-lg" />}>
                   {user ? (
-                    <Suspense fallback={<MapLoadingFallback />}>
-                      <InteractiveMap
-                        tickets={recentTickets}
-                        isLoadingTickets={false}
-                      />
-                    </Suspense>
+                    <InteractiveMap
+                      tickets={recentTickets}
+                      isLoadingTickets={false}
+                    />
                   ) : (
                     <MapLoginPrompt />
                   )}
-                </div>
-              </ClientOnly>
+                </ClientOnly>
+              </Suspense>
             </div>
           </div>
 

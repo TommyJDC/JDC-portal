@@ -48,7 +48,7 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 mt-2 w-96 origin-top-right rounded-md bg-jdc-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none divide-y divide-jdc-gray-700">
+        <Menu.Items className="absolute right-0 mt-2 w-96 origin-top-right rounded-md bg-gray-800 shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out focus:outline-none divide-y divide-gray-700">
           <div className="p-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">Notifications</h3>
@@ -131,9 +131,12 @@ const NotificationContent: React.FC<{ notification: NotificationDisplay }> = ({ 
   return (
     <>
       <p className="text-sm text-white font-medium truncate">
-        {notification.title}
+        {notification.message} {/* Utilisation de message comme titre principal */}
       </p>
-      <p className="text-sm text-jdc-gray-300 line-clamp-2">
+      {/* Optionnel: Si vous voulez toujours afficher un message secondaire, 
+          vous pourriez utiliser metadata ou une partie du message. 
+          Sinon, supprimez ce paragraphe. */}
+      <p className="text-sm text-jdc-gray-300 line-clamp-2"> 
         {notification.message}
       </p>
       <p className="text-xs text-jdc-gray-400 mt-1">

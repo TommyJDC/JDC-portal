@@ -15,6 +15,7 @@ export default {
         },
         'jdc-blue-dark': '#0a0f1f', // Très foncé, pour le fond principal
         'jdc-white': '#FFFFFF', // Blanc standard pour texte sur fond sombre
+        'card-translucent': 'rgba(31, 31, 31, 0.6)', // Fond de carte translucide (basé sur jdc-card #1F1F1F, opacité 60%)
       },
       fontFamily: {
         sans: [
@@ -36,6 +37,11 @@ export default {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '.5' },
         }
+      },
+      backdropBlur: { // Ajouter l'extension pour le flou
+        xs: '2px',
+        sm: '4px',
+        md: '12px', // Ajouter un flou medium
       }
     },
   },

@@ -1,5 +1,5 @@
 import { initializeFirebaseAdmin, getDb } from '~/firebase.admin.config.server';
-import type { Notification } from '~/types/firestore.types';
+import type { Notification, UserProfile } from '~/types/firestore.types'; // Import UserProfile
 import type { DocumentData, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 let db: FirebaseFirestore.Firestore;
@@ -108,5 +108,67 @@ export const getUnreadNotificationsCount = async (userId: string) => {
   } catch (error) {
     console.error('Error getting unread notifications count:', error);
     return 0;
+  }
+};
+
+// New function for real-time listening
+// Note: This function runs on the server, so it uses firebase-admin
+// For client-side listening, you'd use the Firebase JS SDK
+export const setupNotificationsListener = async (
+  user: UserProfile, // Pass the full user profile for role/sector checks
+  callback: (notifications: Notification[]) => void
+): Promise<() => void> => { // Return the unsubscribe function
+  try {
+    const db = await ensureDb();
+    // Query primarily by timestamp, filter later
+    // We need Timestamp from firebase-admin/firestore
+    const { Timestamp } = await import('firebase-admin/firestore'); 
+
+    const query = db.collection('notifications')
+      .orderBy('createdAt', 'desc') // Assuming 'createdAt' field exists and is a Timestamp
+      .limit(100); // Fetch a reasonable number, filter in callback
+
+    const unsubscribe = query.onSnapshot(snapshot => {
+      const allNotifications = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
+        const data = doc.data();
+        // Ensure createdAt is a Date object
+        const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()); 
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: createdAt, // Use the converted Date object
+        } as Notification; // Cast to Notification type
+      });
+
+      // Filter notifications based on user profile
+      const filteredNotifications = allNotifications.filter(notif => {
+        // Admins see everything
+        if (user.role === 'Admin') return true; 
+
+        // Check if targeted directly to user
+        if (notif.userId === user.uid) return true;
+
+        // Check if targeted to user's role(s)
+        // Assuming user.role is a single string like 'Technician'. Adjust if it's an array.
+        if (notif.targetRoles && notif.targetRoles.includes(user.role)) return true; 
+
+        // Check if targeted to user's sector(s)
+        // Assuming user.secteurs is an array of strings.
+        if (notif.sector && user.secteurs && notif.sector.some(s => user.secteurs.includes(s))) return true;
+
+        // If none of the above, the user shouldn't see this notification
+        return false;
+      });
+
+      callback(filteredNotifications); // Pass the filtered list
+    }, error => {
+      console.error('Error in notification listener:', error);
+      callback([]); // Send empty list on error
+    });
+
+    return unsubscribe; // Return the unsubscribe function
+  } catch (error) {
+    console.error('Error setting up notification listener:', error);
+    return () => {}; // Return a no-op unsubscribe function on error
   }
 };

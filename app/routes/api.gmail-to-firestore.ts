@@ -7,8 +7,8 @@ import type { GmailProcessingConfig, UserProfile } from "~/types/firestore.types
 import type { UserSession } from "~/services/session.server";
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { google } from 'googleapis';
-import { gmail_v1 } from 'googleapis';
+import { google , gmail_v1 } from 'googleapis';
+
 
 let db: FirebaseFirestore.Firestore;
 
@@ -67,7 +67,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Pour chaque secteur activé, traiter les mails avec chaque responsable
     const sectorKeys = Object.keys(config.sectorCollections) as Array<keyof typeof config.sectorCollections>;
-    let results: any[] = [];
+    const results: any[] = [];
     for (const sector of sectorKeys) {
       const sectorConfig = config.sectorCollections[sector];
       if (!sectorConfig.enabled || !sectorConfig.responsables || sectorConfig.responsables.length === 0) continue;

@@ -108,7 +108,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 case 'pending':
                     const newAttempt = {
                         date: new Date(),
-                        method: 'phone' as 'phone',
+                        method: 'phone' as const,
                         success: false
                     };
                     updateData.contactAttempts = Array.isArray(ticket.contactAttempts) ? [...ticket.contactAttempts, newAttempt] : [newAttempt];

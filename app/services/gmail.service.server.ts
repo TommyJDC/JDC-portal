@@ -1,7 +1,7 @@
 import { initializeFirebaseAdmin } from '~/firebase.admin.config.server';
 import { FieldValue } from 'firebase-admin/firestore';
-import { gmail_v1 } from 'googleapis';
-import { google } from 'googleapis';
+import { gmail_v1 , google } from 'googleapis';
+
 import type { OAuth2Client } from 'google-auth-library';
 import type { GmailProcessingConfig, SapTicket } from '~/types/firestore.types';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';

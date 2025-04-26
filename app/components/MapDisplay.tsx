@@ -112,8 +112,8 @@ export const MapDisplay: React.FC<MapDisplayProps> = ({
   return (
     <div
       ref={mapRef}
-      className={`leaflet-container ${className} rounded-xl overflow-hidden`} // Added rounded corners
-      style={{ height: '400px', width: '100%', backgroundColor: '#333' }} // Default size and bg
+      className={`leaflet-container ${className} rounded-xl overflow-hidden bg-gray-800 p-6 shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out`} // Added rounded corners and style
+      style={{ height: '400px', width: '100%' }} // Default size
     >
       {!isLeafletLoaded && <p className="p-4 text-center text-jdc-gray-400">Chargement de la carte...</p>}
     </div>

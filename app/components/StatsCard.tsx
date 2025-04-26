@@ -33,14 +33,14 @@ export const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, isLoad
   return (
     <div className={`bg-gray-800 p-2 rounded-lg shadow-lg border border-transparent hover:border-jdc-blue transition-all duration-300 ease-in-out flex flex-col items-center justify-center text-center space-y-1 ${height}`}>
       {/* Icon */}
-      <div className="p-2 rounded-md bg-jdc-yellow/20 text-jdc-yellow border border-jdc-yellow/30 flex-shrink-0"> {/* Icône jaune, taille et padding ajustés */}
-        <FontAwesomeIcon icon={icon} className="h-5 w-5" /> {/* Taille de l'icône légèrement réduite */}
+      <div className="p-3 rounded-md bg-jdc-yellow/20 text-jdc-yellow border border-jdc-yellow/30 flex-shrink-0"> {/* Icône jaune, taille et padding ajustés */}
+        <FontAwesomeIcon icon={icon} className="h-6 w-6" /> {/* Taille de l'icône légèrement réduite */}
       </div>
 
       {/* Title, Value, and Evolution */}
       <div className="flex-grow flex flex-col items-center justify-center space-y-1"> {/* Centrer le contenu texte verticalement et horizontalement, espacement légèrement augmenté */}
-        <p className="text-sm text-gray-400 font-medium">{getStringValue(title)}</p> {/* Taille du titre augmentée */}
-        <p className="text-2xl font-bold text-white">{value}</p> {/* Taille de la valeur augmentée */}
+        <p className="text-base text-gray-400 font-medium">{getStringValue(title)}</p> {/* Taille du titre augmentée */}
+        <p className="text-3xl font-bold text-white">{value}</p> {/* Taille de la valeur augmentée */}
 
         {/* Evolution Display (Text format, below value, smaller) */}
         {!isLoading && showEvolution && (

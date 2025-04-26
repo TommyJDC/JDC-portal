@@ -1,10 +1,9 @@
-import React, { Fragment } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link, NavLink, Form } from '@remix-run/react';
 import { 
   FaBars,
   FaUserCircle,
   FaSignOutAlt,
-  FaSignInAlt,
   FaCog,
   FaTachometerAlt,
   FaTicketAlt,
@@ -12,24 +11,28 @@ import {
   FaSearch,
   FaFileAlt,
   FaChevronDown,
-  FaBug,
   FaUser,
   FaGoogle
 } from 'react-icons/fa';
+import { Menu, Transition } from '@headlessui/react';
+// Firebase Client SDK imports
+import { getFirestore, collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { firebaseConfig } from '~/firebase.config';
+
+// Initialize Firebase client-side
+const firebaseApp = initializeApp(firebaseConfig);
 import { Button } from './ui/Button';
+import { ClientOnly } from './ClientOnly';
+import { NotificationsDropdown, type NotificationDisplay } from './NotificationsDropdown';
 import type { UserSession } from '~/services/session.server';
 import type { UserProfile, Notification } from '~/types/firestore.types';
-import { Menu, Transition } from '@headlessui/react';
-
-import { NotificationsDropdown, type NotificationDisplay } from './NotificationsDropdown';
-import { useEffect, useState } from 'react';
-import { ClientOnly } from './ClientOnly';
 
 interface HeaderProps {
   user: UserSession | null;
   profile: UserProfile | null;
   onToggleMobileMenu: () => void;
-  onLoginClick: () => void;
+  onLoginClick: () => void; // Keep onLoginClick as it's used in the parent component
   loadingAuth: boolean;
 }
 
@@ -73,32 +76,82 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
   const [notifications, setNotifications] = useState<NotificationDisplay[]>([]);
   const [notificationCount, setNotificationCount] = useState(0);
 
+  // Real-time notification listener
   useEffect(() => {
-    if (user?.userId) {
-      // Initialiser les notifications
-      const fetchNotifications = async () => {
-        try {
-          const response = await fetch(`/api/notifications/list?userId=${user.userId}`);
-          if (response.ok) {
-            const data = await response.json();
-            setNotifications(data.notifications.map((notification: any) => ({
-              ...notification,
-              timestamp: notification.timestamp
-            })));
-            setNotificationCount(data.unreadCount);
-          }
-        } catch (error) {
-          console.error('Error fetching notifications:', error);
-        }
-      };
-
-      fetchNotifications();
-
-      // Rafraîchir toutes les 30 secondes
-      const interval = setInterval(fetchNotifications, 30000);
-      return () => clearInterval(interval);
+    // Ensure user and profile are loaded before setting up listener
+    if (!user?.userId || !profile) {
+      setNotifications([]);
+      setNotificationCount(0);
+      return; // Exit if no user or profile
     }
-  }, [user?.userId]);
+
+    const db = getFirestore(firebaseApp);
+    const notificationsRef = collection(db, 'notifications');
+
+    // Query latest 100 notifications, order by creation time
+    // Filtering by role/sector will happen client-side after fetching
+    const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(100));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot: { docs: any[] }) => {
+      const allNotifications = querySnapshot.docs.map((doc: { id: string; data: () => any }) => {
+        const data = doc.data();
+        // Convert Firestore Timestamp to JS Date
+        const createdAtDate = data.createdAt instanceof Timestamp 
+          ? data.createdAt.toDate() 
+          : (data.createdAt ? new Date(data.createdAt) : new Date()); // Fallback if not Timestamp
+        
+        // Return as Notification first for filtering (using the imported type)
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: createdAtDate, // Use Date object
+        } as Notification; // Use the imported Notification type
+      });
+
+      // Filter notifications based on user profile (client-side)
+      const filteredNotifications = allNotifications.filter((notif: Notification & { userId?: string; targetRoles?: string[]; sector?: string[] }) => {
+        if (profile.role === 'Admin') return true; // Admins see all
+        if (notif.userId === profile.uid) return true; // Targeted to user
+        
+        // Check roles - ensure targetRoles and profile.role exist
+        if (notif.targetRoles && Array.isArray(notif.targetRoles) && profile.role && notif.targetRoles.includes(profile.role)) return true; 
+        
+        // Check sectors - ensure sector, profile.secteurs exist and are arrays
+        if (notif.sector && Array.isArray(notif.sector) && profile.secteurs && Array.isArray(profile.secteurs) && notif.sector.some((s: string) => profile.secteurs.includes(s))) return true; // Explicitly type s
+        
+        return false; // User should not see this notification
+      });
+
+      // Map to NotificationDisplay format for the dropdown component
+      const displayNotifications = filteredNotifications.map(notif => {
+        // Ensure createdAt is a Date before calling toISOString()
+        const createdAtDate = notif.createdAt instanceof Date 
+          ? notif.createdAt 
+          : (notif.createdAt as Timestamp).toDate(); // Cast to Timestamp if not Date, then convert
+
+        return {
+          ...notif,
+          // Convert Date to string (ISO format) for NotificationDisplay.timestamp
+          timestamp: createdAtDate.toISOString(), 
+        };
+      });
+
+      setNotifications(displayNotifications);
+      setNotificationCount(displayNotifications.filter((n: NotificationDisplay) => !n.read).length);
+
+    }, (error) => {
+      console.error("Error fetching notifications in real-time:", error);
+      // Optionally clear state or show an error message
+      setNotifications([]);
+      setNotificationCount(0);
+    });
+
+    // Cleanup subscription on component unmount or when user/profile changes
+    return () => unsubscribe();
+
+  }, [user?.userId, profile]); // Re-run effect if user or profile changes
+
+  // --- Handler functions remain largely the same, they modify data which triggers the listener ---
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -164,22 +217,28 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
   console.log('Header - showAdminLink:', showAdminLink);
 
   return (
-<header className="bg-gradient-to-r from-jdc-blue-dark to-jdc-blue border-b border-jdc-gray-800 py-5 px-4 md:px-10 sticky top-0 z-40 shadow-xl backdrop-blur-sm bg-opacity-95">
-      <div className="flex justify-between items-center max-w-7xl mx-auto">
-        {/* Left Section: Logo, Mobile Button, Desktop Nav */}
-        <div className="flex items-center space-x-6 md:space-x-10">
+<header className="bg-gray-900 p-4 shadow-lg border-b border-gray-800 sticky top-0 z-40">
+      <div className="flex justify-between items-center max-w-7xl mx-auto px-4">
+        {/* Logo */}
+        <div className="flex items-center">
           <Link to={user ? "/dashboard" : "/"} className="flex-shrink-0">
-            <img src={JDC_LOGO_URL} alt="JDC Logo" className="h-9 w-auto" />
+            <img 
+              src={JDC_LOGO_URL} 
+              alt="JDC Logo" 
+              className="h-8 w-auto"
+              width={120}
+              height={32}
+            />
           </Link>
+          {/* Mobile Menu Button */}
           {/* Mobile Menu Button */}
           <button
             onClick={onToggleMobileMenu}
-            className="md:hidden text-jdc-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-jdc-yellow focus:ring-opacity-50"
-            aria-label="Ouvrir le menu"
+            className="md:hidden ml-4 text-gray-400 hover:text-white"
+            aria-label="Menu mobile"
             aria-expanded="false"
-            aria-haspopup="true"
           >
-                  <FaBars className="text-xl" />
+            <FaBars className="w-5 h-5" />
           </button>
 
           {/* Desktop Navigation */}
@@ -190,7 +249,13 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={({ isActive }) => `${isActive ? linkActiveClass : linkInactiveClass} font-medium flex items-center transition-transform duration-200 ease-in-out hover:scale-105`}
+                  className={({ isActive }) => 
+                    `flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+                      isActive 
+                        ? 'bg-gray-800 text-white' 
+                        : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                    }`
+                  }
                   prefetch="intent"
                 >
                   <item.icon className="mr-2" />
@@ -374,7 +439,6 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                     className="bg-jdc-gray-800/50 text-jdc-gray-300 text-sm rounded-full pl-10 pr-4 py-1.5 w-48 focus:w-64 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-jdc-yellow/50 placeholder-jdc-gray-500"
                     aria-label="Barre de recherche"
                     role="searchbox"
-                    aria-expanded="false"
                   />
                   <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-jdc-gray-500" />
                 </div>
@@ -433,17 +497,15 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                     </Menu.Item>
                   </div>
                   <div className="px-1 py-1">
-                     <Menu.Item>
-                      {({ active }) => (
-                        <NavLink
-                          to="/user-profile"
-                          className={`${menuItemBaseClass} ${active ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'}`}
-                        >
-                          <FaUser className="mr-2" />
-                          Mon Profil
-                        </NavLink>
-                      )}
-                    </Menu.Item>
+                     <NavLink
+                      to="/user-profile"
+                      className={({ isActive }) => `${menuItemBaseClass} ${
+                        isActive ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'
+                      }`}
+                    >
+                      <FaUser className="mr-2" />
+                      Mon Profil
+                    </NavLink>
                   </div>
                   <div className="px-1 py-1">
                     <Form method="post" action="/logout" className="w-full">

@@ -175,34 +175,6 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
     // Remove handleAddComment as comments are handled separately or integrated differently
     // const handleAddComment = () => { ... };
 
-    const handleStatusChange = () => {
-        if (sectorId && ticket?.id && currentStatus) { // Allow submitting even if status is the same to re-trigger actions if needed
-            const formData = new FormData();
-            formData.append("intent", "update_status");
-            formData.append("ticketId", ticket.id);
-            formData.append("sectorId", sectorId);
-            formData.append("status", currentStatus);
-
-            // Include technician notes if available
-            if (technicianNotes.trim()) {
-                formData.append("technicianNotes", technicianNotes.trim());
-            }
-
-            // Include material type if status is 'open' (assuming RMA/material case uses 'open')
-            // Check if the selected status implies a material request (e.g., 'open' with materialType)
-            // Or if materialType is set and status is being updated to 'open' or kept as 'open'
-            if (currentStatus === 'open' && materialType) { // Adjust logic based on how RMA is triggered
-                 formData.append("materialType", materialType);
-            } else if (ticket.materialType && currentStatus === 'open') {
-                 // If ticket already has materialType and status is updated to/kept as 'open', send existing materialType
-                 formData.append("materialType", getStringValueWithFallback(ticket.materialType));
-            }
-
-
-            fetcher.submit(formData, { method: "POST", action: "/tickets-sap" });
-        }
-    };
-
     if (!ticket) return null;
 
     const [isClient, setIsClient] = useState(false);
@@ -239,8 +211,8 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
 
     const modalContent = (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={handleClose}>
-            <div className="w-11/12 max-w-4xl relative bg-gradient-to-b from-jdc-card to-jdc-card/95 text-jdc-white rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                <div className="sticky top-0 z-20 bg-gradient-to-b from-jdc-card via-jdc-card to-transparent pb-6 pt-4 px-6">
+            <div className="w-11/12 max-w-4xl relative bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 z-20 bg-gray-800 pb-6 pt-4 px-6 border-b border-gray-700">
                     <button onClick={handleClose} className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4 hover:rotate-90 transition-transform duration-200" aria-label="Fermer">✕</button>
                     <div className="flex items-start justify-between gap-4">
                         <div>
@@ -248,7 +220,7 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
                                 {getStringValue(ticket.raisonSociale, 'Client Inconnu')}
                             </h3>
                             <div className="flex items-center gap-2 text-sm text-gray-400">
-                                <span className="px-2 py-1 rounded bg-jdc-gray/50 font-mono">SAP #{getStringValue(ticket.numeroSAP, 'N/A')}</span>
+                                <span className="px-2 py-1 rounded bg-gray-700 font-mono">SAP #{getStringValue(ticket.numeroSAP, 'N/A')}</span>
                                 <span className="text-gray-500">•</span>
                                 <span>{getStringValue(ticket.secteur, 'N/A')}</span>
                             </div>
@@ -258,58 +230,58 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
 
                 <div className="px-6 pb-6">
                     {/* Ticket Information Grid */}
-                    <div className="mb-6 p-4 bg-jdc-gray/20 rounded-lg border border-gray-700/50 backdrop-blur-sm">
+                    <div className="mb-6 p-4 bg-gray-700/30 rounded-lg border border-gray-700">
                         <h4 className="font-bold text-lg mb-4 text-jdc-yellow">Informations du Ticket</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <p className="flex items-center gap-2">
                                 <span className="w-24 text-gray-400">Code Client</span>
-                                <span className="font-medium">{getStringValue(ticket.codeClient, 'N/A')}</span>
+                                <span className="font-medium text-white">{getStringValue(ticket.codeClient, 'N/A')}</span>
                             </p>
                             <p className="flex items-center gap-2">
                                 <span className="w-24 text-gray-400">Téléphone</span>
-                                <span className="font-medium">{getStringValue(ticket.telephone, 'N/A')}</span>
+                                <span className="font-medium text-white">{getStringValue(ticket.telephone, 'N/A')}</span>
                             </p>
                             <p className="flex items-center gap-2">
                                 <span className="w-24 text-gray-400">Date</span>
-                                <span className="font-medium">{formatTicketDate(ticket.date)}</span>
+                                <span className="font-medium text-white">{formatTicketDate(ticket.date)}</span>
                             </p>
                             <p className="flex items-center gap-2">
                                 <span className="w-24 text-gray-400">Secteur</span>
-                                <span className="badge badge-neutral">{getStringValue(ticket.secteur, 'N/A')}</span>
+                                <span className="badge badge-neutral text-white">{getStringValue(ticket.secteur, 'N/A')}</span>
                             </p>
                             {ticket.deducedSalesperson && (
                                 <p className="flex items-center gap-2">
                                     <span className="w-24 text-gray-400">Commercial</span>
-                                    <span className="font-medium">{ticket.deducedSalesperson}</span>
+                                    <span className="font-medium text-white">{ticket.deducedSalesperson}</span>
                                 </p>
                             )}
                             <p className="flex items-center gap-2">
                                 <span className="w-24 text-gray-400">Adresse</span>
-                                <span className="font-medium">{getStringValue(ticket.adresse, 'Non trouvé')}</span>
+                                <span className="font-medium text-white">{getStringValue(ticket.adresse, 'Non trouvé')}</span>
                             </p>
                             {ticket.type && (
                                 <p className="flex items-center gap-2">
                                     <span className="w-24 text-gray-400">Type</span>
-                                    <span className="font-medium">{getStringValue(ticket.type, 'N/A')}</span>
+                                    <span className="font-medium text-white">{getStringValue(ticket.type, 'N/A')}</span>
                                 </p>
                             )}
                             {ticket.priorite && (
                                 <p className="flex items-center gap-2">
                                     <span className="w-24 text-gray-400">Priorité</span>
-                                    <span className="font-medium">{getStringValue(ticket.priorite, 'N/A')}</span>
+                                    <span className="font-medium text-white">{getStringValue(ticket.priorite, 'N/A')}</span>
                                 </p>
                             )}
                             {ticket.origine && (
                                 <p className="flex items-center gap-2">
                                     <span className="w-24 text-gray-400">Origine</span>
-                                    <span className="font-medium">{getStringValue(ticket.origine, 'N/A')}</span>
+                                    <span className="font-medium text-white">{getStringValue(ticket.origine, 'N/A')}</span>
                                 </p>
                             )}
                         </div>
                     </div>
 
                     {/* Problem Description - Collapsible */}
-                    <div className="mb-6 p-4 bg-jdc-gray/20 rounded-lg border border-gray-700/50 backdrop-blur-sm">
+                    <div className="mb-6 p-4 bg-gray-700/30 rounded-lg border border-gray-700">
                         <button
                             className="flex items-center justify-between w-full text-left font-bold text-lg text-jdc-yellow focus:outline-none"
                             onClick={() => setIsDescriptionOpen(!isDescriptionOpen)}
@@ -338,14 +310,12 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
                     {/* AI Generated Content */}
                     <div className="space-y-6 mb-6">
                         <AnimatedTicketSummary
-                            ticketContent={problemDescriptionForAI}
                             ticket={ticket}
                             summary={generatedSummary}
                             isLoading={isSummaryLoading}
                             error={summaryError}
                         />
                         <AnimatedSolution
-                            ticketContent={problemDescriptionForAI}
                             ticket={ticket}
                             solution={generatedSolution}
                             isLoading={isSolutionLoading}
@@ -354,7 +324,7 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
                     </div>
 
                     {/* Status Update and Email Trigger */}
-                    <div className="mb-6 p-4 bg-jdc-gray/20 rounded-xl border border-gray-700/50 backdrop-blur-sm">
+                    <div className="mb-6 p-4 bg-gray-700/30 rounded-xl border border-gray-700">
                         <h4 className="font-bold text-lg mb-3 text-jdc-yellow">Actions Ticket</h4>
                         
                         {/* Form for Status Update and Email */}
@@ -438,7 +408,7 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
                                 ></textarea>
                             </div>
 
-                            {/* Material Type (Conditional for RMA/Envoi Matériel actions or 'open' status) */}
+                            {/* Material Type (Conditional for RMA/Envoi Matériel intents or status update to 'open' with material type) */}
                             {/* Show if status is 'open', 'rma_request', 'material_sent' OR if materialType is already set on the ticket */}
                             {(currentStatus === 'open' || currentStatus === 'rma_request' || currentStatus === 'material_sent' || ticket.materialType) && (
                                 <div className="space-y-4"> {/* Use space-y-4 for spacing within this conditional block */}

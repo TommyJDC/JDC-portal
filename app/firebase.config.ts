@@ -4,7 +4,7 @@ import { getFirestore } from "firebase/firestore"; // Import Firestore
 // Storage n'est plus initialisé ici
 
 // Your web app's Firebase configuration (Keep using environment variables in production)
-const firebaseConfig = {
+export const firebaseConfig = { // Export firebaseConfig
   apiKey: "AIzaSyADAy8ySvJsUP5diMyR9eIUgtPFimpydcA", // Replace with env var process.env.REACT_APP_FIREBASE_API_KEY
   authDomain: "sap-jdc.firebaseapp.com", // Replace with env var
   databaseURL: "https://sap-jdc-default-rtdb.europe-west1.firebasedatabase.app", // Replace with env var if using RTDB

@@ -8,14 +8,13 @@ import { ClientOnly } from './ClientOnly';
 import { FaLightbulb, FaSpinner } from 'react-icons/fa'; // Added FaSpinner
 
 interface AnimatedSolutionProps {
-  ticketContent: string;
   ticket?: SapTicket | null;
   solution: string;
   isLoading: boolean;
   error: string | null;
 }
 
-export function AnimatedSolution({ ticketContent, ticket, solution, isLoading, error }: AnimatedSolutionProps) {
+export function AnimatedSolution({ ticket, solution, isLoading, error }: AnimatedSolutionProps) {
 
   useEffect(() => {
     console.log("[AnimatedSolution] Props updated:", { solution, isLoading, error });
@@ -86,20 +85,15 @@ export function AnimatedSolution({ ticketContent, ticket, solution, isLoading, e
                   let i = 0;
                   const text = contentToDisplay;
                   // Nettoie tout rendu ReactDOM précédent pour éviter les erreurs
-                  // @ts-ignore
                   if (el._root) { // Unmount previous root if it exists
                     el._root.unmount();
-                    // @ts-ignore
                     delete el._root; // Clean up the stored root reference
                   }
                   // Create root
-                  // @ts-ignore
                   const root = createRoot(el);
-                  // @ts-ignore
                   el._root = root; // Store root instance
                   function typeChar() {
                     if (i <= text.length) {
-                      // @ts-ignore
                       root.render( // Use the created root instance
                         <ReactMarkdown>{text.slice(0, i)}</ReactMarkdown>
                       );

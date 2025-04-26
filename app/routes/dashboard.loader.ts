@@ -177,19 +177,16 @@ export interface DashboardLoaderData {
 
                 // Ensure dates in contactAttempts for recentTickets are Date objects
                 recentTickets = recentTicketsResult.status === 'fulfilled'
-                    ? recentTicketsResult.value.map(ticket => {
-                         const processedTicket: SapTicket = {
-                            ...ticket,
-                            // Ensure date is a Date object
-                            date: ticket.date instanceof Date || ticket.date === null ? ticket.date : new Date((ticket.date as any).seconds * 1000),
-                            // Ensure dates in contactAttempts are Date objects
-                            contactAttempts: ticket.contactAttempts?.map(attempt => ({
-                                ...attempt,
-                                date: attempt.date instanceof Date ? attempt.date : new Date((attempt.date as any).seconds * 1000)
-                            }))
-                        };
-                        return processedTicket;
-                    })
+                    ? recentTicketsResult.value.map(ticket => ({
+                        ...ticket,
+                        // Les dates sont déjà en string ISO depuis firestore.types.ts
+                        date: ticket.date,
+                        mailDate: ticket.mailDate,
+                        contactAttempts: ticket.contactAttempts?.map(attempt => ({
+                            ...attempt,
+                            date: attempt.date // Conservation directe de la valeur
+                        }))
+                    }))
                     : [];
 
                 recentShipments = recentShipmentsResult.status === 'fulfilled' ? recentShipmentsResult.value.slice(0, 20) : [];

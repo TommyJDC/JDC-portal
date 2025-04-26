@@ -45,7 +45,7 @@ export const RecentTickets: React.FC<RecentTicketsProps> = ({ tickets, isLoading
   };
 
   return (
-    <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-full">
+    <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out h-full">
       <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
         <TicketIcon className="mr-2 text-jdc-yellow" />
         Tickets SAP Récents
