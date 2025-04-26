@@ -104,8 +104,9 @@ export interface DashboardLoaderData {
                 const latestStatsSnapshotsPromise = getLatestStatsSnapshotsSdk(1);
                 // Remplacer l'appel à getTotalTicketCountSdk par getSapTicketCountBySectorSdk
                 const sapTicketCountsBySectorPromise = getSapTicketCountBySectorSdk(sectorsForTickets);
-                const recentTicketsPromise = getRecentTicketsForSectors(sectorsForTickets, 20);
-                const allShipmentsPromise = getAllShipments(sectorsForShipments);
+                // Limiter à 10 tickets récents et 10 envois pour améliorer les performances
+                const recentTicketsPromise = getRecentTicketsForSectors(sectorsForTickets, 10);
+                const allShipmentsPromise = getAllShipments(sectorsForShipments).then(shipments => shipments.slice(0, 10));
                 const allInstallationsPromise = getAllInstallations();
 
                 // Définir les promesses dépendantes de userProfile

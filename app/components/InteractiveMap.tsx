@@ -127,11 +127,15 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
   const uniqueAddresses = useMemo(() => {
     console.log("[InteractiveMap] Recalculating unique addresses...");
     if (!Array.isArray(tickets)) return [];
-    const addresses = tickets
+    
+    // Limiter à 50 tickets maximum pour éviter les problèmes de performance
+    const limitedTickets = tickets.slice(0, 50);
+    
+    const addresses = limitedTickets
       .map(ticket => getStringValue(ticket.adresse))
       .filter(addr => addr !== '');
     const uniqueSet = new Set(addresses);
-    console.log(`[InteractiveMap] Found ${uniqueSet.size} unique addresses.`);
+    console.log(`[InteractiveMap] Found ${uniqueSet.size} unique addresses (from ${limitedTickets.length} tickets).`);
     return Array.from(uniqueSet);
   }, [tickets]);
 
@@ -300,6 +304,17 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
   );
 
 
+
+  if (isLoadingTickets || isGeocoding) {
+    return (
+      <div className="bg-jdc-card rounded-xl shadow-lg h-full w-full overflow-hidden flex items-center justify-center">
+        <div className="text-center">
+          <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-2xl mb-2" />
+          <p className="text-jdc-gray-400">Chargement de la carte...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-jdc-card rounded-xl shadow-lg h-full w-full overflow-hidden">
