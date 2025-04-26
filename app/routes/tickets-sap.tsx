@@ -12,12 +12,11 @@ import { Timestamp } from 'firebase/firestore'; // Keep for type checking/conver
 import { Input } from "~/components/ui/Input";
 import { Button } from "~/components/ui/Button";
 import TicketSAPDetails from "~/components/TicketSAPDetails";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faTicket, faFilter, faSearch, faUserTag, faChevronDown, faChevronRight, faSpinner,
-  faExclamationTriangle, faPhone, faMapMarkerAlt, faUserTie, faInfoCircle,
-  faCalendarAlt, faChevronUp
-} from "@fortawesome/free-solid-svg-icons"; // Removed faCircleNodes
+  FaTicketAlt, FaFilter, FaSearch, FaUserTag, FaChevronDown, FaChevronRight, FaSpinner,
+  FaExclamationTriangle, FaPhone, FaMapMarkerAlt, FaUserTie, FaInfoCircle,
+  FaCalendarAlt, FaChevronUp
+} from 'react-icons/fa'; // Import React Icons
 import { getTicketStatusStyle } from "~/utils/styleUtils";
 import { formatFirestoreDate, convertFirestoreDate } from "~/utils/dateUtils"; // Corrected import
 
@@ -255,7 +254,7 @@ export default function TicketsSap() {
    // Show loader error if present
    if (loaderError) {
        return <div className="text-center text-red-400 bg-red-900 bg-opacity-50 p-4 rounded-lg flex items-center justify-center">
-          <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
+          <FaExclamationTriangle className="mr-2" />
           {loaderError}
        </div>;
    }
@@ -266,9 +265,9 @@ export default function TicketsSap() {
   return (
     <div className="space-y-6 p-6 bg-gray-900 min-h-screen"> {/* Ajuster le conteneur principal */}
       <h1 className="text-3xl font-semibold text-white mb-6 flex items-center"> {/* Ajuster le titre */}
-        <FontAwesomeIcon icon={faTicket} className="mr-3 text-jdc-blue" />
+        <FaTicketAlt className="mr-3 text-jdc-blue" />
         Gestion des Tickets SAP
-        {isLoading && <FontAwesomeIcon icon={faSpinner} spin className="ml-3 text-jdc-yellow" title="Rafraîchissement..." />}
+        {isLoading && <FaSpinner className="ml-3 text-jdc-yellow animate-spin" title="Rafraîchissement..." />}
       </h1>
 
       {/* Filter and Search Controls */}
@@ -276,7 +275,7 @@ export default function TicketsSap() {
         {/* Sector Filter */}
         <div className="col-span-1">
           <label htmlFor="sector-filter" className="block text-sm font-medium text-gray-400 mb-1"> {/* Ajuster le style du label */}
-            <FontAwesomeIcon icon={faFilter} className="mr-1" /> Filtrer par Secteur
+            <FaFilter className="mr-1" /> Filtrer par Secteur
           </label>
           <select
             id="sector-filter"
@@ -305,7 +304,7 @@ export default function TicketsSap() {
              placeholder="Entrez un nom, ID, mot-clé..."
              value={searchTerm}
              onChange={(e) => setSearchTerm(e.target.value)}
-             icon={<FontAwesomeIcon icon={faSearch} />}
+             icon={<FaSearch />}
              wrapperClassName="mb-0"
              disabled={isLoading} // Disable during revalidation
              className="bg-gray-900 text-white border-gray-700 focus:border-jdc-blue focus:ring-jdc-blue" // Use className for input
@@ -335,7 +334,7 @@ export default function TicketsSap() {
               <details className="group" open={clientGroups.length < 5}>
                 <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700 list-none transition-colors">
                   <div className="flex items-center min-w-0 mr-2">
-                    <FontAwesomeIcon icon={faUserTag} className="mr-3 text-jdc-blue text-lg flex-shrink-0" />
+                    <FaUserTag className="mr-3 text-jdc-blue text-lg flex-shrink-0" />
                     <div className="min-w-0">
                         <span className="font-semibold text-yellow-400 text-lg block truncate" title={raisonSociale}>{raisonSociale}</span>
                         <span className="ml-0 md:ml-3 text-sm text-gray-400">
@@ -343,8 +342,7 @@ export default function TicketsSap() {
                         </span>
                     </div>
                   </div>
-                  <FontAwesomeIcon
-                    icon={faChevronRight}
+                  <FaChevronRight
                     className="text-gray-400 transition-transform duration-200 group-open:rotate-90 text-xl flex-shrink-0"
                   />
                 </summary>
@@ -382,7 +380,7 @@ export default function TicketsSap() {
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2">
                            <div className="flex-1 min-w-0 mb-2 md:mb-0 md:mr-4">
                               <div className="flex items-center mb-1">
-                                <FontAwesomeIcon icon={faInfoCircle} className="mr-2 text-jdc-blue w-4 text-center" />
+                                <FaInfoCircle className="mr-2 text-jdc-blue w-4 text-center" />
                                 <span className="text-white font-semibold" title={`SAP: ${getStringValueOrDefault(ticket.numeroSAP)}`}>
                                   {getStringValueOrDefault(ticket.numeroSAP)}
                                 </span>
@@ -391,7 +389,7 @@ export default function TicketsSap() {
                                 </span>
                               </div>
                               <div className="flex items-center text-xs text-gray-400">
-                                <FontAwesomeIcon icon={faCalendarAlt} className="mr-2 text-gray-500 w-4 text-center" />
+                                <FaCalendarAlt className="mr-2 text-gray-500 w-4 text-center" />
                                 <span>{displayDate}</span>
                                 <span className="mx-2">|</span>
                                 <span className="text-gray-500" title={`ID: ${ticket.id}`}>
@@ -416,10 +414,10 @@ export default function TicketsSap() {
                                     className="text-jdc-blue border-jdc-blue hover:bg-jdc-blue hover:text-white"
                                     title={phoneNumbersArray.length === 1 ? `Appeler ${phoneNumbersArray[0]}` : "Appeler..."}
                                   >
-                                    <FontAwesomeIcon icon={faPhone} className="mr-2" />
+                                    <FaPhone className="mr-2" />
                                     <span>Appeler</span>
                                     {phoneNumbersArray.length > 1 && (
-                                      <FontAwesomeIcon icon={showNumberOptions[ticket.id] ? faChevronUp : faChevronDown} className="ml-2" />
+                                      <FaChevronUp className="ml-2" />
                                     )}
                                   </Button>
                                   {showNumberOptions[ticket.id] && phoneNumbersArray.length > 1 && (
@@ -451,13 +449,13 @@ export default function TicketsSap() {
                         <div className="space-y-1 text-xs text-gray-400">
                            {ticket.deducedSalesperson && (
                              <div className="flex items-center">
-                               <FontAwesomeIcon icon={faUserTie} className="mr-2 text-gray-500 w-4 text-center" />
+                               <FaUserTie className="mr-2 text-gray-500 w-4 text-center" />
                                <span>{ticket.deducedSalesperson}</span>
                              </div>
                            )}
                            {ticket.adresse && (
                              <div className="flex items-center">
-                               <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-gray-500 w-4 text-center" />
+                               <FaMapMarkerAlt className="mr-2 text-gray-500 w-4 text-center" />
                                <span className="truncate" title={getStringValueOrDefault(ticket.adresse)}>{getStringValueOrDefault(ticket.adresse)}</span>
                              </div>
                            )}

@@ -3,10 +3,10 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
     // Importer loader et action
     import { loader } from "./articles.loader";
     import { action } from "./articles.action"; // Importer l'action
-    import type { Article, AppUser, UserProfile } from "~/types/firestore.types";
+    import type { Article, UserProfile } from "~/types/firestore.types";
+    import type { UserSession } from "~/services/session.server"; // Import UserSession from session.server
     import { useOutletContext } from "@remix-run/react";
-    import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // Importer pour icônes
-    import { faPlus, faSpinner, faTimes, faTrashAlt, faSearch } from '@fortawesome/free-solid-svg-icons'; // Importer icônes + faTrashAlt + faSearch
+    import { FaPlus, FaSpinner, FaTimes, FaTrashAlt, FaSearch } from 'react-icons/fa'; // Importer icônes React Icons
     import { Input } from "~/components/ui/Input"; // Importer le composant Input
     import { Button } from "~/components/ui/Button"; // Importer le composant Button
 
@@ -16,7 +16,7 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
 
     // Interface pour le contexte de l'outlet (inchangée)
     interface OutletContextType {
-      user: AppUser | null;
+      user: UserSession | null; // Changed AppUser to UserSession
       profile: UserProfile | null;
       loadingAuth: boolean;
     }
@@ -162,9 +162,9 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
       return (
         <div className="space-y-6 p-6 bg-gray-900 min-h-screen">
           <h1 className="text-3xl font-semibold text-white mb-6 flex items-center">
-             <FontAwesomeIcon icon={faSearch} className="mr-3 text-jdc-yellow" />
+             <FaSearch className="mr-3 text-jdc-yellow" />
              Recherche d'Articles
-             {isLoadingData && <FontAwesomeIcon icon={faSpinner} spin className="ml-3 text-jdc-yellow" title="Chargement..." />}
+             {isLoadingData && <FaSpinner className="ml-3 text-jdc-yellow animate-spin" title="Chargement..." />}
           </h1>
 
           {/* Formulaire de recherche */}
@@ -207,9 +207,9 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                   disabled={isLoadingData}
                 >
                    {isLoadingData ? (
-                     <FontAwesomeIcon icon={faSpinner} spin />
+                     <FaSpinner className="animate-spin" />
                    ) : (
-                     <FontAwesomeIcon icon={faSearch} />
+                     <FaSearch />
                    )}
                   <span>{isLoadingData ? 'Recherche...' : 'Rechercher'}</span>
                 </button>
@@ -265,9 +265,9 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                                           aria-label="Supprimer l'image"
                                         >
                                           {deletingThis ? (
-                                            <FontAwesomeIcon icon={faSpinner} spin className="h-3 w-3" />
+                                            <FaSpinner className="h-3 w-3 animate-spin" />
                                           ) : (
-                                            <FontAwesomeIcon icon={faTrashAlt} className="h-3 w-3" />
+                                            <FaTrashAlt className="h-3 w-3" />
                                           )}
                                         </button>
                                       </div>
@@ -288,9 +288,9 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                                 }`}
                               >
                                 {isUploadingCurrent ? (
-                                  <FontAwesomeIcon icon={faSpinner} spin className="mr-2" />
+                                  <FaSpinner className="mr-2 animate-spin" />
                                 ) : (
-                                  <FontAwesomeIcon icon={faPlus} className="-ml-1 mr-2 h-4 w-4" aria-hidden="true" />
+                                  <FaPlus className="-ml-1 mr-2 h-4 w-4" aria-hidden="true" />
                                 )}
                                 <span>{isUploadingCurrent ? 'Upload...' : 'Photo'}</span>
                               </button>
@@ -342,7 +342,7 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
                   className="absolute top-3 right-3 text-white bg-gray-700 bg-opacity-75 hover:bg-opacity-100 rounded-full p-1 focus:outline-none"
                   aria-label="Fermer l'image"
                 >
-                  <FontAwesomeIcon icon={faTimes} size="lg" />
+        <FaTimes className="h-6 w-6" />
                 </button>
               </div>
             </div>
@@ -350,4 +350,3 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
         </div>
       );
     }
-

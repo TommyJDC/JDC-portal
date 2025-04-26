@@ -1,7 +1,17 @@
 import React from 'react';
 import { Link, NavLink } from '@remix-run/react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faUserCircle, faSignOutAlt, faSignInAlt, faTachometerAlt, faTicketAlt, faTruck, faCog, faSearch, faFileAlt } from '@fortawesome/free-solid-svg-icons'; // Updated icons
+import {
+  FaTimes,
+  FaUserCircle,
+  FaSignOutAlt,
+  FaSignInAlt,
+  FaTachometerAlt,
+  FaTicketAlt,
+  FaTruck,
+  FaCog,
+  FaSearch,
+  FaFileAlt
+} from 'react-icons/fa';
  import { Button } from './ui/Button';
  // Use UserSession from server loader instead of AppUser from client-side auth
  // import type { AppUser } from '~/services/auth.service';
@@ -20,32 +30,32 @@ import { faTimes, faUserCircle, faSignOutAlt, faSignInAlt, faTachometerAlt, faTi
 
 // Main navigation items
 const navItems = [
-  { name: 'Tableau de Bord', to: '/dashboard', icon: faTachometerAlt },
+  { name: 'Tableau de Bord', to: '/dashboard', icon: FaTachometerAlt },
 ];
 
 // Technique menu items
 const techniqueItems = [
-  { name: 'Tickets SAP', to: '/tickets-sap', icon: faTicketAlt },
-  { name: 'Archive SAP', to: '/sap-archive', icon: faFileAlt }, // Ajout du lien vers l'archive
-  { name: 'Installations Kezia', to: '/installations/kezia-firestore', icon: faFileAlt },
-  { name: 'Installations CHR', to: '/installations/chr-firestore', icon: faFileAlt },
-  { name: 'Installations HACCP', to: '/installations/haccp-firestore', icon: faFileAlt },
-  { name: 'Installations Tabac', to: '/installations/tabac-firestore', icon: faFileAlt },
+  { name: 'Tickets SAP', to: '/tickets-sap', icon: FaTicketAlt },
+  { name: 'Archive SAP', to: '/sap-archive', icon: FaFileAlt }, // Ajout du lien vers l'archive
+  { name: 'Installations Kezia', to: '/installations/kezia-firestore', icon: FaFileAlt },
+  { name: 'Installations CHR', to: '/installations/chr-firestore', icon: FaFileAlt },
+  { name: 'Installations HACCP', to: '/installations/haccp-firestore', icon: FaFileAlt },
+  { name: 'Installations Tabac', to: '/installations/tabac-firestore', icon: FaFileAlt },
 ];
 
 // Logistique menu items
 const logistiqueItems = [
-  { name: 'Envois CTN', to: '/envois-ctn', icon: faTruck },
-  { name: 'Recherche Articles', to: '/articles', icon: faSearch },
+  { name: 'Envois CTN', to: '/envois-ctn', icon: FaTruck },
+  { name: 'Recherche Articles', to: '/articles', icon: FaSearch },
 ];
 
 // Commercial menu items
 const commercialItems = [
-  { name: 'Upload Menus', to: '/commercial/upload', icon: faFileAlt }
+  { name: 'Upload Menus', to: '/commercial/upload', icon: FaFileAlt }
 ];
 
 // Define Admin item separately
-const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
+const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
 
  const JDC_LOGO_URL = "https://www.jdc.fr/images/logo_jdc_blanc.svg"; // Re-add logo URL if needed
 
@@ -70,7 +80,7 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
         onClick={(e) => e.stopPropagation()}
       >
         {/* Menu Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+        <div className="flex items-center justify-between px-2 py-1 border-b border-gray-700">
            <Link to={user ? "/dashboard" : "/"} onClick={onClose}>
              <img src={JDC_LOGO_URL} alt="JDC Logo" className="h-8 w-auto" />
            </Link>
@@ -79,7 +89,7 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
             className="text-jdc-gray-400 hover:text-white focus:outline-none"
             aria-label="Fermer le menu"
           >
-            <FontAwesomeIcon icon={faTimes} size="lg" />
+            <FaTimes size={12} className="text-xs" />
           </button>
         </div>
 
@@ -98,7 +108,7 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
                   className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
                   prefetch="intent"
                 >
-                  <FontAwesomeIcon icon={item.icon} className="mr-3 h-5 w-5" />
+                  <item.icon className="mr-3 h-5 w-5" />
                   {item.name}
                 </NavLink>
               ))}
@@ -114,7 +124,7 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
                     className={({ isActive }) => `${linkBaseClass} pl-6 ${isActive ? linkActiveClass : linkInactiveClass}`}
                     prefetch="intent"
                   >
-                    <FontAwesomeIcon icon={item.icon} className="mr-3 h-5 w-5" />
+                    <item.icon className="mr-3 h-5 w-5" />
                     {item.name}
                   </NavLink>
                 ))}
@@ -131,7 +141,7 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
                     className={({ isActive }) => `${linkBaseClass} pl-6 ${isActive ? linkActiveClass : linkInactiveClass}`}
                     prefetch="intent"
                   >
-                    <FontAwesomeIcon icon={item.icon} className="mr-3 h-5 w-5" />
+                    <item.icon className="mr-3 h-5 w-5" />
                     {item.name}
                   </NavLink>
                 ))}
@@ -153,7 +163,7 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
                       className={({ isActive }) => `${linkBaseClass} pl-6 ${isActive ? linkActiveClass : linkInactiveClass}`}
                       prefetch="intent"
                     >
-                      <FontAwesomeIcon icon={item.icon} className="mr-3 h-5 w-5" />
+                      <item.icon className="mr-3 h-5 w-5" />
                       {item.name}
                     </NavLink>
                   ))
@@ -169,7 +179,7 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
                   className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
                   prefetch="intent"
                 >
-                  <FontAwesomeIcon icon={adminItem.icon} className="mr-3 h-5 w-5" />
+                  <adminItem.icon className="mr-3 h-5 w-5" />
                   {adminItem.name}
                 </NavLink>
               )}
@@ -186,7 +196,7 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
           ) : user ? (
             <div className="space-y-3">
               <div className="flex items-center space-x-3 text-sm text-jdc-gray-300 p-2 rounded-lg bg-jdc-gray-800/30">
-                <FontAwesomeIcon icon={faUserCircle} className="h-6 w-6" />
+                <FaUserCircle className="h-6 w-6" />
                 <div className="flex flex-col">
                   <span className="font-medium truncate" title={user.email ?? ''}>
                     {profile?.displayName || user.displayName || user.email?.split('@')[0]}
@@ -203,7 +213,7 @@ const adminItem = { name: 'Admin', to: '/admin', icon: faCog };
               size="sm" 
               onClick={() => { onLoginClick(); onClose(); }} 
               className="w-full transition-transform hover:scale-105" 
-              leftIcon={<FontAwesomeIcon icon={faSignInAlt} />}
+              leftIcon={<FaSignInAlt />}
             >
               Connexion
             </Button>

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSave } from "@fortawesome/free-solid-svg-icons";
+import { FaSave } from 'react-icons/fa';
 import type { Installation } from "~/types/firestore.types";
 import { convertFirestoreDate } from "~/utils/dateUtils";
 import { Timestamp } from 'firebase/firestore';
@@ -182,7 +181,7 @@ const InstallationHACCPTile: React.FC<InstallationHACCPTileProps> = ({ installat
           })}
           className="w-full bg-jdc-blue hover:bg-jdc-blue-dark text-white font-bold py-2 px-4 rounded-md flex items-center justify-center gap-2 transition-colors duration-200"
         >
-          <FontAwesomeIcon icon={faSave} />
+          <FaSave />
           Sauvegarder
         </button>
       </div>

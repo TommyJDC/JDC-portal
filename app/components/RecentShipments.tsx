@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Link } from '@remix-run/react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTruck, faBuilding } from '@fortawesome/free-solid-svg-icons';
+import { FaTruck, FaBuilding } from 'react-icons/fa';
 import type { Shipment } from '~/types/firestore.types';
 import { getStringValue } from '~/utils/firestoreUtils';
 
@@ -32,13 +31,13 @@ export const RecentShipments: React.FC<RecentShipmentsProps> = ({ shipments, isL
   return (
     <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out h-full">
       <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-        <FontAwesomeIcon icon={faTruck} className="mr-2 text-jdc-yellow" />
+        <FaTruck className="mr-2 text-jdc-yellow" />
         Envois CTN Récents
       </h2>
       {isLoading ? (
         <div className="flex items-center justify-center text-gray-400 py-4">
           {/* Consistent loading indicator */}
-          <FontAwesomeIcon icon={faTruck} spin className="mr-2" />
+          <FaTruck className="mr-2 animate-spin" />
           Chargement...
         </div>
       ) : uniqueClientNames.length === 0 ? (
@@ -51,7 +50,7 @@ export const RecentShipments: React.FC<RecentShipmentsProps> = ({ shipments, isL
                 to={`/envois-ctn?client=${encodeURIComponent(getStringValue(clientName))}`}
                 className="flex items-center w-full"
               >
-                <FontAwesomeIcon icon={faBuilding} className="mr-3 text-jdc-blue flex-shrink-0" />
+                <FaBuilding className="mr-3 text-jdc-blue flex-shrink-0" />
                 <span className="font-medium text-yellow-400 truncate" title={getStringValue(clientName)}>{getStringValue(clientName)}</span>
               </Link>
             </li>

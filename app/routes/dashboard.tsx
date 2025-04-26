@@ -13,19 +13,18 @@ import { RecentShipments } from "~/components/RecentShipments";
 import { ClientOnly } from "~/components/ClientOnly";
 import { WeeklyAgenda } from '~/components/WeeklyAgenda';
 import { InstallationsSnapshot } from "~/components/InstallationsSnapshot";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faTicket,
-  faUsers,
-  faMapMarkedAlt,
-  faSpinner,
-  faExclamationTriangle,
-  faCalendarDays,
-  faUtensils, // Added for CHR
-  faShieldAlt, // Added for HACCP
-  faBurger, // Added for Kezia
-  faSmoking // Added for Tabac
-} from "@fortawesome/free-solid-svg-icons";
+  FaTicketAlt, // Assuming faTicket maps to FaTicketAlt based on other files
+  FaUsers, // Assuming faUsers maps to FaUsers
+  FaMapMarkedAlt,
+  FaSpinner,
+  FaExclamationTriangle,
+  FaCalendarAlt, // Changed from FaCalendarDays
+  FaUtensils,
+  FaShieldAlt,
+  FaHamburger, // Changed from FaBurger
+  FaSmoking
+} from 'react-icons/fa';
 
 import type { SapTicket, Shipment, Installation } from "~/types/firestore.types";
 import type { UserSession } from "~/services/session.server";
@@ -81,14 +80,14 @@ const parseSerializedDateNullable = (
 
 const MapLoadingFallback = () => (
   <div className="bg-jdc-card p-2 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[150px] w-full">
-    <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-xl mb-2" />
+    <FaSpinner className="text-jdc-yellow text-xl mb-2 animate-spin" />
     <p className="text-jdc-gray-400 text-center text-xs">Chargement de la carte...</p>
   </div>
 );
 
 const MapLoginPrompt = () => (
   <div className="bg-jdc-card p-2 rounded-lg shadow-lg flex flex-col items-center justify-center min-h-[150px] w-full">
-    <FontAwesomeIcon icon={faMapMarkedAlt} className="text-jdc-gray-500 text-2xl mb-2" />
+    <FaMapMarkedAlt className="text-jdc-gray-500 text-2xl mb-2" />
     <p className="text-jdc-gray-400 text-center text-xs">Connectez-vous pour voir la carte des tickets.</p>
   </div>
 );
@@ -96,11 +95,11 @@ const MapLoginPrompt = () => (
 const WeeklyAgendaFallback = () => (
   <div className="bg-jdc-card p-2 rounded-lg shadow-lg min-h-[80px]">
     <h3 className="text-sm font-semibold text-white mb-1 flex items-center">
-      <FontAwesomeIcon icon={faCalendarDays} className="mr-1 text-jdc-blue text-xs" />
+      <FaCalendarAlt className="mr-1 text-jdc-blue" style={{ width: '13px', height: '13px' }} />
       Agenda de la semaine
     </h3>
     <div className="flex items-center justify-center h-[100px]">
-      <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-xl mr-2" />
+      <FaSpinner className="text-jdc-yellow text-xl mr-2 animate-spin" />
       <span className="text-jdc-gray-400 text-sm">Chargement de l'agenda...</span>
     </div>
   </div>
@@ -138,28 +137,28 @@ export default function Dashboard() {
       sector: 'CHR',
       title: "Tickets CHR", // Modified title
       valueState: sapTicketCountsBySector?.['CHR'] ?? 0,
-      icon: faUtensils, // Modified icon
+      icon: FaUtensils, // Modified icon
       evolutionKey: 'chrTicketCount'
     },
     {
       sector: 'HACCP',
       title: "Tickets HACCP", // Modified title
       valueState: sapTicketCountsBySector?.['HACCP'] ?? 0,
-      icon: faShieldAlt, // Modified icon
+      icon: FaShieldAlt, // Modified icon
       evolutionKey: 'haccpTicketCount'
     },
     {
       sector: 'Kezia',
       title: "Tickets Kezia", // Modified title
       valueState: sapTicketCountsBySector?.['Kezia'] ?? 0,
-      icon: faBurger, // Modified icon
+      icon: FaHamburger, // Modified icon
       evolutionKey: 'keziaTicketCount'
     },
     {
       sector: 'Tabac',
       title: "Tickets Tabac", // Modified title
       valueState: sapTicketCountsBySector?.['Tabac'] ?? 0,
-      icon: faSmoking, // Modified icon
+      icon: FaSmoking, // Modified icon
       evolutionKey: 'tabacTicketCount'
     },
   ];
@@ -175,7 +174,7 @@ export default function Dashboard() {
 
       {clientError && (
         <div className="flex items-center p-1 bg-red-800 text-white rounded-lg mb-1 text-xs">
-          <FontAwesomeIcon icon={faExclamationTriangle} className="mr-1" />
+          <FaExclamationTriangle className="mr-1" />
           {clientError}
         </div>
       )}

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Menu, Transition } from '@headlessui/react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faCheck, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { FaBell, FaCheck, FaTrash } from 'react-icons/fa';
 import { Link } from '@remix-run/react';
 
 import type { Notification as FirestoreNotification } from '~/types/firestore.types';
@@ -31,7 +30,7 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
         className="relative text-jdc-gray-300 hover:text-white transition-colors p-1.5 rounded-full hover:bg-jdc-blue-light/20 focus:outline-none focus:ring-2 focus:ring-jdc-yellow focus:ring-opacity-50"
         aria-label={`Notifications${notificationCount > 0 ? ` (${notificationCount} non lues)` : ''}`}
       >
-        <FontAwesomeIcon icon={faBell} className="text-xl" />
+        <FaBell className="text-xl" />
         {notificationCount > 0 && (
           <span className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
             {notificationCount > 9 ? '9+' : notificationCount}
@@ -59,14 +58,14 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
                       onClick={onMarkAllAsRead}
                       className="text-jdc-yellow text-sm hover:text-yellow-300 transition-colors"
                     >
-                      <FontAwesomeIcon icon={faCheck} className="mr-1" />
+                      <FaCheck className="mr-1" />
                       Tout marquer comme lu
                     </button>
                     <button
                       onClick={onClearAll}
                       className="text-red-500 text-sm hover:text-red-400 transition-colors"
                     >
-                      <FontAwesomeIcon icon={faTrash} className="mr-1" />
+                      <FaTrash className="mr-1" />
                       Vider la liste
                     </button>
                   </>
