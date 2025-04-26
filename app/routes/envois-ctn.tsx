@@ -8,11 +8,11 @@ import type { MetaFunction } from "@remix-run/node";
     import type { EnvoisCtnLoaderData } from "./envois-ctn.loader";
     import { action } from "./envois-ctn.action";
 
-    import type { Shipment, UserProfile, AppUser } from "~/types/firestore.types";
+    import type { Shipment, UserProfile } from "~/types/firestore.types";
+    import type { UserSession } from "~/services/session.server"; // Import UserSession
     import { Input } from "~/components/ui/Input";
     import { Button } from "~/components/ui/Button";
-    import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-    import { faTruckFast, faFilter, faSearch, faBuilding, faChevronRight, faExternalLinkAlt, faSpinner, faTrash } from "@fortawesome/free-solid-svg-icons";
+    import { FaShippingFast, FaFilter, FaSearch, FaBuilding, FaChevronRight, FaExternalLinkAlt, FaSpinner, FaTrash, FaExclamationTriangle } from 'react-icons/fa'; // Import React Icons
     import { getShipmentStatusStyle } from "~/utils/styleUtils";
     import { useToast } from "~/context/ToastContext";
 
@@ -25,7 +25,7 @@ import type { MetaFunction } from "@remix-run/node";
 
     // Outlet context likely provides UserSession now, adjust if needed based on root
     type OutletContextType = {
-      user: AppUser | null; // Keep AppUser if root provides it, or change to UserSession
+      user: UserSession | null; // Use UserSession
     };
 
     // Helper to parse serialized dates (similar to dashboard)
@@ -187,15 +187,15 @@ import type { MetaFunction } from "@remix-run/node";
 
       // Show loader error if present
        if (loaderError) {
-           return <div className="text-center text-red-400 bg-red-900 bg-opacity-50 p-4 rounded-lg">{loaderError}</div>;
+           return <div className="text-center text-red-400 bg-red-900 bg-opacity-50 p-4 rounded-lg"><FaExclamationTriangle className="mr-2" />{loaderError}</div>;
        }
 
       return (
         <div className="space-y-6 p-6 bg-gray-900 min-h-screen">
           <h1 className="text-3xl font-semibold text-white mb-6 flex items-center">
-            <FontAwesomeIcon icon={faTruckFast} className="mr-3 text-jdc-yellow" />
+            <FaShippingFast className="mr-3 text-jdc-yellow" />
             Suivi des Envois CTN
-            {isLoading && <FontAwesomeIcon icon={faSpinner} spin className="ml-3 text-jdc-yellow" title="Rafraîchissement..." />}
+            {isLoading && <FaSpinner className="ml-3 text-jdc-yellow animate-spin" title="Rafraîchissement..." />}
           </h1>
 
           {/* Filter and Search Controls */}
@@ -203,7 +203,7 @@ import type { MetaFunction } from "@remix-run/node";
             {/* Sector Filter - Disable based on fetcher state */}
             <div className="col-span-1">
               <label htmlFor="sector-filter" className="block text-sm font-medium text-gray-400 mb-1">
-                <FontAwesomeIcon icon={faFilter} className="mr-1" /> Filtrer par Secteur
+                <FaFilter className="mr-1" /> Filtrer par Secteur
               </label>
               <select
                 id="sector-filter"
@@ -236,7 +236,7 @@ import type { MetaFunction } from "@remix-run/node";
                  placeholder="Entrez un nom, code, ID, article..."
                  value={searchTerm}
                  onChange={(e) => setSearchTerm(e.target.value)}
-                 icon={<FontAwesomeIcon icon={faSearch} />}
+                 icon={<FaSearch />}
                  wrapperClassName="mb-0"
                  disabled={isLoading} // Disable during action
                  className="bg-gray-900 text-white border-gray-700 focus:border-jdc-blue focus:ring-jdc-blue"
@@ -248,7 +248,7 @@ import type { MetaFunction } from "@remix-run/node";
           {/* Loading State for Action */}
           {isLoading && (
             <div className="text-center text-gray-400 py-10">
-              <FontAwesomeIcon icon={faSpinner} spin className="text-2xl mr-2" />
+              <FaSpinner className="text-2xl mr-2 animate-spin" />
               Traitement en cours...
             </div>
           )}
@@ -271,7 +271,7 @@ import type { MetaFunction } from "@remix-run/node";
                   <details className="group">
                     <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700 list-none transition-colors gap-4">
                       <div className="flex items-center min-w-0 mr-2 flex-grow">
-                        <FontAwesomeIcon icon={faBuilding} className="mr-3 text-jdc-blue text-lg flex-shrink-0" />
+                        <FaBuilding className="mr-3 text-jdc-blue text-lg flex-shrink-0" />
                         <div className="min-w-0">
                             <span className="font-semibold text-yellow-400 text-lg block truncate" title={clientName}>{clientName}</span>
                             <span className="ml-0 md:ml-3 text-sm text-gray-400">
@@ -286,8 +286,9 @@ import type { MetaFunction } from "@remix-run/node";
                       <div className="flex items-center flex-shrink-0 space-x-3">
                         {isAdmin && (
                             <Button
+                                as="button"
                                 variant="danger"
-                                size="sm"
+                                size="icon"
                                 title={`Supprimer tous les envois pour ${clientName}`}
                                 onClick={(e) => {
                                     e.preventDefault();
@@ -295,15 +296,13 @@ import type { MetaFunction } from "@remix-run/node";
                                     handleDeleteGroup(clientName, clientShipments);
                                 }}
                                 isLoading={deletingGroup === clientName}
-                                disabled={isLoading} // Disable if any action is in progress
-                                leftIcon={<FontAwesomeIcon icon={faTrash} />}
-                                className="flex-shrink-0"
+                                disabled={isLoading}
+                                leftIcon={<FaTrash className="h-4 w-4" />}
                             >
-                                Suppr. Groupe
+                                {""}
                             </Button>
                         )}
-                        <FontAwesomeIcon
-                          icon={faChevronRight}
+                        <FaChevronRight
                           className="text-gray-400 transition-transform duration-200 group-open:rotate-90 text-xl flex-shrink-0"
                         />
                       </div>
@@ -350,7 +349,7 @@ import type { MetaFunction } from "@remix-run/node";
                                     variant="secondary"
                                     size="sm"
                                     title="Suivre le colis"
-                                    leftIcon={<FontAwesomeIcon icon={faExternalLinkAlt} />}
+                                    leftIcon={<FaExternalLinkAlt />}
                                   >
                                     Suivi
                                   </Button>

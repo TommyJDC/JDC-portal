@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link, NavLink, Form } from '@remix-run/react';
-import { 
+import {
   FaBars,
   FaUserCircle,
   FaSignOutAlt,
@@ -258,7 +258,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                   }
                   prefetch="intent"
                 >
-                  <item.icon className="mr-2" />
+                  <item.icon className="mr-2 w-5 h-5" />
                   {item.name}
                 </NavLink>
               ))}
@@ -415,7 +415,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                   to={adminItem.to}
                   className={({ isActive }) => `${isActive ? linkActiveClass : linkInactiveClass} font-medium flex items-center transition-transform duration-200 ease-in-out hover:scale-105`}
                 >
-                  <adminItem.icon className="mr-1.5" />
+                  <adminItem.icon className="mr-1.5 w-5 h-5" />
                   {adminItem.name}
                 </NavLink>
               )}
@@ -440,7 +440,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                     aria-label="Barre de recherche"
                     role="searchbox"
                   />
-                  <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-jdc-gray-500" />
+                  <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-jdc-gray-500 w-5 h-5" />
                 </div>
               </div>
 
@@ -467,7 +467,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                 aria-label="Menu utilisateur"
                 aria-haspopup="true"
               >
-                <FaUserCircle className="text-xl" />
+                <FaUserCircle className="w-5 h-5" />
                 <span className="hidden sm:inline font-medium">
                   {profile?.displayName || user.displayName || user.email?.split('@')[0] || 'Utilisateur'}
                 </span>
@@ -487,7 +487,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                     <Menu.Item>
                       {({ active }) => (
                         <div className={`${menuItemBaseClass} ${active ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'}`}>
-                          <FaUser className="mr-2" />
+                          <FaUser className="mr-2 w-5 h-5" />
                           <div className="flex flex-col">
                             <span className="font-medium">{profile?.displayName || user.displayName}</span>
                             <span className="text-xs opacity-75">{user.email}</span>
@@ -503,7 +503,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                         isActive ? 'bg-jdc-gray-700 text-white' : 'text-jdc-gray-300'
                       }`}
                     >
-                      <FaUser className="mr-2" />
+                      <FaUser className="mr-2 w-5 h-5" />
                       Mon Profil
                     </NavLink>
                   </div>
@@ -517,7 +517,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                               active ? 'bg-red-600 text-white' : 'text-jdc-gray-300'
                             }`}
                           >
-                            <FaSignOutAlt className="mr-2" />
+                            <FaSignOutAlt className="mr-2 w-5 h-5" />
                             Déconnexion
                           </button>
                         )}

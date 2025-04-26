@@ -6,8 +6,7 @@ import type { Feature, FeatureCollection, Point } from 'geojson';
 import useGeoCoding from '~/hooks/useGeoCoding';
 import { kmlZones } from '~/utils/kmlZones';
 import type { SapTicket } from '~/types/firestore.types';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faExclamationTriangle, faMapMarkedAlt } from '@fortawesome/free-solid-svg-icons';
+import { FaSpinner, FaExclamationTriangle, FaMapMarkedAlt } from 'react-icons/fa';
 
 // Mapbox Access Token (Ensure this is securely managed, e.g., via environment variables)
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2ltcGVyZnk0MDQiLCJhIjoiY201ZnFuNG5wMDBoejJpczZkNXMxNTBveCJ9.BM3MvMHuUkhQj91tQTChoQ';
@@ -314,7 +313,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
     return (
       <div className="bg-jdc-card rounded-xl shadow-lg h-full w-full overflow-hidden flex items-center justify-center">
         <div className="text-center">
-          <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-2xl mb-2" />
+          <FaSpinner className="text-jdc-yellow text-2xl mb-2 animate-spin" />
           <p className="text-jdc-gray-400">Chargement de la carte...</p>
         </div>
       </div>
@@ -369,7 +368,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({ tickets, isLoadingTicke
                 closeOnClick={false}
                 offset={15}
               >
-                {renderPopupContent(selectedTicket)}
+                renderPopupContent(selectedTicket)
               </Popup>
             )}
           </Map>

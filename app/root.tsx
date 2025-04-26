@@ -16,10 +16,11 @@ import tailwindStylesHref from "~/tailwind.css?url";
 import globalStylesHref from "~/styles/global.css?url";
 import nProgressStylesHref from "nprogress/nprogress.css?url";
 import mapboxStylesHref from 'mapbox-gl/dist/mapbox-gl.css?url';
-import { config } from '@fortawesome/fontawesome-svg-core';
 
-// Tell Font Awesome to skip adding the CSS automatically since it's being added manually via Remix links
-config.autoAddCss = false;
+
+
+
+
 
 import { Header } from "~/components/Header";
 import { DebugAuth } from "~/components/DebugAuth";

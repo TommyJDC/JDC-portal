@@ -1,7 +1,6 @@
 import type { EntryContext } from "@remix-run/node";
 import { RemixServer } from "@remix-run/react";
 import { renderToString } from "react-dom/server";
-import { dom } from '@fortawesome/fontawesome-svg-core';
 
 export default function handleRequest(
   request: Request,
@@ -13,13 +12,10 @@ export default function handleRequest(
     <RemixServer context={remixContext} url={request.url} />
   );
 
-  // Collect Font Awesome server styles
-  const styles = dom.css();
-
   // Inject styles into the head
   const html = `<!DOCTYPE html>${markup.replace(
     '</head>',
-    `${styles}</head>`
+    `</head>`
   )}`;
 
   responseHeaders.set("Content-Type", "text/html");

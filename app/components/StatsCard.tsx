@@ -1,13 +1,11 @@
 import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { FaSpinner } from 'react-icons/fa';
 import { getStringValue } from '~/utils/firestoreUtils';
 
 interface StatsCardProps {
   title: string; // Title like "Tickets SAP (Total)"
   value: string | number; // Main value (live count)
-  icon: IconDefinition;
+  icon: React.ElementType; // Change type to React component
   isLoading?: boolean; // Optional loading prop
   evolutionValue?: number | null; // Optional: Numeric change value (live - snapshot)
   height?: string; // Optional: Custom height (e.g. "h-32", "h-40")
@@ -34,7 +32,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, isLoad
     <div className={`bg-gray-800 p-2 rounded-lg shadow-lg border border-transparent hover:border-jdc-blue transition-all duration-300 ease-in-out flex flex-col items-center justify-center text-center space-y-1 ${height}`}>
       {/* Icon */}
       <div className="p-3 rounded-md bg-jdc-yellow/20 text-jdc-yellow border border-jdc-yellow/30 flex-shrink-0"> {/* Icône jaune, taille et padding ajustés */}
-        <FontAwesomeIcon icon={icon} className="h-6 w-6" /> {/* Taille de l'icône légèrement réduite */}
+        {React.createElement(icon, { className: "h-6 w-6" })} {/* Utiliser React.createElement pour rendre l'icône */}
       </div>
 
       {/* Title, Value, and Evolution */}

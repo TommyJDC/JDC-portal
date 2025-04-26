@@ -5,8 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import frLocale from '@fullcalendar/core/locales/fr';
 import { getWeekDateRangeForAgenda, formatFirestoreDate } from "~/utils/dateUtils"; // Import ajouté
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCalendarDays, faSpinner, faExclamationTriangle, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { FaCalendarAlt, FaSpinner, FaExclamationTriangle, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 interface CalendarEvent {
     id: string;
     title: string;
@@ -77,7 +76,7 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
     if (isLoading) {
         return (
             <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 min-h-[200px] flex items-center justify-center">
-                <FontAwesomeIcon icon={faSpinner} spin className="text-jdc-yellow text-xl mr-2" />
+                <FaSpinner className="text-jdc-yellow text-xl mr-2 animate-spin" />
                 <span className="text-gray-400">Chargement de l'agenda...</span>
             </div>
         );
@@ -87,7 +86,7 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
         <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out flex flex-col">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold text-white flex items-center">
-                    <FontAwesomeIcon icon={faCalendarDays} className="mr-2 text-jdc-yellow" />
+                    <FaCalendarAlt className="mr-2 text-jdc-yellow" style={{ width: '13px', height: '13px' }} />
                     Agenda de la semaine
                 </h3>
 
@@ -97,7 +96,7 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
                         className={buttonStyle}
                         aria-label="Semaine précédente"
                     >
-                        <FontAwesomeIcon icon={faChevronLeft} />
+                        <FaChevronLeft />
                     </button>
 
                     <button
@@ -112,14 +111,14 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
                         className={buttonStyle}
                         aria-label="Semaine suivante"
                     >
-                        <FontAwesomeIcon icon={faChevronRight} />
+                        <FaChevronRight />
                     </button>
                 </div>
             </div>
 
             {error && (
                 <div className="text-red-400 bg-red-900 bg-opacity-50 p-3 rounded mb-4">
-                    <FontAwesomeIcon icon={faExclamationTriangle} className="mr-1" /> {error}
+                    <FaExclamationTriangle className="mr-1" /> {error}
                 </div>
             )}
 

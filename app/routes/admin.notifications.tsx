@@ -3,8 +3,7 @@ import { Form, useActionData, useNavigation } from '@remix-run/react';
 import type { ActionFunctionArgs, SerializeFrom } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { createNotification } from '~/services/notifications.service.server';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { FaSpinner } from 'react-icons/fa';
 
 type ActionData = {
   error?: string;
@@ -30,7 +29,8 @@ export async function action({ request }: ActionFunctionArgs): Promise<Response>
       title,
       message,
       link: link || undefined,
-      type: type || 'system'
+      type: (type || 'ticket_created') as 'ticket_created' | 'ticket_closed' | 'shipment' | 'installation' | 'installation_closed', // Explicitly cast to NotificationType
+      createdAt: new Date() // Added createdAt
     });
 
     if (notification) {
@@ -47,7 +47,7 @@ export default function AdminNotifications() {
   const actionData = useActionData<SerializeFrom<ActionData>>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
-  const [notificationType, setNotificationType] = useState('system');
+  const [notificationType, setNotificationType] = useState('ticket_created'); // Changed default value
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -116,9 +116,12 @@ export default function AdminNotifications() {
             onChange={(e) => setNotificationType(e.target.value)}
             className="w-full px-3 py-2 bg-jdc-gray-800 border border-jdc-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-jdc-yellow focus:border-transparent"
           >
-            <option value="system">Système</option>
-            <option value="ticket">Ticket</option>
+            {/* Removed 'system' option as it's not in NotificationType */}
+            <option value="ticket_created">Ticket créé</option>
+            <option value="ticket_closed">Ticket fermé</option>
             <option value="shipment">Envoi</option>
+            <option value="installation">Installation</option>
+            <option value="installation_closed">Installation fermée</option>
           </select>
         </div>
 
@@ -137,7 +140,7 @@ export default function AdminNotifications() {
         >
           {isSubmitting ? (
             <>
-              <FontAwesomeIcon icon={faSpinner} className="animate-spin mr-2" />
+              <FaSpinner className="animate-spin mr-2" />
               Création en cours...
             </>
           ) : (

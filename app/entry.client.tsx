@@ -1,10 +1,12 @@
 import { RemixBrowser } from "@remix-run/react";
 import { startTransition, StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
+import mapboxgl from 'mapbox-gl';
 
-// Import FontAwesome config and disable auto CSS addition
-import { config } from '@fortawesome/fontawesome-svg-core';
-config.autoAddCss = false;
+// @ts-ignore
+// eslint-disable-next-line import/no-webpack-loader-syntax
+import mapboxWorker from 'mapbox-gl/dist/mapbox-gl-csp-worker?worker';
+mapboxgl.workerClass = mapboxWorker;
 
 startTransition(() => {
   hydrateRoot(

@@ -59,6 +59,7 @@ export interface Notification {
   type: NotificationType;
   sector?: string[];
   targetRoles?: UserRole[];
+  title: string; // Added title property
   message: string;
   metadata?: Record<string, any>;
   createdAt: Timestamp | Date;
@@ -93,7 +94,9 @@ export interface Shipment {
   codePostal: string;
   statutExpedition: 'OUI' | 'NON' | string;
   secteur: string;
-  dateCreation?: string;
+  dateCreation?: Date; // Changed type to Date
+  articleNom?: string; // Added articleNom
+  trackingLink?: string; // Added trackingLink
 }
 
 export type InstallationStatus = 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';

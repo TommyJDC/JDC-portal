@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSave } from "@fortawesome/free-solid-svg-icons";
+import { FaSave } from 'react-icons/fa';
 import { convertFirestoreDate, formatFirestoreDate } from "~/utils/dateUtils"; // Import ajouté
 import { getStringValue } from '~/utils/firestoreUtils';
 
@@ -166,7 +165,7 @@ const InstallationTabacTile: React.FC<InstallationTabacTileProps> = ({ installat
           onClick={() => onSave(localInstallation)}
           className="w-full bg-jdc-blue hover:bg-jdc-blue-dark text-white font-bold py-2 px-4 rounded flex items-center justify-center gap-2"
         >
-          <FontAwesomeIcon icon={faSave} />
+          <FaSave />
           Sauvegarder
         </button>
       </div>
