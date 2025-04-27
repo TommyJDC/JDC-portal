@@ -112,6 +112,8 @@ export const COLUMN_MAPPINGS: ColumnMappings = {
 import { initializeFirebaseAdmin, getDb } from '~/firebase.admin.config.server';
 import type { InstallationStatus } from "~/types/firestore.types"; // Importer le type InstallationStatus
 
+console.log("[api.sync-installations] Action déclenchée.");
+
 let db: Firestore;
 
 async function ensureFirebaseInitialized() {

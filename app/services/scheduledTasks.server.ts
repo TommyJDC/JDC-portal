@@ -22,18 +22,22 @@ export async function triggerScheduledTasks() {
 
         let success = false;
         if (task.type === 'action') {
-          // Créer un objet Request simulé pour l'action Remix
-          // Utiliser un chemin de base au lieu de localhost pour la compatibilité Vercel
-          const request = new Request('/', { method: 'POST' }); // Utilisez POST si l'action est POST
-
-          // Appeler l'action directement
-          const response = await task.handler({ request, params: {}, context: {} }) as Response; // Caster en Response
+          // Appeler l'action directement.
+          // Passer undefined pour l'objet request et caster en 'any' pour satisfaire TypeScript,
+          // car la simulation avec new Request cause une erreur sur Vercel et les actions ne dépendent pas d'un objet Request complet.
+          const response = await task.handler({ request: undefined as any, params: {}, context: {} }) as Response; // Caster en Response
 
           if (response.status === 200) {
             success = true;
           } else {
-            const errorBody = await response.json();
-            console.error(`[scheduledTasks] Erreur lors du déclenchement de la tâche ${task.name}:`, response.status, response.statusText, errorBody);
+            // Tenter de lire le corps de l'erreur si la réponse n'est pas OK
+            try {
+                const errorBody = await response.json();
+                console.error(`[scheduledTasks] Erreur lors du déclenchement de la tâche ${task.name}:`, response.status, response.statusText, errorBody);
+            } catch (jsonError) {
+                // Si le corps n'est pas JSON, afficher le statut et le texte
+                console.error(`[scheduledTasks] Erreur lors du déclenchement de la tâche ${task.name}:`, response.status, response.statusText, "Impossible de parser le corps de l'erreur en JSON.");
+            }
           }
         } else if (task.type === 'service') {
           // Appeler la fonction de service directement

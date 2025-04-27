@@ -9,6 +9,7 @@ import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { google , gmail_v1 } from 'googleapis';
 
+console.log("[api.gmail-to-firestore] Action déclenchée.");
 
 let db: FirebaseFirestore.Firestore;
 
