@@ -1,5 +1,5 @@
 import { getFirestore } from 'firebase-admin/firestore';
-import { initializeFirebaseAdmin } from './firebase.admin.config.server'; // Assurez-vous que ce chemin est correct
+import { initializeFirebaseAdmin } from '~/firebase.admin.config.server'; // Utilisez l'alias de chemin
 import fetch from 'node-fetch';
 
 const TASK_COLLECTION = 'scheduledTasksState';
