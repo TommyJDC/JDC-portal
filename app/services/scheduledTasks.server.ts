@@ -36,9 +36,21 @@ export async function triggerScheduledTasks() {
         console.log(`[scheduledTasks] Déclenchement de la tâche : ${task.name}`);
         // Ajouter le protocole https:// à l'URL Vercel
         const apiUrl = `https://${process.env.VERCEL_URL}${task.path}`;
-        
+        // Ajouter une clé API pour l'authentification des appels internes
+        const apiKey = process.env.SCHEDULED_TASKS_API_KEY;
+        if (!apiKey) {
+          console.error(`[scheduledTasks] SCHEDULED_TASKS_API_KEY n'est pas configurée.`);
+          continue; // Passer à la tâche suivante si la clé n'est pas configurée
+        }
+
         // Utiliser la méthode GET pour les Cron Jobs simulés
-        const response = await fetch(apiUrl, { method: 'GET' }); 
+        // Inclure la clé API dans un en-tête personnalisé
+        const response = await fetch(apiUrl, { 
+          method: 'GET',
+          headers: {
+            'X-API-Key': apiKey
+          }
+        }); 
 
         if (response.ok) {
           console.log(`[scheduledTasks] Tâche ${task.name} exécutée avec succès.`);

@@ -252,6 +252,22 @@ export const handler = async (event) => {
     path: event.path,
     query: event.queryStringParameters
   });
+
+  // Vérifier la clé API pour l'authentification interne (pour les requêtes GET des tâches planifiées)
+  // Note: L'authentification pour les requêtes POST (événements Firestore) peut nécessiter une approche différente.
+  if (event.httpMethod === 'GET') {
+    const apiKey = event.headers['x-api-key'];
+    const expectedApiKey = process.env.SCHEDULED_TASKS_API_KEY;
+
+    if (!apiKey || apiKey !== expectedApiKey) {
+      console.error('[sap-notifications] Tentative d\'accès non autorisée (clé API manquante ou incorrecte)');
+      return {
+        statusCode: 401,
+        body: JSON.stringify({ success: false, error: 'Unauthorized' })
+      };
+    }
+  }
+
   try {
     if (!db) {
       db = await initializeFirebaseAdmin();

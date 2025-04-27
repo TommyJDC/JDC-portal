@@ -3,6 +3,18 @@ import fetch from 'node-fetch';
 export const handler = async (event, context) => {
   console.log('[sync-installations] Début de la synchronisation');
 
+  // Vérifier la clé API pour l'authentification interne
+  const apiKey = event.headers['x-api-key'];
+  const expectedApiKey = process.env.SCHEDULED_TASKS_API_KEY;
+
+  if (!apiKey || apiKey !== expectedApiKey) {
+    console.error('[sync-installations] Tentative d\'accès non autorisée (clé API manquante ou incorrecte)');
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ success: false, error: 'Unauthorized' })
+    };
+  }
+
   try {
     const apiUrl = `${process.env.VERCEL_URL}/api/sync-installations`;
     console.log('[sync-installations] Appel de l\'API:', apiUrl);
