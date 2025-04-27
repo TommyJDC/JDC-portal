@@ -12,6 +12,7 @@ self.addEventListener('install', (event) => {
     caches.open('offline-cache').then((cache) => {
       return cache.addAll([
         '/',
+        '/index.html',
         '/manifest.json',
         '/favicon.ico',
         '/icons/android/android-launchericon-192-192.png',

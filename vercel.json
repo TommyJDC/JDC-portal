@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/scheduled-gmail-processing",
+      "schedule": "@hourly"
+    },
+    {
+      "path": "/api/sync-installations",
+      "schedule": "@hourly"
+    },
+    {
+      "path": "/api/sap-notification",
+      "schedule": "@hourly"
+    }
+  ]
+}

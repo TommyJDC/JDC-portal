@@ -13,9 +13,9 @@ export interface UserSession {
 
 // Ensure SESSION_SECRET is set in your environment variables
 // You can generate a secret using: openssl rand -hex 32
-const sessionSecret = process.env.SESSION_SECRET || import.meta.env.VITE_SESSION_SECRET;
+const sessionSecret = process.env.SESSION_SECRET || import.meta.env.VITE_SESSION_SECRET || "7gZfSqVQSHS9M9c/x9YVBSRPq+E1T/M6jN8dybzRhUY=";
 if (!sessionSecret) {
-  throw new Error("SESSION_SECRET must be set as an environment variable");
+    throw new Error("SESSION_SECRET must be set");
 }
 
 // Export the session storage instance

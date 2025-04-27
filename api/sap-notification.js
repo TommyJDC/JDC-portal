@@ -304,6 +304,14 @@ export const handler = async (event) => {
         statusCode: 200,
         body: JSON.stringify({ message: 'Événement Firestore traité avec succès' })
       };
+    } else if (event.httpMethod === 'GET') {
+      // Logique pour les requêtes GET (Cron Jobs)
+      console.log('[sap-notifications] Reçu une requête GET (potentiellement un Cron Job). Aucune logique de balayage implémentée.');
+      // TODO: Ajouter ici la logique pour interroger Firestore pour les événements récents si nécessaire pour les Cron Jobs
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: 'Requête GET reçue. Logique de balayage non implémentée.' })
+      };
     }
     
     // Si la requête ne correspond à aucun cas géré

@@ -1,23 +1,31 @@
 import { vitePlugin as remix } from "@remix-run/dev";
+import { installGlobals } from "@remix-run/node"; // Import installGlobals
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { netlifyPlugin } from "@netlify/remix-adapter/plugin";
 import { VitePWA } from 'vite-plugin-pwa';
+
+installGlobals(); // Call installGlobals
 
 export default defineConfig({
   build: {
     rollupOptions: {
       external: [
-        'exceljs', 
-        '@fullcalendar/react', 
+        'exceljs',
         '@radix-ui/react-label', 
         'class-variance-authority'
       ]
     }
   },
   plugins: [
-    remix(),
-    netlifyPlugin(),
+    remix({
+      // No explicit adapter needed for Vercel with recent Remix versions
+      // Remix detects the Vercel environment automatically
+      future: {
+        v3_fetcherPersist: true,
+        v3_relativeSplatPath: true,
+        v3_throwAbortReason: true,
+      },
+    }),
     tsconfigPaths(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -80,7 +88,7 @@ export default defineConfig({
               cacheName: 'google-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 jours
+                maxAgeSeconds: 60 * 60 * 24 * 365
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -94,7 +102,7 @@ export default defineConfig({
               cacheName: 'gstatic-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 jours
+                maxAgeSeconds: 60 * 60 * 24 * 365
               },
               cacheableResponse: {
                 statuses: [0, 200]
