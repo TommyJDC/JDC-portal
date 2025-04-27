@@ -143,7 +143,7 @@ export async function getClientCodesWithShipment(sector: string): Promise<Set<st
     }
   });
 
-  return clientCodes;
+  return clientCodes; // Ajouter le retour
 }
 
 export async function getAllTicketsForSectorsSdk() {
@@ -175,10 +175,10 @@ export async function updateSAPTICKET(sectorId: string, ticketId: string, update
   await ticketRef.update(updates);
 }
 
-export async function getAllShipments() {
+export async function getAllShipments(): Promise<Shipment[]> { // Spécifier le type de retour
   if (!db) await initializeFirebaseAdmin();
   const snapshot = await db.collection('Envoi').get();
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as unknown[] as Shipment[]; // Adjust type if needed
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Shipment)); // Caster explicitement
 }
 
 export async function deleteShipmentSdk(shipmentId: string): Promise<void> {
@@ -595,16 +595,16 @@ export async function getHeuresDraft(userId: string, fileId: string): Promise<He
  * @returns Promise<{ success: boolean; message: string }>
  */
 export async function deleteSapTicket(
-  sectorId: string, 
+  sectorId: string,
   ticketId: string
 ): Promise<{ success: boolean; message: string }> {
   try {
     if (!sectorId || !ticketId) {
       throw new Error('Paramètres sectorId et ticketId requis');
     }
-    
+
     if (!db) await initializeFirebaseAdmin();
-    
+
     const validSectors = ['CHR', 'HACCP', 'Kezia', 'Tabac'];
     if (!validSectors.includes(sectorId)) {
       throw new Error(`Secteur invalide: ${sectorId}`);
@@ -614,19 +614,19 @@ export async function deleteSapTicket(
     const docExists = (await docRef.get()).exists;
 
     if (!docExists) {
-      return { 
+      return {
         success: false,
         message: `Ticket ${ticketId} introuvable dans le secteur ${sectorId}`
       };
     }
 
     await docRef.delete();
-    
+
     return {
       success: true,
       message: `Ticket ${ticketId} supprimé avec succès du secteur ${sectorId}`
     };
-    
+
   } catch (error) {
     console.error(`Erreur suppression ticket ${ticketId} (${sectorId}) :`, error);
     return {
@@ -634,4 +634,25 @@ export async function deleteSapTicket(
       message: error instanceof Error ? error.message : 'Erreur inconnue lors de la suppression'
     };
   }
+}
+
+// --- Fonctions pour gérer l'état des tâches planifiées ---
+const TASK_COLLECTION = 'scheduledTasksState';
+
+interface TaskState {
+  lastRun: Timestamp;
+}
+
+export async function getScheduledTaskState(taskName: string): Promise<TaskState | undefined> {
+  if (!db) await initializeFirebaseAdmin();
+  const taskDoc = await db.collection(TASK_COLLECTION).doc(taskName).get();
+  const data = taskDoc.data();
+  if (!data) return undefined;
+  return data as TaskState;
+}
+
+export async function updateScheduledTaskState(taskName: string): Promise<void> {
+  if (!db) await initializeFirebaseAdmin();
+  const now = new Date();
+  await db.collection(TASK_COLLECTION).doc(taskName).set({ lastRun: now });
 }

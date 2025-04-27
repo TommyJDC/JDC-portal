@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "remix vite:build",
-    "dev": "remix vite:dev",
+    "dev": "cross-env NODE_OPTIONS=--openssl-legacy-provider remix vite:dev",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "vercel dev",
     "typecheck": "tsc"
@@ -37,11 +37,11 @@
     "firebase-admin": "^13.2.0",
     "framer-motion": "^12.7.4",
     "google-spreadsheet": "^4.1.1",
-    "node-fetch": "^3.3.2",
     "googleapis": "^148.0.0",
     "isbot": "^4.1.0",
     "lucide-react": "^0.503.0",
     "mapbox-gl": "^3.11.0",
+    "node-fetch": "^3.3.2",
     "nprogress": "^0.2.0",
     "react": "^18.2.0",
     "react-big-calendar": "^1.18.0",
@@ -54,6 +54,7 @@
     "remix-auth": "^3.7.0",
     "remix-auth-google": "^2.0.0",
     "tailwind-merge": "^3.2.0",
+    "vercel": "^41.6.2",
     "vite-env-only": "^3.0.3"
   },
   "devDependencies": {
@@ -68,6 +69,7 @@
     "@typescript-eslint/eslint-plugin": "^6.7.4",
     "@typescript-eslint/parser": "^6.7.4",
     "autoprefixer": "^10.4.19",
+    "cross-env": "^7.0.3",
     "esbuild": "^0.25.2",
     "eslint": "^8.38.0",
     "eslint-config-prettier": "^9.0.0",

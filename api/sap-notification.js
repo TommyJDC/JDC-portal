@@ -1,46 +1,13 @@
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-
-async function initializeFirebaseAdmin() {
-  try {
-    const app = initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      })
-    });
-    
-    return getFirestore(app);
-  } catch (error) {
-    if (error.code === 'app/duplicate-app') {
-    const apps = getApps();
-    const app = apps.length ? apps[0] : null;
-    if (app) {
-        return getFirestore(app);
-      }
-    }
-    console.error('Firebase Admin initialization error:', error);
-    throw error;
-  }
-}
+import { initializeFirebaseAdmin } from '../app/firebase.admin.config.server'; // Ajustez le chemin si nécessaire
 
 let db;
 
-// Fonction pour obtenir les utilisateurs notifiables
-async function getNotifiableUsers() {
-  console.log('[sap-notifications] Récupération des utilisateurs notifiables');
-  const usersRef = db.collection('users');
-  const snapshot = await usersRef
-    .where('role', 'in', ['Admin', 'Technician'])
-    .get();
-  
-  const users = snapshot.docs.map(doc => ({
-    ...doc.data(),
-    uid: doc.id,
-  }));
-  console.log(`[sap-notifications] ${users.length} utilisateurs notifiables trouvés`);
-  return users;
+async function ensureDb() {
+  if (!db) {
+    db = await initializeFirebaseAdmin();
+  }
+  return db;
 }
 
 // Créer une notification (modifiée pour la nouvelle structure)
@@ -52,14 +19,15 @@ async function createNotification(notificationData) {
     sourceId: notificationData.metadata?.ticketId || notificationData.metadata?.shipmentId || notificationData.metadata?.installationId
   });
   try {
+    const db = await ensureDb(); // Utiliser ensureDb ici
     const notificationToSave = {
       ...notificationData,
       createdAt: new Date(), // Utiliser Date pour la création
       read: false, // Les nouvelles notifications sont non lues par défaut
     };
 
-    const notificationRef = await db.collection('notifications').add(notificationToSave);
-    console.log('[sap-notifications] Notification créée avec ID:', notificationRef.id);
+    const docRef = await db.collection('notifications').add(notificationToSave);
+    console.log('[sap-notifications] Notification créée avec ID:', docRef.id);
     return true;
   } catch (error) {
     console.error('Erreur lors de la création de la notification:', error);
@@ -148,52 +116,6 @@ async function notifyClosedSapTicket(ticket) {
   }
 }
 
-
-// --- Ajout logique notification SAP depuis Firestore installations (modifiée) ---
-async function notifySapFromInstallations() {
-  console.log('[sap-notifications] Début notification depuis installations');
-  if (!db) {
-    db = await initializeFirebaseAdmin();
-  }
-
-  // Récupérer toutes les installations, tous secteurs confondus
-  const snapshot = await db.collection('installations').get();
-  let notifiedCount = 0;
-  for (const doc of snapshot.docs) {
-    const data = doc.data();
-    // Notification pour nouvelle installation (status 'rendez-vous pris' et pas encore notifié)
-    if (data.status === 'rendez-vous pris' && !data.sapNotificationSent) {
-      const notificationData = {
-        type: 'installation',
-        sector: [data.secteur],
-        targetRoles: ['Admin', 'Technician'], // Cibler Admins et Techniciens pour les nouvelles installations
-        message: `Nouvelle installation (${data.secteur}) - ${data.nom || data.codeClient} - ${data.commentaire || 'Rendez-vous pris'}`,
-        metadata: { installationId: doc.id },
-        link: `/installations/${data.secteur.toLowerCase()}-firestore?id=${doc.id}` // Lien vers l'installation (ajuster si nécessaire)
-      };
-      await createNotification(notificationData);
-      await doc.ref.update({ sapNotificationSent: true }); // Marquer comme notifié
-      notifiedCount++;
-    }
-    // Notification pour clôture d'installation (status 'installation terminée' et pas encore notifié de clôture)
-    if (data.status === 'installation terminée' && !data.installationClosedNotificationSent) {
-       const notificationData = {
-        type: 'installation_closed',
-        sector: [data.secteur],
-        targetRoles: ['Admin', 'Client'], // Cibler Admins et Clients pour les clôtures
-        message: `Installation terminée (${data.secteur}) - ${data.nom || data.codeClient}`,
-        metadata: { installationId: doc.id },
-        link: `/installations/${data.secteur.toLowerCase()}-firestore?id=${doc.id}` // Lien vers l'installation (ajuster si nécessaire)
-      };
-      await createNotification(notificationData);
-      await doc.ref.update({ installationClosedNotificationSent: true }); // Marquer comme notifié de clôture
-      notifiedCount++;
-    }
-  }
-  console.log(`[sap-notifications] ${notifiedCount} notifications générées depuis installations`);
-  return notifiedCount;
-}
-
 // Nouvelle fonction pour notifier une nouvelle installation (déclenchée par événement Firestore)
 async function notifyNewInstallation(installation) {
   console.log('[sap-notifications] Notification nouvelle installation:', {
@@ -256,32 +178,27 @@ export const handler = async (event) => {
   // Vérifier la clé API pour l'authentification interne (pour les requêtes GET des tâches planifiées)
   // Note: L'authentification pour les requêtes POST (événements Firestore) peut nécessiter une approche différente.
   if (event.httpMethod === 'GET') {
-    const apiKey = event.headers['x-api-key'];
-    const expectedApiKey = process.env.SCHEDULED_TASKS_API_KEY;
-
-    if (!apiKey || apiKey !== expectedApiKey) {
-      console.error('[sap-notifications] Tentative d\'accès non autorisée (clé API manquante ou incorrecte)');
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ success: false, error: 'Unauthorized' })
+    // Cette logique est maintenant gérée dans scheduledTasks.server.ts
+    console.log('[sap-notifications] Reçu une requête GET. Logique de balayage déplacée.');
+     return {
+        statusCode: 200,
+        body: JSON.stringify({ message: 'Requête GET reçue. Logique de balayage déplacée.' })
       };
-    }
   }
 
+
   try {
-    if (!db) {
-      db = await initializeFirebaseAdmin();
-    }
+    const db = await ensureDb(); // Utiliser ensureDb ici
 
     // Gérer les événements Firestore (POST)
     if (event.httpMethod === 'POST' && event.body) {
       const data = JSON.parse(event.body);
-      
+
       // Si c'est un nouveau ticket SAP
       if (data.collection === 'tickets-sap' && data.type === 'created') {
         await notifyNewSapTicket(data.document);
       }
-      
+
       // Si c'est un ticket SAP mis à jour (pour la clôture)
       if (data.collection === 'tickets-sap' && data.type === 'updated' && data.document?.status === 'closed') {
          await notifyClosedSapTicket(data.document);
@@ -291,7 +208,7 @@ export const handler = async (event) => {
       if (data.collection === 'envois-ctn' && data.type === 'created') {
         await notifyNewCTN(data.document);
       }
-      
+
       // Si c'est une nouvelle installation
       if (data.collection === 'installations' && data.type === 'created' && data.document?.status === 'rendez-vous pris') {
         // Note: We might need to check if sapNotificationSent is already true if this event can fire multiple times for the same doc
@@ -320,17 +237,9 @@ export const handler = async (event) => {
         statusCode: 200,
         body: JSON.stringify({ message: 'Événement Firestore traité avec succès' })
       };
-    } else if (event.httpMethod === 'GET') {
-      // Logique pour les requêtes GET (Cron Jobs)
-      console.log('[sap-notifications] Reçu une requête GET (potentiellement un Cron Job). Aucune logique de balayage implémentée.');
-      // TODO: Ajouter ici la logique pour interroger Firestore pour les événements récents si nécessaire pour les Cron Jobs
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ message: 'Requête GET reçue. Logique de balayage non implémentée.' })
-      };
     }
-    
-    // Si la requête ne correspond à aucun cas géré
+
+    // Si la requête ne correspond à aucun cas géré (et n'est pas un GET)
     return {
         statusCode: 400,
         body: JSON.stringify({ message: 'Requête non supportée ou corps manquant' })

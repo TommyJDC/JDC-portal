@@ -1,5 +1,5 @@
 import { initializeFirebaseAdmin, getDb } from '~/firebase.admin.config.server';
-import type { Notification, UserProfile } from '~/types/firestore.types'; // Import UserProfile
+import type { Notification, UserProfile, NotificationType, UserRole } from '~/types/firestore.types'; // Import UserProfile, NotificationType, and UserRole
 import type { DocumentData, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 let db: FirebaseFirestore.Firestore;
@@ -64,12 +64,12 @@ export const markAllNotificationsAsRead = async (userId: string) => {
   }
 };
 
-export const createNotification = async (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+export const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
   try {
     const db = await ensureDb();
     const notificationData = {
       ...notification,
-      timestamp: new Date(),
+      createdAt: new Date(), // Utiliser createdAt
       read: false
     };
 
@@ -77,7 +77,7 @@ export const createNotification = async (notification: Omit<Notification, 'id' |
     return {
       id: docRef.id,
       ...notificationData
-    };
+    } as Notification; // Caster pour assurer le type de retour complet
   } catch (error) {
     console.error('Error creating notification:', error);
     return null;
@@ -111,6 +111,52 @@ export const getUnreadNotificationsCount = async (userId: string) => {
   }
 };
 
+// --- Ajout logique notification SAP depuis Firestore installations ---
+export async function notifySapFromInstallations() {
+  console.log('[notifications.service] Début notification depuis installations');
+  const db = await ensureDb();
+
+  // Récupérer toutes les installations, tous secteurs confondus
+  const snapshot = await db.collection('installations').get();
+  let notifiedCount = 0;
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    // Notification pour nouvelle installation (status 'rendez-vous pris' et pas encore notifié)
+    if (data.status === 'rendez-vous pris' && !data.sapNotificationSent) {
+      const notificationData = {
+        type: 'installation' as NotificationType, // Caster explicitement
+        sector: [data.secteur as string], // Caster explicitement
+        targetRoles: ['Admin', 'Technician'] as UserRole[], // Caster explicitement
+        title: `Nouvelle installation ${data.secteur}`,
+        message: `Nouvelle installation (${data.secteur}) - ${data.nom || data.codeClient} - ${data.commentaire || 'Rendez-vous pris'}`,
+        metadata: { installationId: doc.id },
+        link: `/installations/${(data.secteur as string).toLowerCase()}-firestore?id=${doc.id}` // Caster explicitement
+      };
+      await createNotification(notificationData);
+      await doc.ref.update({ sapNotificationSent: true }); // Marquer comme notifié
+      notifiedCount++;
+    }
+    // Notification pour clôture d'installation (status 'installation terminée' et pas encore notifié de clôture)
+    if (data.status === 'installation terminée' && !data.installationClosedNotificationSent) {
+       const notificationData = {
+        type: 'installation_closed' as NotificationType, // Caster explicitement
+        sector: [data.secteur as string], // Caster explicitement
+        targetRoles: ['Admin', 'Client'] as UserRole[], // Caster explicitement
+        title: `Installation terminée ${data.secteur}`,
+        message: `Installation terminée (${data.secteur}) - ${data.nom || data.codeClient}`,
+        metadata: { installationId: doc.id },
+        link: `/installations/${(data.secteur as string).toLowerCase()}-firestore?id=${doc.id}` // Caster explicitement
+      };
+      await createNotification(notificationData);
+      await doc.ref.update({ installationClosedNotificationSent: true }); // Marquer comme notifié de clôture
+      notifiedCount++;
+    }
+  }
+  console.log(`[notifications.service] ${notifiedCount} notifications générées depuis installations`);
+  return notifiedCount;
+}
+
+
 // New function for real-time listening
 // Note: This function runs on the server, so it uses firebase-admin
 // For client-side listening, you'd use the Firebase JS SDK
@@ -122,7 +168,7 @@ export const setupNotificationsListener = async (
     const db = await ensureDb();
     // Query primarily by timestamp, filter later
     // We need Timestamp from firebase-admin/firestore
-    const { Timestamp } = await import('firebase-admin/firestore'); 
+    const { Timestamp } = await import('firebase-admin/firestore');
 
     const query = db.collection('notifications')
       .orderBy('createdAt', 'desc') // Assuming 'createdAt' field exists and is a Timestamp
@@ -132,7 +178,7 @@ export const setupNotificationsListener = async (
       const allNotifications = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
         const data = doc.data();
         // Ensure createdAt is a Date object
-        const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()); 
+        const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date());
         return {
           id: doc.id,
           ...data,
@@ -143,14 +189,14 @@ export const setupNotificationsListener = async (
       // Filter notifications based on user profile
       const filteredNotifications = allNotifications.filter(notif => {
         // Admins see everything
-        if (user.role === 'Admin') return true; 
+        if (user.role === 'Admin') return true;
 
         // Check if targeted directly to user
         if (notif.userId === user.uid) return true;
 
         // Check if targeted to user's role(s)
         // Assuming user.role is a single string like 'Technician'. Adjust if it's an array.
-        if (notif.targetRoles && notif.targetRoles.includes(user.role)) return true; 
+        if (notif.targetRoles && notif.targetRoles.includes(user.role)) return true;
 
         // Check if targeted to user's sector(s)
         // Assuming user.secteurs is an array of strings.

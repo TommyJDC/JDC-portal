@@ -1,62 +1,52 @@
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeFirebaseAdmin } from '~/firebase.admin.config.server'; // Utilisez l'alias de chemin
-import fetch from 'node-fetch';
-
-const TASK_COLLECTION = 'scheduledTasksState';
-
-interface TaskState {
-  lastRun: Date;
-}
-
-async function getDb() {
-  // Assurez-vous que Firebase Admin est initialisé
-  // La fonction initializeFirebaseAdmin doit gérer l'initialisation unique
-  await initializeFirebaseAdmin(); 
-  return getFirestore();
-}
+import { action as processGmailAction } from '~/routes/api.gmail-to-firestore';
+import { action as syncInstallationsAction } from '~/routes/api.sync-installations';
+import { notifySapFromInstallations } from '~/services/notifications.service.server';
+import { getScheduledTaskState, updateScheduledTaskState } from '~/services/firestore.service.server'; // Importez les fonctions de service Firestore
 
 export async function triggerScheduledTasks() {
-  const db = await getDb();
-  const tasksRef = db.collection(TASK_COLLECTION);
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // Une heure en millisecondes
 
   const tasksToRun = [
-    { name: 'scheduled-gmail-processing', path: '/api/scheduled-gmail-processing' },
-    { name: 'sync-installations', path: '/api/sync-installations' },
-    { name: 'sap-notification', path: '/api/sap-notification' }, 
+    { name: 'scheduled-gmail-processing', type: 'action', handler: processGmailAction },
+    { name: 'sync-installations', type: 'action', handler: syncInstallationsAction },
+    { name: 'sap-notification', type: 'service', handler: notifySapFromInstallations },
   ];
 
   for (const task of tasksToRun) {
     try {
-      const taskDoc = await tasksRef.doc(task.name).get();
-      const taskState = taskDoc.data() as TaskState | undefined;
+      const taskState = await getScheduledTaskState(task.name); // Utiliser la fonction de service
 
-      if (!taskState || taskState.lastRun < oneHourAgo) {
+      if (!taskState || (taskState.lastRun && taskState.lastRun.toDate() < oneHourAgo)) { // Vérifier l'existence de lastRun
         console.log(`[scheduledTasks] Déclenchement de la tâche : ${task.name}`);
-        // Ajouter le protocole https:// à l'URL Vercel
-        const apiUrl = `https://${process.env.VERCEL_URL}${task.path}`;
-        // Ajouter une clé API pour l'authentification des appels internes
-        const apiKey = process.env.SCHEDULED_TASKS_API_KEY;
-        if (!apiKey) {
-          console.error(`[scheduledTasks] SCHEDULED_TASKS_API_KEY n'est pas configurée.`);
-          continue; // Passer à la tâche suivante si la clé n'est pas configurée
+
+        let success = false;
+        if (task.type === 'action') {
+          // Créer un objet Request simulé pour l'action Remix
+          // Utiliser un chemin de base au lieu de localhost pour la compatibilité Vercel
+          const request = new Request('/', { method: 'POST' }); // Utilisez POST si l'action est POST
+
+          // Appeler l'action directement
+          const response = await task.handler({ request, params: {}, context: {} }) as Response; // Caster en Response
+
+          if (response.status === 200) {
+            success = true;
+          } else {
+            const errorBody = await response.json();
+            console.error(`[scheduledTasks] Erreur lors du déclenchement de la tâche ${task.name}:`, response.status, response.statusText, errorBody);
+          }
+        } else if (task.type === 'service') {
+          // Appeler la fonction de service directement
+          await task.handler();
+          success = true; // Supposer le succès si aucune erreur n'est levée
         }
 
-        // Utiliser la méthode GET pour les Cron Jobs simulés
-        // Inclure la clé API dans un en-tête personnalisé
-        const response = await fetch(apiUrl, { 
-          method: 'GET',
-          headers: {
-            'X-API-Key': apiKey
-          }
-        }); 
-
-        if (response.ok) {
+        if (success) {
           console.log(`[scheduledTasks] Tâche ${task.name} exécutée avec succès.`);
-          await tasksRef.doc(task.name).set({ lastRun: now });
+          // Mettre à jour l'état de la tâche avec le nom de la tâche
+          await updateScheduledTaskState(task.name);
         } else {
-          console.error(`[scheduledTasks] Erreur lors du déclenchement de la tâche ${task.name}:`, response.status, response.statusText);
+           console.error(`[scheduledTasks] La tâche ${task.name} a échoué.`);
         }
       } else {
         console.log(`[scheduledTasks] Tâche ${task.name} déjà exécutée récemment.`);
