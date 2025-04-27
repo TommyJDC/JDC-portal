@@ -34,7 +34,8 @@ export async function triggerScheduledTasks() {
 
       if (!taskState || taskState.lastRun < oneHourAgo) {
         console.log(`[scheduledTasks] Déclenchement de la tâche : ${task.name}`);
-        const apiUrl = `${process.env.VERCEL_URL}${task.path}`;
+        // Ajouter le protocole https:// à l'URL Vercel
+        const apiUrl = `https://${process.env.VERCEL_URL}${task.path}`;
         
         // Utiliser la méthode GET pour les Cron Jobs simulés
         const response = await fetch(apiUrl, { method: 'GET' }); 
