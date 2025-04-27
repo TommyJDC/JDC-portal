@@ -4,6 +4,7 @@ import { authenticator } from "~/services/auth.server";
 import { getGoogleAuthClient, getCalendarEvents } from "~/services/google.server";
 import { getCache, setCache } from "~/services/cache.server";
 import { getWeekDateRangeForAgenda } from "~/utils/dateUtils";
+import { triggerScheduledTasks } from "~/services/scheduledTasks.server"; // Importez la fonction
 import {
   getUserProfileSdk,
   getRecentTicketsForSectors,
@@ -59,6 +60,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 
   if (!session?.userId) return json(data);
+
+  // Déclencher les tâches planifiées simulées
+  await triggerScheduledTasks();
 
   try {
     data.userProfile = await getUserProfileSdk(session.userId);
