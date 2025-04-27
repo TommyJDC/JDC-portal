@@ -22,10 +22,10 @@ export async function triggerScheduledTasks() {
 
         let success = false;
         if (task.type === 'action') {
-          // Appeler l'action directement.
-          // Passer undefined pour l'objet request et caster en 'any' pour satisfaire TypeScript,
-          // car la simulation avec new Request cause une erreur sur Vercel et les actions ne dépendent pas d'un objet Request complet.
-          const response = await task.handler({ request: undefined as any, params: {}, context: {} }) as Response; // Caster en Response
+          // Créer un objet simulé avec la propriété 'method' attendue par les actions,
+          // et le caster en 'any' pour satisfaire TypeScript et éviter l'erreur Invalid URL sur Vercel.
+          const simulatedRequest = { method: 'POST' };
+          const response = await task.handler({ request: simulatedRequest as any, params: {}, context: {} }) as Response; // Caster en Response
 
           if (response.status === 200) {
             success = true;
