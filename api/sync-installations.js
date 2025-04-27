@@ -4,7 +4,7 @@ export const handler = async (event, context) => {
   console.log('[sync-installations] Début de la synchronisation');
 
   try {
-    const apiUrl = `${process.env.URL}/api/sync-installations`;
+    const apiUrl = `${process.env.VERCEL_URL}/api/sync-installations`;
     console.log('[sync-installations] Appel de l\'API:', apiUrl);
     
     const response = await fetch(apiUrl, {

@@ -4,7 +4,7 @@ export const handler = async (event, context) => {
   console.log('[scheduled-gmail] Début du traitement planifié');
 
   try {
-    const apiUrl = `${process.env.URL}/api/gmail-to-firestore`;
+    const apiUrl = `${process.env.VERCEL_URL}/api/gmail-to-firestore`;
     console.log('[scheduled-gmail] Appel de l\'API:', apiUrl);
     
     const response = await fetch(apiUrl, {
