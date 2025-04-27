@@ -2,15 +2,15 @@
   "crons": [
     {
       "path": "/api/scheduled-gmail-processing",
-      "schedule": "@hourly"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/sync-installations",
-      "schedule": "@hourly"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/sap-notification",
-      "schedule": "@hourly"
+      "schedule": "0 * * * *"
     }
   ]
 }
