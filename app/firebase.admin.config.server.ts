@@ -25,7 +25,10 @@ export async function initializeFirebaseAdmin() {
     }
 
     db = getFirestore(firebaseAdminApp);
-    db.settings({ ignoreUndefinedProperties: true });
+    // Ne configurer les paramètres que si c'est la première initialisation
+    if (apps.length === 0) {
+      db.settings({ ignoreUndefinedProperties: true });
+    }
     storage = getStorage(firebaseAdminApp); // Initialiser Storage
     return db; // Retourner db comme avant, ou l'app si nécessaire
   } catch (error: any) {
