@@ -341,7 +341,7 @@ export async function sapNumberExists(sapNumber: string, collection: string): Pr
  */
 export async function sendDataToFirebase(row: EmailData, sapNumber: string, collection: string): Promise<void> {
   try {
-    await db.collection(collection).add({
+    const docData: Record<string, any> = {
       date: row.date, // Utiliser la chaîne de date directement
       raisonSociale: row.raisonSociale,
       numeroSAP: sapNumber,
@@ -350,8 +350,6 @@ export async function sendDataToFirebase(row: EmailData, sapNumber: string, coll
       telephone: row.telephone,
       demandeSAP: row.demandeSAP,
       status: 'open', // Ajouter le statut par défaut
-      // Informations de base du mail
-      mailId: row.messageId,
       // Nouvelles informations d'email (s'assurer qu'elles ne sont pas undefined)
       mailFrom: row.mailFrom || '', // Assurer une chaîne vide si undefined
       mailTo: row.mailTo || [], // Assurer un tableau vide si undefined
@@ -362,7 +360,14 @@ export async function sendDataToFirebase(row: EmailData, sapNumber: string, coll
       mailReferences: row.mailReferences || '', // Assurer une chaîne vide si undefined
       mailDate: row.mailDate || null, // Firestore accepte null pour les dates
       createdAt: FieldValue.serverTimestamp()
-    });
+    };
+
+    // Ajouter mailId seulement s'il est défini
+    if (row.messageId) {
+      docData.mailId = row.messageId;
+    }
+
+    await db.collection(collection).add(docData, { ignoreUndefinedProperties: true });
     console.log(`[GmailService] Données envoyées à Firestore (${collection}) pour le numéro SAP: ${sapNumber}`);
   } catch (error) {
     console.error(`[GmailService] Erreur lors de l'envoi des données à Firestore (${collection}):`, error);
