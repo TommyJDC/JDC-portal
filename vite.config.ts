@@ -71,9 +71,6 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
-        additionalManifestEntries: [
-          { url: 'index.html', revision: null } // Add index.html to precache
-        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

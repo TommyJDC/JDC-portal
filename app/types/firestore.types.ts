@@ -83,6 +83,9 @@ export interface UserProfile {
   gmailAuthStatus?: 'active' | 'expired' | 'unauthorized';
   phone?: string;
   address?: string;
+  labelSapClosed?: string; // Added for Gmail config
+  labelSapRma?: string; // Added for Gmail config
+  labelSapNoResponse?: string; // Added for Gmail config
 }
 
 export interface Shipment {
@@ -115,16 +118,17 @@ export interface Installation {
   secteur: 'CHR' | 'HACCP' | 'Tabac' | 'Kezia' | string;
   codeClient: string;
   nom: string;
-  ville: string;
-  contact: string;
-  telephone: string;
-  commercial: string;
-  tech: string;
+  ville?: string; // Rendre optionnel
+  contact?: string; // Rendre optionnel
+  telephone?: string; // Rendre optionnel
+  commercial?: string; // Rendre optionnel
+  tech?: string; // Rendre optionnel
   status: InstallationStatus;
-  dateInstall?: string;
-  commentaire: string;
-  adresse?: string;
-  codePostal?: string;
+  dateInstall?: string; // Déjà optionnel, mais vérifier
+  commentaire?: string; // Rendre optionnel
+  adresse?: string; // Déjà optionnel, mais vérifier
+  codePostal?: string; // Déjà optionnel, mais vérifier
+  hasCTN?: boolean; // Ajouter la propriété hasCTN (optionnelle car elle n'est pas toujours présente dans les données brutes)
 }
 
 export interface InstallationsSnapshot { // Exportation ajoutée

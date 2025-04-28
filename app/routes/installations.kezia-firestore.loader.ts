@@ -5,13 +5,14 @@ import {
   getInstallationsBySector, 
   getAllShipments // Importer la fonction pour récupérer tous les envois
 } from "~/services/firestore.service.server";
-import type { Installation, Shipment } from "~/types/firestore.types"; // Importer les types
+import type { Installation, Shipment, InstallationStatus } from "~/types/firestore.types"; // Importer les types et InstallationStatus
 import { formatFirestoreDate } from "~/utils/dateUtils"; // Importer la fonction de formatage
 import { COLUMN_MAPPINGS } from "~/routes/api.sync-installations"; // Importer les mappings
 
 // Interface pour les données d'installation traitées, correspondant aux props de InstallationTile
 interface ProcessedInstallation {
   id: string;
+  secteur: string; // Ajouter la propriété secteur
   codeClient: string;
   nom: string;
   ville?: string;
@@ -20,7 +21,7 @@ interface ProcessedInstallation {
   commercial?: string;
   dateInstall?: string | Date; // Accepter string ou Date
   tech?: string;
-  status?: string;
+  status?: InstallationStatus; // Utiliser le type InstallationStatus
   commentaire?: string;
   hasCTN: boolean; // Propriété ajoutée
   // Inclure d'autres champs spécifiques si nécessaire, en s'assurant que les types correspondent
@@ -31,6 +32,8 @@ interface ProcessedInstallation {
   personneContact?: string;
   materielEnvoye?: string;
   confirmationReception?: string;
+  adresse?: string; // Ajouter la propriété adresse
+  codePostal?: string; // Ajouter la propriété codePostal
 }
 
 export interface LoaderData {
@@ -74,6 +77,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       // sont déjà mappées avec les clés correctes par la fonction de synchronisation.
       return {
         id: installation.id, // L'ID est toujours présent
+        secteur: sector, // Ajouter la propriété secteur
         codeClient: data.codeClient || '',
         nom: data.nom || '',
         ville: data.ville || '',
@@ -83,11 +87,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         tech: data.tech || '',
         status: data.status || '', // Utiliser la clé directe
         commentaire: data.commentaire || '',
-        
+
         // --- Champs traités ---
         dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : '', // Utiliser formatFirestoreDate
-        hasCTN: keziaShipmentClientCodes.has(data.codeClient), 
-        
+        hasCTN: keziaShipmentClientCodes.has(data.codeClient),
+
         // Inclure d'autres champs spécifiques au secteur Kezia si nécessaire
         configCaisse: data.configCaisse || '',
         offreTpe: data.offreTpe || '',
@@ -95,6 +99,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         dossier: data.dossier || '',
         materielEnvoye: data.materielEnvoye || '',
         confirmationReception: data.confirmationReception || '',
+        adresse: data.adresse || '', // Inclure la propriété adresse
+        codePostal: data.codePostal || '', // Inclure la propriété codePostal
         colonne1: data.colonne1 || '', // Utiliser la clé directe
       };
     });

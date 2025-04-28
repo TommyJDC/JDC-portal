@@ -146,23 +146,52 @@ export async function getClientCodesWithShipment(sector: string): Promise<Set<st
   return clientCodes;
 }
 
-export async function getAllTicketsForSectorsSdk() {
+export async function getAllTicketsForSectorsSdk(sectors: string[]) { // Accept sectors array as parameter
   if (!db) await initializeFirebaseAdmin();
-  const sectors = ['CHR', 'HACCP', 'Kezia', 'Tabac']; // Using uppercase sector names
+  // const sectors = ['CHR', 'HACCP', 'Kezia', 'Tabac']; // Removed hardcoded sectors
   let allTickets: SapTicket[] = [];
+  if (!sectors || sectors.length === 0) {
+      console.warn("getAllTicketsForSectorsSdk called with empty or null sectors array.");
+      return []; // Return empty array if no sectors are provided
+  }
   for (const sector of sectors) {
+    // Ensure sector name is valid before querying
+    const validSectors = ['CHR', 'HACCP', 'Kezia', 'Tabac'];
+    if (!validSectors.includes(sector)) {
+        console.warn(`getAllTicketsForSectorsSdk: Invalid sector name provided: ${sector}. Skipping.`);
+        continue; // Skip invalid sectors
+    }
     const snapshot = await db.collection(sector).get();
-  const sectorTickets = snapshot.docs.map(doc => {
-    const data = doc.data();
-    // Convertir la date en utilisant la fonction utilitaire
-    const date = convertFirestoreDate(data.date);
-    return {
-      id: doc.id,
-      ...data,
-      date,
-      secteur: sector
-    } as SapTicket;
-  });
+    const sectorTickets = snapshot.docs.map(doc => {
+      const data = doc.data();
+      // Convertir la date en utilisant la fonction utilitaire
+      const date = convertFirestoreDate(data.date);
+
+      // Add logging here to inspect the raw status value from Firestore
+      console.log(`Raw status from Firestore for ticket ${doc.id} in sector ${sector}:`, data.statut, `Type:`, typeof data.statut);
+
+      // Process status: ensure it's in { stringValue: string } format or undefined
+      let statut: { stringValue: string } | undefined;
+      // Corrected field name from data.statut to data.status
+      const rawStatut = data.status;
+      if (typeof rawStatut === 'string') {
+          statut = { stringValue: rawStatut };
+      } else if (typeof rawStatut === 'object' && rawStatut !== null && 'stringValue' in rawStatut && typeof rawStatut.stringValue === 'string') {
+          statut = rawStatut as { stringValue: string };
+      } else {
+          // Default status if missing or invalid format
+          statut = { stringValue: 'Inconnu' };
+      }
+
+
+      return {
+        id: doc.id,
+        ...data, // Include other raw data
+        date, // Use the processed date
+        secteur: sector, // Ensure sector is set
+        statut // Use the processed status
+      } as SapTicket;
+    });
     allTickets = [...allTickets, ...sectorTickets];
   }
   return allTickets;

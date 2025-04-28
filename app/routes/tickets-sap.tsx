@@ -1,6 +1,6 @@
 import type { MetaFunction } from "@remix-run/node";
-import { useState, useMemo, useRef, useCallback } from "react"; // Removed useEffect
-import { useOutletContext, useLoaderData, useRevalidator } from "@remix-run/react"; // Added useLoaderData, useRevalidator
+import { useState, useMemo, useRef, useCallback, useEffect } from "react"; // Added useEffect
+import { useOutletContext, useLoaderData, useRevalidator, useSearchParams } from "@remix-run/react"; // Added useLoaderData, useRevalidator, useSearchParams
 // Import loader and action with their types
 import { loader } from "./tickets-sap.loader";
 import { action } from "./tickets-sap.action";
@@ -125,11 +125,13 @@ export default function TicketsSap() {
   // Get data from loader
   const { userProfile, allTickets: serializedTickets, error: loaderError } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator(); // Hook to trigger revalidation
+  const [searchParams, setSearchParams] = useSearchParams(); // Hook to manage URL search params
 
   console.log("TicketsSap component loaded. Raw loader data:", { userProfile, serializedTickets, loaderError });
 
   // State for client-side filtering and UI
-  const [selectedSector, setSelectedSector] = useState<string>('');
+  // Initialize selectedSector from URL search params
+  const [selectedSector, setSelectedSector] = useState<string>(searchParams.get('sector') || '');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showNumberOptions, setShowNumberOptions] = useState<Record<string, boolean>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -144,6 +146,21 @@ export default function TicketsSap() {
       return serializedTickets.map(parseSapTicketDates);
   }, [serializedTickets]);
 
+  // Effect to update URL search params when selectedSector changes
+  useEffect(() => {
+    if (selectedSector) {
+      setSearchParams(prev => {
+        prev.set('sector', selectedSector);
+        return prev;
+      }, { replace: true }); // Use replace to avoid adding to history
+    } else {
+      setSearchParams(prev => {
+        prev.delete('sector');
+        return prev;
+      }, { replace: true });
+    }
+  }, [selectedSector, setSearchParams]);
+
 
   const availableSectors = useMemo(() => {
      // Use profile from loader data
@@ -153,10 +170,7 @@ export default function TicketsSap() {
   const filteredAndGroupedTickets = useMemo(() => {
     let filtered = allTickets;
 
-    if (selectedSector && selectedSector !== '') {
-      filtered = filtered.filter(t => t.secteur === selectedSector);
-    }
-
+    // Client-side filtering for search term only
     if (searchTerm.trim() !== '') {
       const lowerSearchTerm = searchTerm.trim().toLowerCase();
       filtered = filtered.filter(t =>
@@ -171,8 +185,9 @@ export default function TicketsSap() {
         (typeof t.telephone === 'string' ? t.telephone : t.telephone?.stringValue)?.toLowerCase().includes(lowerSearchTerm)
       );
     }
+    // Sector filtering is now handled by the loader based on URL search params
     return groupTicketsByRaisonSociale(filtered);
-  }, [allTickets, selectedSector, searchTerm]);
+  }, [allTickets, searchTerm]); // Removed selectedSector from dependencies
 
   const clientGroups = useMemo(() => {
     const findMostRecentDate = (tickets: SapTicket[]): Date | null => {
@@ -262,6 +277,13 @@ export default function TicketsSap() {
    // Determine loading state based on revalidator
    const isLoading = revalidator.state === 'loading';
 
+   // Helper function to get string value or default
+   const getStringValueOrDefault = (val: any, defaultValue: string = 'N/A'): string => {
+     if (typeof val === 'string') return val;
+     return val?.stringValue || defaultValue;
+   };
+
+
   return (
     <div className="space-y-6 p-6 bg-gray-900 min-h-screen"> {/* Ajuster le conteneur principal */}
       <h1 className="text-3xl font-semibold text-white mb-6 flex items-center"> {/* Ajuster le titre */}
@@ -281,11 +303,14 @@ export default function TicketsSap() {
             id="sector-filter"
             name="sector-filter"
             value={selectedSector}
-            onChange={(e) => setSelectedSector(e.target.value)}
+            onChange={(e) => {
+              // Update state and trigger URL change via useEffect
+              setSelectedSector(e.target.value);
+            }}
             className="block w-full rounded-md bg-gray-900 border-gray-700 focus:border-jdc-blue focus:ring focus:ring-jdc-blue focus:ring-opacity-50 text-white py-2 pl-3 pr-10 text-sm"
             disabled={isLoading || availableSectors.length === 0} // Disable during revalidation
           >
-            <option value="">Tous les secteurs ({userProfile?.secteurs?.length ?? 0})</option>
+             <option value="">Tous les secteurs</option> {/* Option to show all sectors */}
             {availableSectors.map(sector => (
               <option key={sector} value={sector}>{sector}</option>
             ))}
@@ -340,6 +365,29 @@ export default function TicketsSap() {
                         <span className="ml-0 md:ml-3 text-sm text-gray-400">
                             ({clientTickets.length} ticket{clientTickets.length > 1 ? 's' : ''})
                         </span>
+                         {/* Display status badge for the most recent ticket in the summary */}
+                         {clientTickets.length > 0 && (
+                            (() => {
+                                // Find the most recent ticket to display its status
+                                const mostRecentTicket = clientTickets.sort((a, b) => {
+                                    const dateA = a.date;
+                                    const dateB = b.date;
+                                    if (!(dateA instanceof Date) && !(dateB instanceof Date)) return 0;
+                                    if (!(dateA instanceof Date)) return 1;
+                                    if (!(dateB instanceof Date)) return -1;
+                                    return dateB.getTime() - dateA.getTime();
+                                })[0];
+                                // Add logging here to inspect the status value
+                                console.log(`Most recent ticket status for ${raisonSociale}:`, mostRecentTicket.statut, `Type:`, typeof mostRecentTicket.statut);
+                                const status = getStringValueOrDefault(mostRecentTicket.statut);
+                                const statusStyle = getTicketStatusStyle(status);
+                                return (
+                                    <span className={`ml-3 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyle.bgColor} ${statusStyle.textColor}`}>
+                                        {status}
+                                    </span>
+                                );
+                            })()
+                         )}
                     </div>
                   </div>
                   <FaChevronRight
@@ -351,14 +399,15 @@ export default function TicketsSap() {
                       // Use parsed dates for sorting
                       const dateA = a.date;
                       const dateB = b.date;
-                      if (!(dateB instanceof Date)) return -1;
-                      if (!(dateA instanceof Date)) return 1;
-                      return dateB.getTime() - dateA.getTime(); // Corrected sorting logic
+
+                      // Handle cases where one or both dates are not valid Date objects
+                      if (!(dateA instanceof Date) && !(dateB instanceof Date)) return 0; // Both invalid, keep original order relative to each other
+                      if (!(dateA instanceof Date)) return 1; // a is invalid, b is valid, b comes first
+                      if (!(dateB instanceof Date)) return -1; // b is invalid, a is valid, a comes first
+
+                      // Sort by date descending (most recent first)
+                      return dateB.getTime() - dateA.getTime();
                     }).map((ticket) => {
-                    const getStringValueOrDefault = (val: any, defaultValue: string = 'N/A'): string => {
-                      if (typeof val === 'string') return val;
-                      return val?.stringValue || defaultValue;
-                    };
                     
                     const statusStyle = getTicketStatusStyle(getStringValueOrDefault(ticket.statut));
                     
@@ -384,8 +433,8 @@ export default function TicketsSap() {
                                 <span className="text-white font-semibold" title={`SAP: ${getStringValueOrDefault(ticket.numeroSAP)}`}>
                                   {getStringValueOrDefault(ticket.numeroSAP)}
                                 </span>
-                                <span className={`ml-3 inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${statusStyle.bgColor} ${statusStyle.textColor}`}>
-                                  {getStringValueOrDefault(ticket.statut)}
+                                <span className={`ml-3 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyle.bgColor} ${statusStyle.textColor}`}>
+                                  {getStringValueOrDefault(ticket.status)} {/* Corrected field name */}
                                 </span>
                               </div>
                               <div className="flex items-center text-xs text-gray-400">

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, useCallback } from 'react'; // Added useCallback
 import { Link, NavLink, Form } from '@remix-run/react';
 import {
   FaBars,
@@ -12,16 +12,17 @@ import {
   FaFileAlt,
   FaChevronDown,
   FaUser,
-  FaGoogle
+  FaGoogle,
+  FaSyncAlt // Added FaSyncAlt for refresh button
 } from 'react-icons/fa';
 import { Menu, Transition } from '@headlessui/react';
-// Firebase Client SDK imports
-import { getFirestore, collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
-import { initializeApp } from 'firebase/app';
-import { firebaseConfig } from '~/firebase.config';
+// Removed Firebase Client SDK imports for onSnapshot
+// import { getFirestore, collection, query, orderBy, limit, onSnapshot, Timestamp, where } from 'firebase/firestore';
+// import { initializeApp } from 'firebase/app';
+// import { firebaseConfig } from '~/firebase.config';
 
-// Initialize Firebase client-side
-const firebaseApp = initializeApp(firebaseConfig);
+// Initialize Firebase client-side - No longer needed for notifications fetch
+// const firebaseApp = initializeApp(firebaseConfig);
 import { Button } from './ui/Button';
 import { ClientOnly } from './ClientOnly';
 import { NotificationsDropdown, type NotificationDisplay } from './NotificationsDropdown';
@@ -75,83 +76,77 @@ const JDC_LOGO_URL = "https://www.jdc.fr/images/logo_jdc_blanc.svg";
 export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMenu, onLoginClick, loadingAuth }) => {
   const [notifications, setNotifications] = useState<NotificationDisplay[]>([]);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [isFetchingNotifications, setIsFetchingNotifications] = useState(false); // State for loading indicator
 
-  // Real-time notification listener
-  useEffect(() => {
-    // Ensure user and profile are loaded before setting up listener
+  // Function to fetch notifications from Netlify Function
+  const fetchNotifications = useCallback(async () => {
     if (!user?.userId || !profile) {
       setNotifications([]);
       setNotificationCount(0);
-      return; // Exit if no user or profile
+      return;
     }
 
-    const db = getFirestore(firebaseApp);
-    const notificationsRef = collection(db, 'notifications');
+    setIsFetchingNotifications(true); // Start loading
 
-    // Query latest 100 notifications, order by creation time
-    // Filtering by role/sector will happen client-side after fetching
-    const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(100));
-
-    const unsubscribe = onSnapshot(q, (querySnapshot: { docs: any[] }) => {
-      const allNotifications = querySnapshot.docs.map((doc: { id: string; data: () => any }) => {
-        const data = doc.data();
-        // Convert Firestore Timestamp to JS Date
-        const createdAtDate = data.createdAt instanceof Timestamp 
-          ? data.createdAt.toDate() 
-          : (data.createdAt ? new Date(data.createdAt) : new Date()); // Fallback if not Timestamp
-        
-        // Return as Notification first for filtering (using the imported type)
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: createdAtDate, // Use Date object
-        } as Notification; // Use the imported Notification type
+    try {
+      const response = await fetch('/.netlify/functions/getNotificationsForUser', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.userId,
+          userRole: profile.role,
+          userSectors: profile.secteurs, // Assuming profile.secteurs is an array
+        }),
       });
 
-      // Filter notifications based on user profile (client-side)
-      const filteredNotifications = allNotifications.filter((notif: Notification & { userId?: string; targetRoles?: string[]; sector?: string[] }) => {
-        if (profile.role === 'Admin') return true; // Admins see all
-        if (notif.userId === profile.uid) return true; // Targeted to user
-        
-        // Check roles - ensure targetRoles and profile.role exist
-        if (notif.targetRoles && Array.isArray(notif.targetRoles) && profile.role && notif.targetRoles.includes(profile.role)) return true; 
-        
-        // Check sectors - ensure sector, profile.secteurs exist and are arrays
-        if (notif.sector && Array.isArray(notif.sector) && profile.secteurs && Array.isArray(profile.secteurs) && notif.sector.some((s: string) => profile.secteurs.includes(s))) return true; // Explicitly type s
-        
-        return false; // User should not see this notification
-      });
+      if (!response.ok) {
+        console.error('Error calling Netlify function:', response.status, response.statusText);
+        // Optionally show an error message to the user
+        setNotifications([]);
+        setNotificationCount(0);
+        return;
+      }
 
-      // Map to NotificationDisplay format for the dropdown component
-      const displayNotifications = filteredNotifications.map(notif => {
+      const fetchedNotifications: Notification[] = await response.json();
+
+      console.log('Fetched notifications:', fetchedNotifications); // Log fetched data
+
+      // Map to NotificationDisplay format
+      const displayNotifications: NotificationDisplay[] = fetchedNotifications.map(notif => ({
+        ...notif,
         // Ensure createdAt is a Date before calling toISOString()
-        const createdAtDate = notif.createdAt instanceof Date 
-          ? notif.createdAt 
-          : (notif.createdAt as Timestamp).toDate(); // Cast to Timestamp if not Date, then convert
+        timestamp: notif.createdAt instanceof Date
+          ? notif.createdAt.toISOString()
+          : (notif.createdAt as any)?.toDate?.()?.toISOString() || new Date().toISOString(), // Handle potential non-Date/Timestamp
+      }));
 
-        return {
-          ...notif,
-          // Convert Date to string (ISO format) for NotificationDisplay.timestamp
-          timestamp: createdAtDate.toISOString(), 
-        };
-      });
+      const unreadCount = displayNotifications.filter(n => !n.read).length;
+      console.log('Calculated unread count:', unreadCount); // Log calculated count
 
       setNotifications(displayNotifications);
-      setNotificationCount(displayNotifications.filter((n: NotificationDisplay) => !n.read).length);
+      setNotificationCount(unreadCount);
 
-    }, (error) => {
-      console.error("Error fetching notifications in real-time:", error);
+    } catch (error) {
+      console.error("Error fetching notifications via Netlify function:", error);
       // Optionally clear state or show an error message
       setNotifications([]);
       setNotificationCount(0);
-    });
+    } finally {
+      setIsFetchingNotifications(false); // End loading
+    }
+  }, [user?.userId, profile]); // Dependencies for useCallback
 
-    // Cleanup subscription on component unmount or when user/profile changes
-    return () => unsubscribe();
-
-  }, [user?.userId, profile]); // Re-run effect if user or profile changes
+  // Fetch notifications on component mount and when user/profile changes
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]); // Dependency on fetchNotifications function
 
   // --- Handler functions remain largely the same, they modify data which triggers the listener ---
+  // Note: With the Netlify function approach, modifications (mark as read, clear)
+  // will require re-fetching notifications to update the UI, as there's no real-time listener.
+  // We can call fetchNotifications() after successful API calls.
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -159,12 +154,8 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
         method: 'POST',
       });
       if (response.ok) {
-        setNotifications(prev => 
-          prev.map(notif => 
-            notif.id === id ? { ...notif, read: true } : notif
-          )
-        );
-        setNotificationCount(prev => Math.max(0, prev - 1));
+        // Re-fetch notifications to update the list
+        fetchNotifications();
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -172,17 +163,28 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
   };
 
   const handleClearAll = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('handleClearAll: User not authenticated, returning.');
+      return;
+    }
+    console.log('handleClearAll: Attempting to clear notifications...');
     try {
       const response = await fetch('/api/notifications/clear', {
         method: 'POST',
       });
+      console.log('handleClearAll: API response status:', response.status);
       if (response.ok) {
-        setNotifications([]);
-        setNotificationCount(0);
+        console.log('handleClearAll: API call successful, re-fetching notifications.');
+        // Re-fetch notifications to update the list
+        fetchNotifications();
+      } else {
+        console.error('handleClearAll: API call failed with status:', response.status);
+        // Optionally parse response body for more error details
+        const errorBody = await response.text();
+        console.error('handleClearAll: API error response body:', errorBody);
       }
     } catch (error) {
-      console.error('Error clearing notifications:', error);
+      console.error('handleClearAll: Error clearing notifications:', error);
     }
   };
 
@@ -194,8 +196,8 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
         body: JSON.stringify({ userId: user.userId }),
       });
       if (response.ok) {
-        setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
-        setNotificationCount(0);
+        // Re-fetch notifications to update the list
+        fetchNotifications();
       }
     } catch (error) {
       console.error('Error marking all notifications as read:', error);

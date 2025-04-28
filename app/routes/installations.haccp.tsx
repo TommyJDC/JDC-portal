@@ -6,11 +6,14 @@ import {
   getInstallationsBySector, 
   updateInstallation,
   deleteInstallation,
-  bulkUpdateInstallations
+  bulkUpdateInstallations,
+  getAllShipments // Importer la fonction pour récupérer les envois
 } from "~/services/firestore.service.server";
-import { useState, useEffect, useMemo } from "react";
-import InstallationHACCPTile from "~/components/InstallationHACCPTile";
-import type { Installation } from "~/types/firestore.types";
+import { useState } from "react"; // useEffect et useMemo ne sont plus nécessaires ici
+// Remplacer InstallationHACCPTile par InstallationListItem et InstallationDetails
+import InstallationListItem from "~/components/InstallationListItem"; 
+import InstallationDetails from "~/components/InstallationDetails"; 
+import type { Installation, Shipment } from "~/types/firestore.types"; // Importer Shipment
 import { formatFirestoreDate } from "~/utils/dateUtils"; // Importer la fonction de formatage
 import { COLUMN_MAPPINGS } from "~/routes/api.sync-installations"; // Importer les mappings
 
@@ -19,29 +22,11 @@ interface ActionData {
   error?: string;
 }
 
-// Interface pour les données d'installation HACCP traitées
-interface ProcessedInstallationHACCP {
-  id: string;
-  codeClient: string;
-  nom: string;
-  ville?: string;
-  contact?: string;
-  telephone?: string;
-  commercial?: string;
-  dateInstall?: string | Date; // Type attendu par InstallationHACCPTile
-  tech?: string;
-  status?: string;
-  commentaire?: string;
-  dateCdeMateriel?: string | Date; // Champ spécifique HACCP
-  configCaisse?: string; // Champ spécifique HACCP
-  offreTpe?: string; // Champ spécifique HACCP
-  install?: string; // Champ spécifique HACCP
-  [key: string]: any; // Permettre d'autres champs spécifiques au loader si nécessaire
-}
+// Plus besoin de ProcessedInstallationHACCP, on utilise Installation directement
 
-
+// Le loader retourne directement des Installations
 interface LoaderData {
-  installations: ProcessedInstallationHACCP[]; // Utiliser le type traité spécifique à HACCP
+  installations: Installation[]; 
   error?: string;
 }
 
@@ -76,16 +61,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
+    // 1. Récupérer tous les envois
+    const allShipments = await getAllShipments();
+    
+    // 2. Créer un Set des codeClient pour le secteur 'haccp'
+    const haccpShipmentClientCodes = new Set<string>();
+    allShipments.forEach((shipment: Shipment) => {
+      if (shipment.secteur?.toLowerCase() === 'haccp' && shipment.codeClient) {
+        haccpShipmentClientCodes.add(shipment.codeClient);
+      }
+    });
+
+    // 3. Récupérer les installations HACCP
     const installationsRaw = await getInstallationsBySector('haccp');
     const sector = 'haccp';
     const sectorMapping = COLUMN_MAPPINGS[sector];
 
-    // Mapper les données brutes de Firestore aux clés attendues par InstallationHACCPTile
-    const installations: ProcessedInstallationHACCP[] = installationsRaw.map(installation => {
+    // 4. Mapper les données brutes au type Installation standard
+    const installations: Installation[] = installationsRaw.map(installation => {
       const data = installation as any; // Utiliser 'any' temporairement
 
       return {
-        id: installation.id, // L'ID est toujours présent
+        id: installation.id, 
         codeClient: data.codeClient || '',
         nom: data.nom || '',
         ville: data.ville || '',
@@ -93,21 +90,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         telephone: data.telephone || '', 
         commercial: data.commercial || '',
         tech: data.tech || '', 
-        status: data.status || '', 
+        // status: data.status || '', // Supprimer cette ligne dupliquée
         commentaire: data.commentaire || '',
 
-        // Champs spécifiques HACCP
-        dateSignatureCde: data.dateSignatureCde ? formatFirestoreDate(data.dateSignatureCde) : '', 
-        dateCdeMateriel: data.dateCdeMateriel ? formatFirestoreDate(data.dateCdeMateriel) : '', 
-        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : '', 
-        materielPreParametrage: data.materielPreParametrage || '',
-        dossier: data.dossier || '',
-        materielLivre: data.materielLivre || '',
-        numeroColis: data.numeroColis || '',
-        commentaireInstall: data.commentaireInstall || '',
-        identifiantMotDePasse: data.identifiantMotDePasse || '',
-        numerosSondes: data.numerosSondes || '',
-        install: data.install || 'Non', 
+        // Champs spécifiques HACCP (non inclus dans le type Installation de base)
+        // dateSignatureCde: data.dateSignatureCde ? formatFirestoreDate(data.dateSignatureCde) : undefined, 
+        // dateCdeMateriel: data.dateCdeMateriel ? formatFirestoreDate(data.dateCdeMateriel) : undefined, 
+        // materielPreParametrage: data.materielPreParametrage || '',
+        // dossier: data.dossier || '',
+        // materielLivre: data.materielLivre || '',
+        // numeroColis: data.numeroColis || '',
+        // commentaireInstall: data.commentaireInstall || '',
+        // identifiantMotDePasse: data.identifiantMotDePasse || '',
+        // numerosSondes: data.numerosSondes || '',
+        // install: data.install || 'Non', 
+
+        // Champs traités pour correspondre à Installation
+        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : undefined, 
+        status: (data.status || 'À planifier') as Installation['status'], // Valeur par défaut et cast
+        hasCTN: haccpShipmentClientCodes.has(data.codeClient), // Ajouter la logique hasCTN
+        secteur: 'haccp', // Ajouter le secteur
       };
     });
 
@@ -123,9 +125,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // --- Component ---
 export default function HACCPInstallations() {
-  const { installations, error } = useLoaderData<typeof loader>();
+  const { installations, error } = useLoaderData<LoaderData>(); // Utiliser LoaderData qui contient Installation[]
   const fetcher = useFetcher<ActionData>();
-  const [searchTerm, setSearchTerm] = useState(''); // Ajouter l'état pour le terme de recherche
+  const [searchTerm, setSearchTerm] = useState(''); 
+  const [isModalOpen, setIsModalOpen] = useState(false); // État pour la modale
+  const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null); // État pour l'installation sélectionnée
 
   const handleSave = async (id: string, updates: Partial<Installation>) => {
     fetcher.submit(
@@ -151,6 +155,16 @@ export default function HACCPInstallations() {
       (installation.commentaire && installation.commentaire.toLowerCase().includes(lowerCaseSearchTerm))
     );
   });
+
+  const handleInstallationClick = (installation: Installation) => {
+    setSelectedInstallation(installation);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedInstallation(null);
+  };
 
   return (
     <div className="space-y-4">
@@ -178,20 +192,30 @@ export default function HACCPInstallations() {
         </div>
       )}
 
-      {!error && filteredInstallations.length > 0 && ( // Utiliser la liste filtrée
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredInstallations.map((installation) => ( // Utiliser la liste filtrée
-            <InstallationHACCPTile
+      {!error && filteredInstallations.length > 0 && (
+        <div className="space-y-4"> {/* Rétablir l'affichage en liste verticale */}
+          {filteredInstallations.map((installation) => (
+            <InstallationListItem 
               key={installation.id}
               installation={installation}
-              onSave={(values) => handleSave(installation.id, values)}
+              onClick={handleInstallationClick} 
+              hasCTN={installation.hasCTN} 
             />
           ))}
         </div>
       )}
 
-      {!error && filteredInstallations.length === 0 && ( // Vérifier la longueur de la liste filtrée
+      {!error && filteredInstallations.length === 0 && (
         <p className="text-jdc-gray-400">Aucune installation HACCP à afficher.</p>
+      )}
+
+      {/* Modale de détails */}
+      {isModalOpen && selectedInstallation && (
+        <InstallationDetails
+          installation={selectedInstallation}
+          onClose={handleCloseModal}
+          onSave={handleSave} // Passer la fonction handleSave
+        />
       )}
     </div>
   );

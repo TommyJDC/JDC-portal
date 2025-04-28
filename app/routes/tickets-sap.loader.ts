@@ -14,6 +14,8 @@ import type { SapTicket, UserProfile } from "~/types/firestore.types";
 
     export const loader = async ({ request }: LoaderFunctionArgs): Promise<ReturnType<typeof json<TicketsSapLoaderData>>> => {
         const session: UserSession | null = await authenticator.isAuthenticated(request);
+        const url = new URL(request.url);
+        const selectedSectorParam = url.searchParams.get("sector");
 
         if (!session?.userId) {
             return json({ userProfile: null, allTickets: [], error: "Utilisateur non authentifié." });
@@ -29,19 +31,44 @@ import type { SapTicket, UserProfile } from "~/types/firestore.types";
                 throw new Error("Profil utilisateur introuvable.");
             }
 
-            // Déterminer les secteurs à interroger en fonction du rôle de l'utilisateur
-            const sectorsToQuery = userProfile.role === 'Admin' 
-                ? ['CHR', 'HACCP', 'Kezia', 'Tabac'] // Admins voient tous les secteurs
-                : userProfile.secteurs ?? []; // Autres utilisateurs voient leurs secteurs définis
+            // Déterminer les secteurs à interroger
+            let sectorsToQuery: string[] = [];
+            if (userProfile.role === 'Admin') {
+                // Si Admin et un secteur est sélectionné dans l'URL, interroger uniquement ce secteur
+                if (selectedSectorParam && selectedSectorParam !== '') {
+                    sectorsToQuery = [selectedSectorParam];
+                    console.log(`Tickets SAP Loader: Admin user requesting specific sector: ${selectedSectorParam}`);
+                } else {
+                    // Si Admin et aucun secteur n'est sélectionné, interroger tous les secteurs
+                    sectorsToQuery = ['CHR', 'HACCP', 'Kezia', 'Tabac'];
+                    console.log(`Tickets SAP Loader: Admin user requesting all sectors.`);
+                }
+            } else {
+                // Pour les non-admins, interroger uniquement leurs secteurs assignés
+                sectorsToQuery = userProfile.secteurs ?? [];
+                 // Si un secteur est sélectionné dans l'URL et qu'il fait partie des secteurs assignés,
+                 // on peut potentiellement affiner la requête, mais pour l'instant, on se base sur les secteurs assignés.
+                 // Le filtrage par selectedSectorParam sera fait côté client si nécessaire,
+                 // mais idéalement, getAllTicketsForSectorsSdk devrait gérer une liste de secteurs.
+                 // On s'assure que le secteur demandé est bien dans les secteurs de l'utilisateur si non-admin
+                 if (selectedSectorParam && selectedSectorParam !== '' && sectorsToQuery.includes(selectedSectorParam)) {
+                     sectorsToQuery = [selectedSectorParam];
+                     console.log(`Tickets SAP Loader: Non-admin user requesting specific assigned sector: ${selectedSectorParam}`);
+                 } else if (selectedSectorParam && selectedSectorParam !== '' && !sectorsToQuery.includes(selectedSectorParam)) {
+                      console.warn(`Tickets SAP Loader: Non-admin user ${session.userId} requested sector ${selectedSectorParam} which is not assigned. Loading all assigned sectors.`);
+                      // sectorsToQuery reste userProfile.secteurs
+                 } else {
+                      console.log(`Tickets SAP Loader: Non-admin user ${session.userId} requesting all assigned sectors: ${sectorsToQuery.join(', ')}`);
+                 }
+            }
+
 
             if (sectorsToQuery.length === 0) {
-                console.warn(`Tickets SAP Loader: User ${session.userId} (Role: ${userProfile.role}) has no sectors assigned or is not an Admin.`);
+                console.warn(`Tickets SAP Loader: User ${session.userId} (Role: ${userProfile.role}) has no sectors assigned or no valid sector requested.`);
                 // allTickets reste []
             } else {
-                console.log(`Tickets SAP Loader: Fetching tickets for sectors: ${sectorsToQuery.join(', ')}`);
+                console.log(`Tickets SAP Loader: Final sectors to query: ${sectorsToQuery.join(', ')}`);
                 const fetchedTickets = await getAllTicketsForSectorsSdk(sectorsToQuery);
-                // Filter out tickets without raisonSociale on the server
-                allTickets = fetchedTickets.filter(t => t.raisonSociale);
                 console.log(`Tickets SAP Loader: Fetched ${fetchedTickets.length} tickets.`);
                 // Filter out tickets without raisonSociale and ensure dates in contactAttempts are Date objects
                 allTickets = fetchedTickets
