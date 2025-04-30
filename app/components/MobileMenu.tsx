@@ -47,6 +47,7 @@ const techniqueItems = [
 const logistiqueItems = [
   { name: 'Envois CTN', to: '/envois-ctn', icon: FaTruck },
   { name: 'Recherche Articles', to: '/articles', icon: FaSearch },
+  { name: 'Suivie de RMA', to: '/logistique/grenoble', icon: FaTruck },
 ];
 
 // Commercial menu items
