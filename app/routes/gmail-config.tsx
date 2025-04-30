@@ -247,10 +247,17 @@ export async function action({ request }: ActionFunctionArgs) {
 /**
  * Composant principal
  */
+import { useEffect } from 'react'; // Import useEffect
+
 export default function AdminGmailConfig() {
   const { users, config, userProfile, userRole } = useLoaderData<LoaderData>(); // Get userRole and userProfile from loader
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+
+  useEffect(() => {
+    console.log("Loader Data:", { users, config, userProfile, userRole });
+  }, [users, config, userProfile, userRole]);
+
   const isSubmitting = navigation.state === "submitting";
 
   const isAdmin = userRole === 'Admin'; // Determine if the user is an admin

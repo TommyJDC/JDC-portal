@@ -9,7 +9,9 @@ import {
   bulkUpdateInstallations,
   getAllShipments // Importer la fonction pour récupérer les envois
 } from "~/services/firestore.service.server";
-import InstallationTile from "~/components/InstallationTile";
+// Remplacer InstallationTile par InstallationListItem et InstallationDetails
+import InstallationListItem from "~/components/InstallationListItem"; 
+import InstallationDetails from "~/components/InstallationDetails"; 
 import type { Installation, Shipment } from "~/types/firestore.types"; // Importer les types
 import { formatFirestoreDate } from "~/utils/dateUtils"; // Importer la fonction de formatage
 import { COLUMN_MAPPINGS } from "~/routes/api.sync-installations"; // Importer les mappings
@@ -32,13 +34,13 @@ interface ProcessedInstallation {
   dateInstall?: string | Date; // Accepter string ou Date
   tech?: string;
   status?: string;
-  commentaire?: string;
-  hasCTN: boolean; // Propriété ajoutée
-  // Inclure d'autres champs si nécessaire, en s'assurant que les types correspondent
-}
+} // Supprimer cette accolade fermante de l'ancienne interface
 
+// Plus besoin de ProcessedInstallation, on utilise Installation directement
+
+// Le loader retourne directement des Installations
 interface LoaderData {
-  installations: ProcessedInstallation[]; // Utiliser le type traité
+  installations: Installation[]; 
   error?: string;
 }
 
@@ -90,8 +92,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const sector = 'tabac';
     const sectorMapping = COLUMN_MAPPINGS[sector];
 
-    // 4. Mapper les données brutes, formater la date et ajouter la propriété hasCTN à chaque installation
-    const installations: ProcessedInstallation[] = installationsRaw.map(installation => {
+    // 4. Mapper les données brutes au type Installation standard
+    const installations: Installation[] = installationsRaw.map(installation => {
       const data = installation as any; // Utiliser 'any' temporairement
 
       // Accéder aux propriétés directement par leur nom, car les données de Firestore
@@ -105,20 +107,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         telephone: data.telephone || '', // Utiliser la clé directe (assurez-vous que la synchronisation mappe coordonneesTel à telephone)
         commercial: data.commercial || '',
         tech: data.tech || '',
-        status: data.status || '', // Utiliser la clé directe
+        // status: data.status || '', // Sera géré ci-dessous avec valeur par défaut
         commentaire: data.commentaire || '',
         
         // --- Champs traités ---
-        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : '', // Utiliser formatFirestoreDate
+        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : undefined, // Retourne string ou undefined
+        status: (data.status || 'À planifier') as Installation['status'], // Valeur par défaut et cast
         hasCTN: tabacShipmentClientCodes.has(data.codeClient), 
+        secteur: 'tabac', // Ajouter le secteur
         
-        // Inclure d'autres champs spécifiques au secteur Tabac si nécessaire
+        // Champs spécifiques au secteur Tabac (non inclus dans Installation de base)
         dateSignatureCde: data.dateSignatureCde ? formatFirestoreDate(data.dateSignatureCde) : '', // Utiliser formatFirestoreDate
         materielBalance: data.materielBalance || '',
         offreTpe: data.offreTpe || '',
         cdc: data.cdc || '',
         typeInstall: data.typeInstall || '',
         commentaireEtatMateriel: data.commentaireEtatMateriel || '',
+        // dateSignatureCde: data.dateSignatureCde ? formatFirestoreDate(data.dateSignatureCde) : undefined, 
+        // materielBalance: data.materielBalance || '',
+        // offreTpe: data.offreTpe || '',
+        // cdc: data.cdc || '',
+        // typeInstall: data.typeInstall || '',
+        // commentaireEtatMateriel: data.commentaireEtatMateriel || '',
       };
     });
 
@@ -133,11 +143,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function TabacInstallations() {
-  const { installations, error } = useLoaderData<typeof loader>();
+  const { installations, error } = useLoaderData<LoaderData>(); // Utiliser LoaderData qui contient Installation[]
   const fetcher = useFetcher<ActionData>();
-  const [searchTerm, setSearchTerm] = useState(''); // Ajouter l'état pour le terme de recherche
+  const [searchTerm, setSearchTerm] = useState(''); 
+  const [isModalOpen, setIsModalOpen] = useState(false); // État pour la modale
+  const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null); // État pour l'installation sélectionnée
 
-  const handleSave = async (id: string, updates: any) => {
+  const handleSave = async (id: string, updates: Partial<Installation>) => { // Utiliser Partial<Installation>
     fetcher.submit(
       {
         id,
@@ -161,6 +173,16 @@ export default function TabacInstallations() {
       (installation.commentaire && installation.commentaire.toLowerCase().includes(lowerCaseSearchTerm))
     );
   });
+
+  const handleInstallationClick = (installation: Installation) => {
+    setSelectedInstallation(installation);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedInstallation(null);
+  };
 
   return (
     <div className="space-y-4">
@@ -188,21 +210,30 @@ export default function TabacInstallations() {
         </div>
       )}
 
-      {!error && filteredInstallations.length > 0 && ( // Utiliser la liste filtrée
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredInstallations.map((installation) => ( // Utiliser la liste filtrée
-            <InstallationTile
+      {!error && filteredInstallations.length > 0 && (
+        <div className="space-y-4"> {/* Rétablir l'affichage en liste verticale */}
+          {filteredInstallations.map((installation) => (
+            <InstallationListItem 
               key={installation.id}
               installation={installation}
-              hasCTN={installation.hasCTN}
-              onSave={(values) => handleSave(installation.id, values)}
+              onClick={handleInstallationClick} 
+              hasCTN={installation.hasCTN} 
             />
           ))}
         </div>
       )}
 
-      {!error && filteredInstallations.length === 0 && ( // Vérifier la longueur de la liste filtrée
+      {!error && filteredInstallations.length === 0 && (
         <p className="text-jdc-gray-400">Aucune installation Tabac à afficher.</p>
+      )}
+
+      {/* Modale de détails */}
+      {isModalOpen && selectedInstallation && (
+        <InstallationDetails
+          installation={selectedInstallation}
+          onClose={handleCloseModal}
+          onSave={handleSave} // Passer la fonction handleSave
+        />
       )}
     </div>
   );

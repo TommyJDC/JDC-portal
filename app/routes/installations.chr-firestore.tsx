@@ -9,7 +9,9 @@ import {
   bulkUpdateInstallations,
   getAllShipments // Importer la fonction pour récupérer les envois
 } from "~/services/firestore.service.server";
-import InstallationTile from "~/components/InstallationTile";
+// Remplacer InstallationTile par InstallationListItem et InstallationDetails
+import InstallationListItem from "~/components/InstallationListItem"; 
+import InstallationDetails from "~/components/InstallationDetails"; 
 import type { Installation, Shipment } from "~/types/firestore.types"; // Importer les types
 import { formatFirestoreDate } from "~/utils/dateUtils"; // Importer la fonction de formatage
 import { COLUMN_MAPPINGS } from "~/routes/api.sync-installations"; // Importer les mappings
@@ -29,7 +31,7 @@ interface ProcessedInstallation {
   contact?: string;
   telephone?: string;
   commercial?: string;
-  dateInstall?: string | Date; // Accepter string ou Date
+  dateInstall?: string; // Doit être string ou undefined pour correspondre à Installation
   tech?: string;
   status?: string;
   commentaire?: string;
@@ -111,7 +113,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         commentaire: data.commentaire || '',
         
         // --- Champs traités ---
-        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : '', // Utiliser formatFirestoreDate
+        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : undefined, // Retourne string ou undefined
         hasCTN: chrShipmentClientCodes.has(data.codeClient), 
         
         // Inclure d'autres champs spécifiques au secteur si nécessaire
@@ -124,14 +126,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         materielLivre: data.materielLivre || '',
         commentaireEnvoiBT: data.commentaireEnvoiBT || '',
         techSecu: data.techSecu || '',
-        techAffecte: data.techAffecte || '',
-      };
-    });
+      // --- Champs spécifiques CHR (peuvent être passés à InstallationDetails si nécessaire) ---
+      // configCaisse: data.configCaisse || '',
+      // cdc: data.cdc || '',
+      // integrationJalia: data.integrationJalia || '',
+      // dossier: data.dossier || '',
+      // heure: data.heure || '',
+      // commentaireTech: data.commentaireTech || '',
+      // materielLivre: data.materielLivre || '',
+      // commentaireEnvoiBT: data.commentaireEnvoiBT || '',
+      // techSecu: data.techSecu || '',
+      // techAffecte: data.techAffecte || '',
+    };
+  });
 
-    return json<LoaderData>({ installations });
+    // Retourner les données formatées comme Installation pour correspondre à InstallationListItem/Details
+    const installationsTyped: Installation[] = installations.map(inst => ({
+      ...inst,
+      secteur: 'chr', // Ajouter le secteur explicitement si nécessaire
+      status: (inst.status || 'À planifier') as Installation['status'], // Fournir une valeur par défaut valide et caster
+      // Assurer que tous les champs requis par Installation sont présents
+      // Les champs spécifiques CHR ne sont pas dans le type Installation de base
+      // Ils pourraient être ajoutés à un type étendu ou gérés séparément si besoin dans Details
+    }));
+
+
+    return json<{ installations: Installation[], error?: string }>({ installations: installationsTyped });
   } catch (error: any) {
     console.error("[installations.chr Loader] Error fetching data:", error);
-    return json<LoaderData>({ 
+    return json<{ installations: Installation[], error?: string }>({ 
       installations: [],
       error: error.message || "Erreur lors du chargement des installations CHR." 
     }, { status: 500 });
@@ -139,11 +162,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function CHRInstallations() {
-  const { installations, error } = useLoaderData<typeof loader>();
+  const { installations, error } = useLoaderData<{ installations: Installation[], error?: string }>(); // Utiliser le type Installation
   const fetcher = useFetcher<ActionData>();
-  const [searchTerm, setSearchTerm] = useState(''); // Ajouter l'état pour le terme de recherche
+  const [searchTerm, setSearchTerm] = useState(''); 
+  const [isModalOpen, setIsModalOpen] = useState(false); // État pour la modale
+  const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null); // État pour l'installation sélectionnée
 
-  const handleSave = async (id: string, updates: any) => {
+  const handleSave = async (id: string, updates: Partial<Installation>) => { // Utiliser Partial<Installation>
     fetcher.submit(
       {
         id,
@@ -151,11 +176,25 @@ export default function CHRInstallations() {
       },
       { method: "post" }
     );
+    // Optionnel: Fermer la modale après sauvegarde
+    // handleCloseModal(); 
   };
+
+  const handleInstallationClick = (installation: Installation) => {
+    setSelectedInstallation(installation);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedInstallation(null);
+  };
+
 
   // Filtrer les installations en fonction du terme de recherche
   const filteredInstallations = installations.filter(installation => {
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    // Utiliser l'opérateur ?. pour accéder aux propriétés potentiellement undefined
     return (
       installation.nom.toLowerCase().includes(lowerCaseSearchTerm) ||
       installation.codeClient.toLowerCase().includes(lowerCaseSearchTerm) ||
@@ -194,21 +233,30 @@ export default function CHRInstallations() {
         </div>
       )}
 
-      {!error && filteredInstallations.length > 0 && ( // Utiliser la liste filtrée
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredInstallations.map((installation) => ( // Utiliser la liste filtrée
-            <InstallationTile
+      {!error && filteredInstallations.length > 0 && (
+        <div className="space-y-4"> {/* Rétablir l'affichage en liste verticale */}
+          {filteredInstallations.map((installation) => (
+            <InstallationListItem 
               key={installation.id}
               installation={installation}
-              hasCTN={installation.hasCTN}
-              onSave={(values) => handleSave(installation.id, values)}
+              onClick={handleInstallationClick} 
+              hasCTN={installation.hasCTN} 
             />
           ))}
         </div>
       )}
 
-      {!error && filteredInstallations.length === 0 && ( // Vérifier la longueur de la liste filtrée
+      {!error && filteredInstallations.length === 0 && (
         <p className="text-jdc-gray-400">Aucune installation CHR à afficher.</p>
+      )}
+
+      {/* Modale de détails */}
+      {isModalOpen && selectedInstallation && (
+        <InstallationDetails
+          installation={selectedInstallation}
+          onClose={handleCloseModal}
+          onSave={handleSave} // Passer la fonction handleSave
+        />
       )}
     </div>
   );

@@ -72,7 +72,7 @@ export function parseSerializedDateNullable(date: any, defaultValue: string = ''
 
 // Nouvelle fonction pour formater les dates
 export function formatFirestoreDate(date: Date | null | undefined, formatString: string = 'dd/MM/yyyy'): string {
-    if (!date) {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) { // Vérifier si la date est un objet Date valide
         return '';
     }
     try {

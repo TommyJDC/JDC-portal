@@ -52,23 +52,25 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">Notifications</h3>
               <div className="flex gap-4">
+                {/* Bouton "Tout marquer comme lu" visible s'il y a des notifications non lues */}
                 {notificationCount > 0 && (
-                  <>
-                    <button
-                      onClick={onMarkAllAsRead}
-                      className="text-jdc-yellow text-sm hover:text-yellow-300 transition-colors"
-                    >
-                      <FaCheck className="mr-1" />
-                      Tout marquer comme lu
-                    </button>
-                    <button
-                      onClick={onClearAll}
-                      className="text-red-500 text-sm hover:text-red-400 transition-colors"
-                    >
-                      <FaTrash className="mr-1" />
-                      Vider la liste
-                    </button>
-                  </>
+                  <button
+                    onClick={onMarkAllAsRead}
+                    className="text-jdc-yellow text-sm hover:text-yellow-300 transition-colors"
+                  >
+                    <FaCheck className="mr-1" />
+                    Tout marquer comme lu
+                  </button>
+                )}
+                {/* Bouton "Vider la liste" visible s'il y a des notifications (lues ou non) */}
+                {notifications.length > 0 && (
+                  <button
+                    onClick={onClearAll}
+                    className="text-red-500 text-sm hover:text-red-400 transition-colors"
+                  >
+                    <FaTrash className="mr-1" />
+                    Vider la liste
+                  </button>
                 )}
               </div>
             </div>

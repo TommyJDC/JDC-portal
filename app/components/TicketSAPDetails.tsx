@@ -3,14 +3,19 @@ import ReactDOM from 'react-dom';
 import { useFetcher, Form } from '@remix-run/react'; // Import Form
 import useGeminiSummary from '~/hooks/useGeminiSummary';
 import ReactMarkdown from 'react-markdown';
-import { FaSpinner, FaChevronDown, FaChevronUp } from 'react-icons/fa';
-import type { SapTicket } from '~/types/firestore.types';
+import { FaSpinner, FaChevronDown, FaChevronUp, FaTimes, FaBuilding, FaInfoCircle, FaCalendarAlt, FaUserTie, FaPhone, FaMapMarkerAlt, FaCommentDots, FaSave } from 'react-icons/fa'; // Ajouter les icônes nécessaires
+import type { SapTicket, SapTicketStatus } from '~/types/firestore.types'; // Importer SapTicketStatus
 import { Timestamp } from 'firebase/firestore';
-import { convertFirestoreDate, formatFirestoreDate } from '~/utils/dateUtils'; // Import ajouté
+import { convertFirestoreDate, formatFirestoreDate } from '~/utils/dateUtils';
 import { AnimatedTicketSummary } from '~/components/AnimatedTicketSummary';
 import { AnimatedSolution } from '~/components/AnimatedSolution';
-import { AnimatedComments } from '~/components/AnimatedComments';
+// AnimatedComments n'est plus utilisé ici si la section commentaires est retirée ou gérée différemment
 import { getStringValue } from '~/utils/firestoreUtils';
+import { getTicketStatusStyle } from '~/utils/styleUtils'; // Importer pour les styles de statut
+import { Button } from './ui/Button'; // Importer Button si nécessaire pour les actions
+import { Input } from './ui/Input'; // Importer Input
+import { Textarea } from './ui/Textarea'; // Importer Textarea
+import { Select } from './ui/Select'; // Importer Select si utilisé (sinon select HTML standard)
 
 interface TicketSAPDetailsProps {
     ticket: SapTicket | null;
@@ -23,31 +28,36 @@ interface TicketSAPDetailsProps {
 const isFirestoreStringValue = (val: any): val is { stringValue: string } =>
     typeof val === 'object' && val !== null && 'stringValue' in val;
 
-const getInitialSAPStatus = (ticket: SapTicket | null): string => {
-    if (!ticket?.statutSAP) return 'Nouveau';
-    return isFirestoreStringValue(ticket.statutSAP)
-        ? ticket.statutSAP.stringValue
-        : String(ticket.statutSAP);
+// Utiliser SapTicketStatus pour le type de retour
+const getInitialSAPStatus = (ticket: SapTicket | null): SapTicketStatus => {
+    const statusVal = ticket?.status; // Utiliser le champ 'status' interne
+    if (!statusVal) return 'open'; // Défaut à 'open' si non défini
+    const statusString = getStringValue(statusVal, 'open'); // Obtenir la chaîne de caractères
+    // Assurer que la valeur retournée est une des valeurs valides de SapTicketStatus
+    const validStatuses: SapTicketStatus[] = ['open', 'pending', 'closed', 'rma_request', 'material_sent', 'archived'];
+    if (validStatuses.includes(statusString as SapTicketStatus)) {
+        return statusString as SapTicketStatus;
+    }
+    // Mapper les anciens statuts si nécessaire ou retourner un défaut
+    switch (statusString.toLowerCase()) {
+        case 'nouveau':
+        case 'ouvert':
+            return 'open';
+        case 'en attente (pas de réponse)':
+        case 'en attente':
+            return 'pending';
+        case 'clôturé':
+        case 'fermé':
+            return 'closed';
+        case 'demande de rma':
+            return 'rma_request';
+        case 'demande d\'envoi materiel':
+            return 'material_sent';
+        default:
+            return 'open'; // Retourner 'open' par défaut si inconnu
+    }
 };
 
-const getSAPStatusBadgeClass = (status: string | { stringValue: string } | undefined): string => {
-    let statusString: string | undefined;
-    if (typeof status === 'string') {
-        statusString = status;
-    } else if (isFirestoreStringValue(status)) {
-        statusString = status.stringValue;
-    } else {
-        statusString = undefined;
-    }
-
-    switch (statusString?.toLowerCase()) {
-        case 'nouveau': return 'badge-info';
-        case 'en cours': return 'badge-primary';
-        case 'terminé': return 'badge-success';
-        case 'annulé': return 'badge-error';
-        default: return 'badge-ghost';
-    }
-};
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -67,25 +77,26 @@ const getStringValueWithFallback = (val: any, fallback: string = ''): string => 
     return fallback;
 };
 
-const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUpdated }) => {
+const TicketSAPDetails: React.FC<TicketSAPDetailsProps> = ({ ticket, onClose, sectorId, onTicketUpdated }) => {
     const fetcher = useFetcher<ActionData>();
-    const [technicianNotes, setTechnicianNotes] = useState<string>(''); // State for technician notes
-    const [materialType, setMaterialType] = useState<string>(''); // State for material type (RMA case)
-    const [currentStatus, setCurrentStatus] = useState<SapTicket['status']>('open'); // Use SapTicket['status'] type
+    const [technicianNotes, setTechnicianNotes] = useState<string>('');
+    const [materialType, setMaterialType] = useState<string>('');
+    const [currentStatus, setCurrentStatus] = useState<SapTicketStatus>('open'); // Utiliser SapTicketStatus
     const [isDescriptionOpen, setIsDescriptionOpen] = useState<boolean>(false);
+    const [materialDetails, setMaterialDetails] = useState<string>(''); // State for material details
 
     const isLoadingAction = fetcher.state !== 'idle';
 
-    // Correction: Fix reduce parenthesis and logic for problemDescriptionForAI
-    const problemDescriptionForAI = [
+    const problemDescriptionForAI = useMemo(() => [
         ticket?.demandeSAP,
         ticket?.descriptionProbleme,
         ticket?.description
     ].reduce((acc: string, field) => {
         if (!field) return acc;
-        if (acc) return acc;
-        return getStringValue(field, '');
-    }, '');
+        const value = getStringValue(field, '');
+        if (value && !acc) return value; // Prendre la première description non vide
+        return acc;
+    }, ''), [ticket]);
 
     const {
         summary: generatedSummary,
@@ -102,7 +113,7 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
         error: solutionError,
         generateSummary: triggerSolutionGeneration,
         isCached: isSolutionCached,
-        resetSummaryState: resetSolutionHookState // Corrected to use resetSummaryState
+        resetSummaryState: resetSolutionHookState
     } = useGeminiSummary(GEMINI_API_KEY);
 
     const handleSaveSummary = useCallback(async (summaryToSave: string): Promise<void> => {
@@ -127,13 +138,11 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
 
     useEffect(() => {
         if (!ticket?.id) return;
-        // Initialize currentStatus from ticket data, mapping if necessary
-        // Assuming getInitialSAPStatus maps Firestore/string values to SapTicket['status']
-        setCurrentStatus(getInitialSAPStatus(ticket) as SapTicket['status']);
-        // Initialize technician notes and material type from ticket if they exist
-        setTechnicianNotes(getStringValueWithFallback(ticket.technicianNotes, '')); // Assuming technicianNotes field exists on ticket
-        setMaterialType(getStringValueWithFallback(ticket.materialType, '')); // Assuming materialType field exists on ticket
-    }, [ticket?.id, ticket?.technicianNotes, ticket?.materialType]); // Add dependencies
+        setCurrentStatus(getInitialSAPStatus(ticket));
+        setTechnicianNotes(getStringValueWithFallback(ticket.technicianNotes, ''));
+        setMaterialType(getStringValueWithFallback(ticket.materialType, ''));
+        setMaterialDetails(getStringValueWithFallback(ticket.materialDetails, '')); // Initialize material details
+    }, [ticket]); // Simplifier les dépendances
 
     const generationAttempted = useRef<string | null>(null);
 
@@ -172,9 +181,6 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
         onClose();
     };
 
-    // Remove handleAddComment as comments are handled separately or integrated differently
-    // const handleAddComment = () => { ... };
-
     if (!ticket) return null;
 
     const [isClient, setIsClient] = useState(false);
@@ -186,319 +192,257 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
         return formatFirestoreDate(convertedDate);
     };
 
-    const getTicketDateForSorting = (date: Date | Timestamp | string | null | undefined): Date => {
-        if (!date) return new Date(0);
-        try {
-            if (date instanceof Timestamp) {
-                return date.toDate();
-            }
-            if (date instanceof Date) {
-                return date;
-            }
-            if (typeof date === 'string') {
-                return new Date(date);
-            }
-            return new Date(0);
-        } catch (e) {
-            return new Date(0);
+    // Déplacer la logique de soumission dans une fonction séparée pour plus de clarté
+    const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        formData.set("intent", "update_status"); // L'intention est toujours de mettre à jour
+        formData.set("ticketId", ticket?.id || '');
+        formData.set("sectorId", sectorId);
+
+        // Valider les notes si fermeture
+        if (formData.get('status') === 'closed' && !technicianNotes.trim()) {
+            alert("Les notes du technicien sont requises pour clôturer le ticket.");
+            return;
         }
+        // Ajouter les notes si elles existent
+        if (technicianNotes.trim()) {
+            formData.set("technicianNotes", technicianNotes.trim());
+        }
+
+        // Ajouter le type et les détails du matériel si pertinents
+        const statusValue = formData.get('status') as SapTicketStatus;
+        if ((statusValue === 'rma_request' || statusValue === 'material_sent') && !materialType) {
+            alert("Veuillez sélectionner un type de matériel pour cette action.");
+            return;
+        }
+        if (materialType) {
+            formData.set("materialType", materialType);
+            if (materialDetails.trim()) {
+                formData.set("materialDetails", materialDetails.trim());
+            }
+        } else {
+            // S'assurer que ces champs ne sont pas envoyés s'ils ne sont pas pertinents
+            formData.delete("materialType");
+            formData.delete("materialDetails");
+        }
+
+
+        fetcher.submit(formData, { method: "POST", action: "/tickets-sap" });
     };
 
+    // Statuts pour le select
+    const ticketStatuses: { value: SapTicketStatus; label: string }[] = [
+        { value: 'open', label: 'Ouvert' },
+        { value: 'pending', label: 'En attente (Pas de réponse)' },
+        { value: 'closed', label: 'Clôturé' },
+        { value: 'rma_request', label: 'Demande de RMA' },
+        { value: 'material_sent', label: 'Demande d\'envoi matériel' },
+    ];
+
+    const statusStyle = getTicketStatusStyle(currentStatus); // Obtenir le style du statut actuel
+
     const modalContent = (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={handleClose}>
-            <div className="w-11/12 max-w-4xl relative bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                <div className="sticky top-0 z-20 bg-gray-800 pb-6 pt-4 px-6 border-b border-gray-700">
-                    <button onClick={handleClose} className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4 hover:rotate-90 transition-transform duration-200" aria-label="Fermer">✕</button>
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <h3 className="font-bold text-2xl mb-1 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-400">
-                                {getStringValue(ticket.raisonSociale, 'Client Inconnu')}
-                            </h3>
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                                <span className="px-2 py-1 rounded bg-gray-700 font-mono">SAP #{getStringValue(ticket.numeroSAP, 'N/A')}</span>
-                                <span className="text-gray-500">•</span>
-                                <span>{getStringValue(ticket.secteur, 'N/A')}</span>
-                            </div>
-                        </div>
-                    </div>
+        // Appliquer le style de la modale InstallationDetails
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={handleClose}>
+            {/* Utiliser fetcher.Form pour la soumission */}
+            <fetcher.Form method="post" onSubmit={handleFormSubmit} className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative text-white flex flex-col">
+                {/* Header */}
+                <div className="flex justify-between items-center p-4 border-b border-gray-700 sticky top-0 bg-gradient-to-r from-gray-800 to-gray-850 z-10">
+                    <h2 className="text-xl font-semibold text-jdc-blue flex items-center">
+                        <FaBuilding className="mr-2" /> Détails Ticket SAP - {getStringValue(ticket.raisonSociale, 'N/A')} (SAP #{getStringValue(ticket.numeroSAP, 'N/A')})
+                        {isLoadingAction && <FaSpinner className="ml-3 text-jdc-yellow animate-spin" title="Sauvegarde en cours..." />}
+                    </h2>
+                    <button type="button" onClick={handleClose} className="text-gray-400 hover:text-white transition-colors">
+                        <FaTimes size={20} />
+                    </button>
                 </div>
 
-                <div className="px-6 pb-6">
-                    {/* Ticket Information Grid */}
-                    <div className="mb-6 p-4 bg-gray-700/30 rounded-lg border border-gray-700">
-                        <h4 className="font-bold text-lg mb-4 text-jdc-yellow">Informations du Ticket</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <p className="flex items-center gap-2">
-                                <span className="w-24 text-gray-400">Code Client</span>
-                                <span className="font-medium text-white">{getStringValue(ticket.codeClient, 'N/A')}</span>
-                            </p>
-                            <p className="flex items-center gap-2">
-                                <span className="w-24 text-gray-400">Téléphone</span>
-                                <span className="font-medium text-white">{getStringValue(ticket.telephone, 'N/A')}</span>
-                            </p>
-                            <p className="flex items-center gap-2">
-                                <span className="w-24 text-gray-400">Date</span>
-                                <span className="font-medium text-white">{formatTicketDate(ticket.date)}</span>
-                            </p>
-                            <p className="flex items-center gap-2">
-                                <span className="w-24 text-gray-400">Secteur</span>
-                                <span className="badge badge-neutral text-white">{getStringValue(ticket.secteur, 'N/A')}</span>
-                            </p>
-                            {ticket.deducedSalesperson && (
-                                <p className="flex items-center gap-2">
-                                    <span className="w-24 text-gray-400">Commercial</span>
-                                    <span className="font-medium text-white">{ticket.deducedSalesperson}</span>
-                                </p>
+                {/* Body */}
+                <div className="p-6 space-y-6 flex-grow">
+                    {/* Section Informations Ticket */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-start space-x-3">
+                            <FaInfoCircle className="text-jdc-blue mt-1 flex-shrink-0" />
+                            <div>
+                                <p className="font-semibold text-gray-300">Client / Code</p>
+                                <p>{getStringValue(ticket.raisonSociale, 'N/A')} / {getStringValue(ticket.codeClient, 'N/A')}</p>
+                            </div>
+                        </div>
+                         <div className="flex items-start space-x-3">
+                            <FaMapMarkerAlt className="text-jdc-blue mt-1 flex-shrink-0" />
+                            <div>
+                                <p className="font-semibold text-gray-300">Adresse</p>
+                                <p>{getStringValue(ticket.adresse, 'Non trouvé')}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                            <FaPhone className="text-jdc-blue mt-1 flex-shrink-0" />
+                            <div>
+                                <p className="font-semibold text-gray-300">Téléphone</p>
+                                <p>{getStringValue(ticket.telephone, 'N/A')}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                            <FaCalendarAlt className="text-jdc-blue mt-1 flex-shrink-0" />
+                            <div>
+                                <p className="font-semibold text-gray-300">Date Ticket</p>
+                                <p>{formatTicketDate(ticket.date)}</p>
+                            </div>
+                        </div>
+                        {ticket.deducedSalesperson && (
+                            <div className="flex items-start space-x-3">
+                                <FaUserTie className="text-jdc-blue mt-1 flex-shrink-0" />
+                                <div>
+                                    <p className="font-semibold text-gray-300">Commercial</p>
+                                    <p>{ticket.deducedSalesperson}</p>
+                                </div>
+                            </div>
+                        )}
+                         <div className="flex items-start space-x-3">
+                            <FaInfoCircle className="text-jdc-blue mt-1 flex-shrink-0" />
+                            <div>
+                                <p className="font-semibold text-gray-300">Secteur</p>
+                                <p>{getStringValue(ticket.secteur, 'N/A')}</p>
+                            </div>
+                        </div>
+                        {/* Ajouter Type, Priorité, Origine si nécessaire */}
+                    </div>
+
+                    <hr className="border-gray-700" />
+
+                    {/* Section Description & AI */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Description */}
+                        <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-700">
+                            <button
+                                type="button"
+                                className="flex items-center justify-between w-full text-left font-bold text-lg text-jdc-yellow focus:outline-none mb-2"
+                                onClick={() => setIsDescriptionOpen(!isDescriptionOpen)}
+                                aria-expanded={isDescriptionOpen}
+                            >
+                                Description du problème
+                                {isDescriptionOpen ? <FaChevronUp /> : <FaChevronDown />}
+                            </button>
+                            {isDescriptionOpen && (
+                                <div className="mt-2 text-white text-sm prose prose-invert max-w-none">
+                                    <ReactMarkdown>{problemDescriptionForAI || '*Aucune description fournie*'}</ReactMarkdown>
+                                </div>
                             )}
-                            <p className="flex items-center gap-2">
-                                <span className="w-24 text-gray-400">Adresse</span>
-                                <span className="font-medium text-white">{getStringValue(ticket.adresse, 'Non trouvé')}</span>
-                            </p>
-                            {ticket.type && (
-                                <p className="flex items-center gap-2">
-                                    <span className="w-24 text-gray-400">Type</span>
-                                    <span className="font-medium text-white">{getStringValue(ticket.type, 'N/A')}</span>
-                                </p>
-                            )}
-                            {ticket.priorite && (
-                                <p className="flex items-center gap-2">
-                                    <span className="w-24 text-gray-400">Priorité</span>
-                                    <span className="font-medium text-white">{getStringValue(ticket.priorite, 'N/A')}</span>
-                                </p>
-                            )}
-                            {ticket.origine && (
-                                <p className="flex items-center gap-2">
-                                    <span className="w-24 text-gray-400">Origine</span>
-                                    <span className="font-medium text-white">{getStringValue(ticket.origine, 'N/A')}</span>
-                                </p>
-                            )}
+                        </div>
+
+                        {/* AI Content */}
+                        <div className="space-y-4">
+                            <AnimatedTicketSummary
+                                ticket={ticket}
+                                summary={generatedSummary}
+                                isLoading={isSummaryLoading}
+                                error={summaryError}
+                            />
+                            <AnimatedSolution
+                                ticket={ticket}
+                                solution={generatedSolution}
+                                isLoading={isSolutionLoading}
+                                error={solutionError}
+                            />
                         </div>
                     </div>
 
-                    {/* Problem Description - Collapsible */}
-                    <div className="mb-6 p-4 bg-gray-700/30 rounded-lg border border-gray-700">
-                        <button
-                            className="flex items-center justify-between w-full text-left font-bold text-lg text-jdc-yellow focus:outline-none"
-                            onClick={() => setIsDescriptionOpen(!isDescriptionOpen)}
-                            aria-expanded={isDescriptionOpen}
-                        >
-                            Description du problème
-                        </button>
-                        {isDescriptionOpen && (
-                            <div className="mt-2 text-white">
-                                { ticket?.id
-                                    ? ( [
-                                        ticket?.demandeSAP,
-                                        ticket?.descriptionProbleme,
-                                        ticket?.description
-                                      ].reduce((acc: string, field) => {
-                                        if (!field) return acc;
-                                        if (acc) return acc;
-                                        return getStringValue(field, '');
-                                      }, ''))
-                                    : ''
-                                }
+                    <hr className="border-gray-700" />
+
+                    {/* Section Actions */}
+                    <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-700 space-y-4">
+                        <h4 className="font-bold text-lg text-jdc-yellow">Actions Ticket</h4>
+
+                        {/* Statut Select */}
+                        <div className="flex items-center space-x-2">
+                             {/* Utiliser une icône dynamique basée sur le statut */}
+                             {/* <StatusIcon className="w-5 h-5 flex-shrink-0" style={{ color: statusStyle.textColor }} /> */}
+                             <label htmlFor="status" className="font-semibold text-gray-300 w-20">Statut:</label>
+                             <select
+                                id="status"
+                                name="status"
+                                value={currentStatus}
+                                onChange={(e) => setCurrentStatus(e.target.value as SapTicketStatus)}
+                                // Combiner les classes statiques et dynamiques
+                                className={`block w-full rounded-md bg-gray-700 border-gray-600 focus:border-jdc-blue focus:ring focus:ring-jdc-blue focus:ring-opacity-50 py-1 pl-2 pr-8 text-sm ${statusStyle.textColor}`}
+                                // Appliquer la couleur via style uniquement si ce n'est pas une classe Tailwind (au cas où)
+                                style={{ color: statusStyle.textColor.startsWith('text-') ? undefined : statusStyle.textColor }}
+                             >
+                                {ticketStatuses.map(statusInfo => (
+                                    <option key={statusInfo.value} value={statusInfo.value}> {/* Enlever l'espace superflu avant > */}
+                                        {statusInfo.label}
+                                    </option>
+                                ))}
+                             </select>
+                        </div>
+
+                        {/* Notes Technicien */}
+                        <div>
+                            <label htmlFor="technicianNotes" className="block text-sm font-medium text-gray-300 mb-1 flex items-center">
+                                <FaCommentDots className="mr-2 text-jdc-blue" /> Notes Technicien
+                            </label>
+                            <Textarea
+                                id="technicianNotes"
+                                name="technicianNotes"
+                                value={technicianNotes}
+                                onChange={(e) => setTechnicianNotes(e.target.value)}
+                                className="bg-gray-700 text-white border-gray-600 focus:border-jdc-blue focus:ring-jdc-blue w-full"
+                                rows={3}
+                                placeholder="Notes pour résumé AI, clôture, ou suivi..."
+                            />
+                        </div>
+
+                        {/* Matériel (conditionnel) */}
+                        {(currentStatus === 'rma_request' || currentStatus === 'material_sent' || (currentStatus === 'open' && materialType)) && (
+                            <div className="space-y-4 p-3 border border-dashed border-gray-600 rounded-md">
+                                <h5 className="text-sm font-semibold text-gray-400">Détails Matériel</h5>
+                                <div>
+                                    <label htmlFor="materialType" className="block text-sm font-medium text-gray-400 mb-1">Type</label>
+                                    <select
+                                        id="materialType"
+                                        name="materialType"
+                                        value={materialType}
+                                        onChange={(e) => setMaterialType(e.target.value)}
+                                        className="select select-bordered w-full bg-gray-700 text-white border-gray-600 focus:border-jdc-blue focus:ring-jdc-blue rounded-lg text-sm"
+                                    >
+                                        <option value="">-- Sélectionner --</option>
+                                        <option value="RMA">RMA</option>
+                                        <option value="envoi-materiel">Envoi Matériel</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label htmlFor="materialDetails" className="block text-sm font-medium text-gray-400 mb-1">Détails (Réf, Qté...)</label>
+                                    <Textarea
+                                        id="materialDetails"
+                                        name="materialDetails"
+                                        value={materialDetails}
+                                        onChange={(e) => setMaterialDetails(e.target.value)}
+                                        rows={2}
+                                        className="textarea textarea-bordered w-full bg-gray-700 text-white border-gray-600 focus:border-jdc-blue focus:ring-jdc-blue rounded-lg text-sm"
+                                        placeholder="Spécifier le matériel..."
+                                    />
+                                </div>
                             </div>
                         )}
-                    </div>
 
-                    {/* AI Generated Content */}
-                    <div className="space-y-6 mb-6">
-                        <AnimatedTicketSummary
-                            ticket={ticket}
-                            summary={generatedSummary}
-                            isLoading={isSummaryLoading}
-                            error={summaryError}
-                        />
-                        <AnimatedSolution
-                            ticket={ticket}
-                            solution={generatedSolution}
-                            isLoading={isSolutionLoading}
-                            error={solutionError}
-                        />
-                    </div>
+                        {/* Bouton de soumission unique */}
+                         <Button
+                            type="submit"
+                            disabled={isLoadingAction}
+                            className="w-full bg-jdc-blue hover:bg-blue-600"
+                         >
+                            {isLoadingAction ? <FaSpinner className="animate-spin mr-2" /> : <FaSave className="mr-2" />}
+                            Mettre à jour le Statut
+                         </Button>
 
-                    {/* Status Update and Email Trigger */}
-                    <div className="mb-6 p-4 bg-gray-700/30 rounded-xl border border-gray-700">
-                        <h4 className="font-bold text-lg mb-3 text-jdc-yellow">Actions Ticket</h4>
-                        
-                        {/* Form for Status Update and Email */}
-                        <Form method="post" action="/tickets-sap" onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
-                            // Prevent default form submission as we are using fetcher.submit
-                            e.preventDefault();
-                            // Determine which action was triggered by the button clicked
-                            const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-                            const intent = submitter?.name === 'intent' ? submitter.value : 'update_status'; // Default to update_status
-
-                            const formData = new FormData(e.currentTarget); // Use form data
-                            formData.set("intent", intent); // Set the correct intent
-
-                            // Ensure ticket and sector IDs are included
-                            formData.set("ticketId", ticket?.id || '');
-                            formData.set("sectorId", sectorId);
-
-                            // Include technician notes if available
-                            if (technicianNotes.trim()) {
-                                formData.set("technicianNotes", technicianNotes.trim());
-                            } else if (intent === 'update_status' && formData.get('status') === 'closed') {
-                                // Require technician notes for closure status update
-                                alert("Les notes du technicien sont requises pour clôturer le ticket.");
-                                return; // Prevent submission
-                            }
-
-
-                            // Include material type if applicable (for RMA/Envoi Matériel intents or status update to 'open' with material type)
-                            if (intent === 'trigger_rma' || intent === 'trigger_envoi_materiel') {
-                                if (!materialType) {
-                                     alert("Veuillez sélectionner un type de matériel.");
-                                     return; // Prevent submission
-                                }
-                                formData.set("materialType", materialType);
-                            } else if (formData.get('status') === 'open' && materialType) {
-                                // If status is updated to 'open' and material type is selected
-                                formData.set("materialType", materialType);
-                            } else if (formData.get('status') === 'open' && ticket.materialType) {
-                                // If status is updated to 'open' and ticket already has materialType
-                                formData.set("materialType", getStringValueWithFallback(ticket.materialType));
-                            } else {
-                                // Ensure materialType is not sent for other status updates if not relevant
-                                formData.delete("materialType");
-                            }
-
-
-                            fetcher.submit(formData, { method: "POST", action: "/tickets-sap" });
-                        }} className="space-y-4">
-
-                            {/* Status Select */}
-                            <div>
-                                <label htmlFor="status" className="block text-sm font-medium text-gray-400 mb-1">Statut</label>
-                                <select
-                                    id="status"
-                                    name="status" // Name must match formData key in action
-                                    value={currentStatus}
-                                    onChange={(e) => setCurrentStatus(e.target.value as SapTicket['status'])}
-                                    className="select select-bordered w-full bg-gray-700 text-white border-gray-600 focus:border-jdc-yellow focus:ring-jdc-yellow rounded-lg"
-                                >
-                                    {/* Map internal statuses to display values if needed, or use action statuses directly */}
-                                    <option value="open">Ouvert</option>
-                                    <option value="pending">En attente (Pas de réponse)</option>
-                                    <option value="closed">Clôturé</option>
-                                    <option value="rma_request">Demande de RMA</option> {/* Added new status */}
-                                    <option value="material_sent">Demande d'envoi materiel</option> {/* Added new status */}
-                                    {/* 'archived' status is likely not set via this UI */}
-                                </select>
-                            </div>
-
-                            {/* Technician Notes */}
-                            <div>
-                                <label htmlFor="technicianNotes" className="block text-sm font-medium text-gray-400 mb-1">Notes du technicien</label>
-                                <textarea
-                                    id="technicianNotes"
-                                    name="technicianNotes" // Name must match formData key in action
-                                    value={technicianNotes}
-                                    onChange={(e) => setTechnicianNotes(e.target.value)}
-                                    rows={3}
-                                    className="textarea textarea-bordered w-full bg-gray-700 text-white border-gray-600 focus:border-jdc-yellow focus:ring-jdc-yellow rounded-lg"
-                                    placeholder="Ajouter des notes pour le résumé AI ou l'archivage..."
-                                ></textarea>
-                            </div>
-
-                            {/* Material Type (Conditional for RMA/Envoi Matériel intents or status update to 'open' with material type) */}
-                            {/* Show if status is 'open', 'rma_request', 'material_sent' OR if materialType is already set on the ticket */}
-                            {(currentStatus === 'open' || currentStatus === 'rma_request' || currentStatus === 'material_sent' || ticket.materialType) && (
-                                <div className="space-y-4"> {/* Use space-y-4 for spacing within this conditional block */}
-                                    <div>
-                                        <label htmlFor="materialType" className="block text-sm font-medium text-gray-400 mb-1">Type de matériel (RMA/Envoi)</label>
-                                        <select
-                                            id="materialType"
-                                            name="materialType" // Name must match formData key in action
-                                            value={materialType}
-                                            onChange={(e) => setMaterialType(e.target.value)}
-                                            className="select select-bordered w-full bg-gray-700 text-white border-gray-600 focus:border-jdc-yellow focus:ring-jdc-yellow rounded-lg"
-                                        >
-                                            <option value="">-- Sélectionner --</option>
-                                            <option value="RMA">RMA</option>
-                                            <option value="envoi-materiel">Envoi Matériel</option>
-                                            {/* Add other material types as needed */}
-                                        </select>
-                                    </div>
-
-                                    {/* Material Details (Conditional on materialType being selected) */}
-                                    {materialType && (
-                                        <div>
-                                            <label htmlFor="materialDetails" className="block text-sm font-medium text-gray-400 mb-1">Détails du matériel</label>
-                                            <textarea
-                                                id="materialDetails"
-                                                name="materialDetails" // New field name
-                                                value={getStringValueWithFallback(ticket.materialDetails, '')} // Assuming materialDetails field exists on ticket
-                                                onChange={(e) => { /* Handle state update if needed, or rely on form data */ }}
-                                                rows={3}
-                                                className="textarea textarea-bordered w-full bg-gray-700 text-white border-gray-600 focus:border-jdc-yellow focus:ring-jdc-yellow rounded-lg"
-                                                placeholder="Spécifier le matériel (référence, quantité, etc.)"
-                                            ></textarea>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-
-                            {/* Action Buttons */}
-                            {/* Keep the single submit button for status update */}
-                            <button
-                                type="submit" // This button submits the form
-                                disabled={isLoadingAction}
-                                className={`btn w-full rounded-lg ${isLoadingAction ? 'opacity-50 cursor-not-allowed' : ''} bg-jdc-yellow hover:bg-jdc-yellow/90 border-none text-jdc-card font-bold`}
-                            >
-                                {isLoadingAction ? (
-                                    <>
-                                        <FaSpinner className="animate-spin mr-2" />
-                                        Enregistrement...
-                                    </>
-                                ) : 'Mettre à jour & Envoyer Email'} {/* Modified button text */}
-                            </button>
-
-                            {/* Remove specific RMA/Envoi Materiel buttons as status selection now handles this */}
-                            {/*
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                <button
-                                    type="submit"
-                                    name="intent"
-                                    value="trigger_rma"
-                                    disabled={isLoadingAction || !materialType || !technicianNotes.trim()}
-                                    className={`btn btn-secondary w-full sm:w-1/2 rounded-md ${isLoadingAction ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                >
-                                     {isLoadingAction && fetcher.formData?.get('intent') === 'trigger_rma' ? (
-                                        <>
-                                            <FaSpinner className="animate-spin mr-2" />
-                                            Envoi RMA...
-                                        </>
-                                    ) : 'Déclencher Email RMA'}
-                                </button>
-                                <button
-                                    type="submit"
-                                    name="intent"
-                                    value="trigger_envoi_materiel"
-                                    disabled={isLoadingAction || !materialType || !technicianNotes.trim()}
-                                    className={`btn btn-accent w-full sm:w-1/2 rounded-md ${isLoadingAction ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                >
-                                     {isLoadingAction && fetcher.formData?.get('intent') === 'trigger_envoi_materiel' ? (
-                                        <>
-                                            <FaSpinner className="animate-spin mr-2" />
-                                            Envoi Matériel...
-                                        </>
-                                    ) : 'Déclencher Email Envoi Matériel'}
-                                </button>
-                            </div>
-                            */}
-                        </Form>
-
-                        {/* Action Result Message */}
+                        {/* Affichage des erreurs/succès */}
                         {fetcher.data && (
                             <div className={`mt-4 p-3 rounded-md text-sm ${
                                 hasMessageProperty(fetcher.data)
-                                    ? "bg-green-100 text-green-800"
+                                    ? "bg-green-900 bg-opacity-50 text-green-300 border border-green-700"
                                     : hasErrorProperty(fetcher.data)
-                                        ? "bg-red-100 text-red-800"
+                                        ? "bg-red-900 bg-opacity-50 text-red-300 border border-red-700"
                                         : ""
                             }`}>
                                 {hasMessageProperty(fetcher.data) && fetcher.data.message}
@@ -507,9 +451,9 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
                         )}
                     </div>
 
-                    {/* Contact Attempts Section */}
+                    {/* Tentatives de Contact */}
                     {ticket.contactAttempts && ticket.contactAttempts.length > 0 && (
-                        <div className="mb-6 p-4 bg-gray-700/30 rounded-xl border border-gray-700">
+                        <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-700">
                             <h4 className="font-bold text-lg mb-3 text-jdc-yellow">Tentatives de Contact</h4>
                             <ul className="space-y-2 text-sm text-gray-300">
                                 {(ticket.contactAttempts || []).map((attempt: { date: Date | null; method: 'email' | 'phone'; success: boolean; }, index: number) => (
@@ -526,11 +470,14 @@ const TicketSAPDetails: React.FC<any> = ({ ticket, onClose, sectorId, onTicketUp
                             </ul>
                         </div>
                     )}
-
-
-                    {/* Comments Section - Removed as per user request */}
                 </div>
-            </div>
+
+                {/* Footer (peut rester simple ou être retiré si le bouton est dans le body) */}
+                 <div className="p-4 border-t border-gray-700 flex justify-end space-x-3 sticky bottom-0 bg-gradient-to-r from-gray-800 to-gray-850">
+                    {/* Le bouton de sauvegarde est maintenant dans le formulaire */}
+                    <Button type="button" onClick={handleClose} variant="secondary" disabled={isLoadingAction}>Fermer</Button>
+                 </div>
+            </fetcher.Form>
         </div>
     );
 
