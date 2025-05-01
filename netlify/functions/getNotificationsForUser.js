@@ -2,7 +2,7 @@
 // It uses firebase-admin to bypass Firestore security rules and fetch notifications
 // based on user ID, roles, and sectors.
 
-import { initializeFirebaseAdmin } from '../../app/firebase.admin.config.server.js';
+import { initializeFirebaseAdmin } from '~/firebase.admin.config.server';
 
 let dbAdmin;
 

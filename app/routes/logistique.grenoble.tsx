@@ -130,7 +130,7 @@ export async function loader({ request }: { request: Request }) {
 // Fonction pour déterminer la couleur du badge en fonction du statut CDE
 const getStatutColor = (statut: string | undefined): string => {
   if (!statut) return 'bg-gray-600 text-gray-100'; // Couleur par défaut si le statut est vide
-  const lowerStatut = statut.toLowerCase();
+  const lowerStatut = statut?.toLowerCase(); // Utiliser ?. pour éviter l'erreur si statut est undefined
   switch (lowerStatut) {
     case 'expédiée':
       return 'bg-green-600 text-green-100';
@@ -160,98 +160,113 @@ export default function LogistiqueGrenoble() {
         <p className="text-gray-400">Aucune donnée trouvée pour Grenoble.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4"> {/* Changé en liste verticale */}
-          {data.map((item: LogistiqueItem, index: number) => (
-            <div
-              key={index}
-              className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 transition-all duration-200 flex flex-col space-y-3 border-l-4 border-jdc-blue" // Appliquer le style de carte
-            >
-              {/* Header */}
-              <div className="flex justify-between items-center">
-                <div className="flex items-center min-w-0">
-                  <FaTruck className="mr-2 text-jdc-yellow flex-shrink-0" />
-                  <span className="text-white font-semibold text-base mr-2 truncate" title={item.service}>Service: {item.service}</span>
+          {data.map((item: LogistiqueItem, index: number) => {
+            const statutColorClass = getStatutColor(item.statutCDE);
+            // Déterminer la couleur de la bordure en hexadécimal
+            let borderColor = '#4b5563'; // Default: gray-600 from getStatutColor default
+            if (statutColorClass.includes('bg-green-600')) borderColor = '#10b981'; // green-600
+            else if (statutColorClass.includes('bg-red-600')) borderColor = '#ef4444'; // red-600
+            else if (statutColorClass.includes('bg-orange-600')) borderColor = '#f97316'; // orange-600
+            else if (statutColorClass.includes('bg-blue-600')) borderColor = '#3b82f6'; // blue-600
+
+            return (
+              <div
+                key={index}
+                className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 cursor-pointer hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex flex-col space-y-3 border-l-4" // Appliquer le style de carte complet
+                style={{ borderLeftColor: borderColor }} // Bordure colorée selon le statut
+                // Ajouter un onClick si on veut ouvrir les détails (non spécifié dans la tâche)
+                // onClick={() => handleItemClick(item)}
+                role="button" // Optionnel si cliquable
+                tabIndex={0} // Optionnel si cliquable
+              >
+                {/* Header */}
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center min-w-0">
+                    <FaTruck className="mr-2 text-jdc-yellow flex-shrink-0" />
+                    <span className="text-white font-semibold text-base mr-2 truncate" title={item.service}>Service: {item.service}</span>
+                  </div>
+                  <span
+                    className={`ml-2 flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statutColorClass}`} // Utiliser la classe de statut
+                    title={`Statut CDE: ${item.statutCDE || 'N/A'}`}
+                  >
+                     <FaInfoCircle className="mr-1" />
+                    {item.statutCDE || 'N/A'}
+                  </span>
                 </div>
-                <span
-                  className={`ml-2 flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatutColor(item.statutCDE)}`} // Utiliser la fonction pour la couleur
-                  title={`Statut CDE: ${item.statutCDE || 'N/A'}`}
-                >
-                   <FaInfoCircle className="mr-1" />
-                  {item.statutCDE || 'N/A'}
-                </span>
-              </div>
 
-              {/* Body: Articles */}
-              <div className="grid grid-cols-1 gap-2 text-xs text-gray-400 mt-2"> {/* Ajout de marge supérieure */}
-                {/* En-tête de la section Articles */}
-                <div className="flex items-center text-white font-medium mb-1">
-                   <FaBox className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                   <span>Articles:</span>
+                {/* Body: Articles */}
+                <div className="grid grid-cols-1 gap-2 text-xs text-gray-400 mt-2"> {/* Ajout de marge supérieure */}
+                  {/* En-tête de la section Articles */}
+                  <div className="flex items-center text-white font-medium mb-1">
+                     <FaBox className="mr-2 text-gray-500 w-4 flex-shrink-0" />
+                     <span>Articles:</span>
+                  </div>
+
+                  {/* Liste des articles SAP */}
+                  {item.sap1 && (
+                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2"> {/* Conteneur pour chaque article */}
+                      <div className="flex items-center text-white font-medium"> {/* SAP number and Designation */}
+                        <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
+                        <span>SAP 1: {item.sap1} - {item.designation1 || 'N/A'}</span> {/* Combine SAP and Designation */}
+                      </div>
+                      <div className="pl-6 text-gray-400"> {/* Quantity below */}
+                        <p><strong className="text-gray-500">Qté:</strong> {item.qte1 || 'N/A'}</p>
+                      </div>
+                    </div>
+                  )}
+                   {item.sap2 && (
+                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
+                       <div className="flex items-center text-white font-medium">
+                         <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
+                         <span>SAP 2: {item.sap2} - {item.designation2 || 'N/A'}</span>
+                      </div>
+                      <div className="pl-6 text-gray-400">
+                        <p><strong className="text-gray-500">Qté:</strong> {item.qte2 || 'N/A'}</p>
+                      </div>
+                    </div>
+                  )}
+                  {item.sap3 && (
+                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
+                       <div className="flex items-center text-white font-medium">
+                         <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
+                         <span>SAP 3: {item.sap3} - {item.designation3 || 'N/A'}</span>
+                      </div>
+                      <div className="pl-6 text-gray-400">
+                        <p><strong className="text-gray-500">Qté:</strong> {item.qte3 || 'N/A'}</p>
+                      </div>
+                    </div>
+                  )}
+                  {item.sap4 && (
+                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
+                       <div className="flex items-center text-white font-medium">
+                         <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
+                         <span>SAP 4: {item.sap4} - {item.designation4 || 'N/A'}</span>
+                      </div>
+                      <div className="pl-6 text-gray-400">
+                        <p><strong className="text-gray-500">Qté:</strong> {item.qte4 || 'N/A'}</p>
+                      </div>
+                    </div>
+                  )}
+                  {item.sap5 && (
+                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
+                       <div className="flex items-center text-white font-medium">
+                         <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
+                         <span>SAP 5: {item.sap5} - {item.designation5 || 'N/A'}</span>
+                      </div>
+                      <div className="pl-6 text-gray-400">
+                        <p><strong className="text-gray-500">Qté:</strong> {item.qte5 || 'N/A'}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Liste des articles SAP */}
-                {item.sap1 && (
-                  <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2"> {/* Conteneur pour chaque article */}
-                    <div className="flex items-center text-white font-medium"> {/* SAP number and Designation */}
-                      <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                      <span>SAP 1: {item.sap1} - {item.designation1 || 'N/A'}</span> {/* Combine SAP and Designation */}
-                    </div>
-                    <div className="pl-6 text-gray-400"> {/* Quantity below */}
-                      <p><strong className="text-gray-500">Qté:</strong> {item.qte1 || 'N/A'}</p>
-                    </div>
-                  </div>
-                )}
-                 {item.sap2 && (
-                  <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
-                     <div className="flex items-center text-white font-medium">
-                       <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                       <span>SAP 2: {item.sap2} - {item.designation2 || 'N/A'}</span>
-                    </div>
-                    <div className="pl-6 text-gray-400">
-                      <p><strong className="text-gray-500">Qté:</strong> {item.qte2 || 'N/A'}</p>
-                    </div>
-                  </div>
-                )}
-                {item.sap3 && (
-                  <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
-                     <div className="flex items-center text-white font-medium">
-                       <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                       <span>SAP 3: {item.sap3} - {item.designation3 || 'N/A'}</span>
-                    </div>
-                    <div className="pl-6 text-gray-400">
-                      <p><strong className="text-gray-500">Qté:</strong> {item.qte3 || 'N/A'}</p>
-                    </div>
-                  </div>
-                )}
-                {item.sap4 && (
-                  <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
-                     <div className="flex items-center text-white font-medium">
-                       <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                       <span>SAP 4: {item.sap4} - {item.designation4 || 'N/A'}</span>
-                    </div>
-                    <div className="pl-6 text-gray-400">
-                      <p><strong className="text-gray-500">Qté:</strong> {item.qte4 || 'N/A'}</p>
-                    </div>
-                  </div>
-                )}
-                {item.sap5 && (
-                  <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
-                     <div className="flex items-center text-white font-medium">
-                       <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                       <span>SAP 5: {item.sap5} - {item.designation5 || 'N/A'}</span>
-                    </div>
-                    <div className="pl-6 text-gray-400">
-                      <p><strong className="text-gray-500">Qté:</strong> {item.qte5 || 'N/A'}</p>
-                    </div>
-                  </div>
-                )}
+                {/* Footer - Pas de champs spécifiques demandés, on peut laisser vide ou ajouter autre chose si pertinent */}
+                <div className="border-t border-gray-700 pt-2 mt-2 space-y-1 text-xs text-gray-400">
+                  {/* Ajoutez d'autres champs pertinents ici si nécessaire */}
+                </div>
               </div>
-
-              {/* Footer - Pas de champs spécifiques demandés, on peut laisser vide ou ajouter autre chose si pertinent */}
-              <div className="border-t border-gray-700 pt-2 mt-2 space-y-1 text-xs text-gray-400">
-                {/* Ajoutez d'autres champs pertinents ici si nécessaire */}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

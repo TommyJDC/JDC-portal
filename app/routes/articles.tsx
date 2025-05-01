@@ -233,73 +233,91 @@ import { Form, useLoaderData, useSearchParams, useFetcher } from "@remix-run/rea
             {!isLoadingData && !loaderError && (
               <>
                 {loaderArticles && loaderArticles.length > 0 ? (
-                  <ul className="divide-y divide-gray-700 space-y-4">
+                  // Remplacer ul par un div avec space-y pour espacer les cartes
+                  <div className="space-y-4">
                     {loaderArticles.map((article) => {
                       const isUploadingCurrent = uploadingImageId === article.id && fetcher.state !== 'idle';
                       const isDeletingCurrent = (imageUrl: string) => deletingImageUrl === imageUrl && fetcher.state !== 'idle';
 
                       return (
-                        <li key={article.id} className="py-4 px-3 hover:bg-gray-700/30 rounded-md transition-colors">
-                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        // Appliquer le style de carte ici (sans bordure colorée)
+                        <div
+                          key={article.id}
+                          className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex flex-col space-y-3"
+                        >
+                          {/* Header: Code et Désignation */}
+                          <div className="flex justify-between items-center">
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-white">Code: <span className="text-yellow-400">{article.Code}</span></p>
-                              <p className="text-sm text-gray-300">Désignation: {article.Désignation}</p>
-                              {article.imageUrls && article.imageUrls.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {article.imageUrls.map((url, index) => {
-                                    const deletingThis = isDeletingCurrent(url);
-                                    return (
-                                      <div key={index} className="relative group">
-                                        <img
-                                          src={url}
-                                          alt={`Image ${index + 1} pour ${article.Code}`}
-                                          className={`h-16 w-16 object-cover rounded-md border border-gray-600 transition-opacity ${deletingThis ? 'opacity-50' : 'group-hover:opacity-70 cursor-pointer'}`}
-                                          loading="lazy"
-                                          onClick={() => !deletingThis && openImageModal(url)}
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); handleDeleteImage(article.id, url); }}
-                                          disabled={deletingThis || fetcher.state !== 'idle'}
-                                          className={`absolute top-1 right-1 p-1 bg-red-600 bg-opacity-75 rounded-full text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${deletingThis ? 'cursor-not-allowed opacity-50' : 'hover:bg-red-700'}`}
-                                          aria-label="Supprimer l'image"
-                                        >
-                                          {deletingThis ? (
-                                            <FaSpinner className="h-3 w-3 animate-spin" />
-                                          ) : (
-                                            <FaTrashAlt className="h-3 w-3" />
-                                          )}
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
+                              <p className="font-semibold text-white text-base truncate" title={`Code: ${article.Code}`}>
+                                Code: <span className="text-yellow-400">{article.Code}</span>
+                              </p>
+                              <p className="text-sm text-gray-300 truncate" title={`Désignation: ${article.Désignation}`}>
+                                {article.Désignation}
+                              </p>
                             </div>
-                            <div className="ml-0 md:ml-4 flex-shrink-0 mt-4 md:mt-0">
-                              <button
-                                type="button"
-                                onClick={() => handleAddPhotoClick(article.id)}
-                                disabled={isUploadingCurrent || fetcher.state !== 'idle'}
-                                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
-                                  isUploadingCurrent || fetcher.state !== 'idle'
-                                    ? 'bg-gray-500 cursor-not-allowed'
-                                    : 'bg-jdc-yellow hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-jdc-yellow'
-                                }`}
-                              >
-                                {isUploadingCurrent ? (
-                                  <FaSpinner className="mr-2 animate-spin" />
-                                ) : (
-                                  <FaPlus className="-ml-1 mr-2 h-4 w-4" aria-hidden="true" />
-                                )}
-                                <span>{isUploadingCurrent ? 'Upload...' : 'Photo'}</span>
-                              </button>
-                            </div>
+                            {/* Bouton Ajouter Photo déplacé vers le bas */}
                           </div>
-                        </li>
+
+                          {/* Body: Images (si présentes) */}
+                          {article.imageUrls && article.imageUrls.length > 0 && (
+                            <div className="border-t border-gray-700 pt-3 mt-3">
+                              <p className="text-xs text-gray-400 mb-2">Images :</p>
+                              <div className="flex flex-wrap gap-2">
+                                {article.imageUrls.map((url, index) => {
+                                  const deletingThis = isDeletingCurrent(url);
+                                  return (
+                                    <div key={index} className="relative group">
+                                      <img
+                                        src={url}
+                                        alt={`Image ${index + 1} pour ${article.Code}`}
+                                        className={`h-16 w-16 object-cover rounded-md border border-gray-600 transition-opacity ${deletingThis ? 'opacity-50' : 'group-hover:opacity-70 cursor-pointer'}`}
+                                        loading="lazy"
+                                        onClick={() => !deletingThis && openImageModal(url)}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteImage(article.id, url); }}
+                                        disabled={deletingThis || fetcher.state !== 'idle'}
+                                        className={`absolute top-1 right-1 p-1 bg-red-600 bg-opacity-75 rounded-full text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${deletingThis ? 'cursor-not-allowed opacity-50' : 'hover:bg-red-700'}`}
+                                        aria-label="Supprimer l'image"
+                                      >
+                                        {deletingThis ? (
+                                          <FaSpinner className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <FaTrashAlt className="h-3 w-3" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Footer: Bouton Ajouter Photo */}
+                          <div className="border-t border-gray-700 pt-3 mt-3 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleAddPhotoClick(article.id)}
+                              disabled={isUploadingCurrent || fetcher.state !== 'idle'}
+                              className={`inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-black ${ // text-black pour contraste sur jaune
+                                isUploadingCurrent || fetcher.state !== 'idle'
+                                  ? 'bg-gray-500 cursor-not-allowed text-gray-300' // Ajuster texte pour état désactivé
+                                  : 'bg-jdc-yellow hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-jdc-yellow'
+                              }`}
+                            >
+                              {isUploadingCurrent ? (
+                                <FaSpinner className="mr-1.5 animate-spin h-4 w-4" />
+                              ) : (
+                                <FaPlus className="-ml-0.5 mr-1.5 h-4 w-4" aria-hidden="true" />
+                              )}
+                              <span>{isUploadingCurrent ? 'Upload...' : 'Ajouter Photo'}</span>
+                            </button>
+                          </div>
+                        </div>
                       );
                     })}
-                  </ul>
+                  </div>
                 ) : (
                   <p className="text-gray-400 italic">
                     {loaderSearchParams.code || loaderSearchParams.nom

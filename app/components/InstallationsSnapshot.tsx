@@ -49,15 +49,16 @@ const InstallationCard = ({
   gradientFrom: string;
   gradientTo: string;
 }) => (
+  // Appliquer le style de carte de InstallationListItem
   <Link
     to={to}
-    className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out block" // Utiliser block pour que le lien remplisse la carte
+    className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-6 cursor-pointer hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex flex-col space-y-4" // Ajuster padding et space-y
   >
-    <div className="flex items-center gap-3 mb-4">
-      <div className={`p-3 rounded-full bg-gradient-to-r from-${gradientFrom} to-${gradientTo}`}> {/* Rendre l'icône plus grande et ronde */}
+    <div className="flex items-center gap-3"> {/* Ajuster l'espacement */}
+      <div className={`p-3 rounded-full bg-gradient-to-r from-${gradientFrom} to-${gradientTo} flex-shrink-0`}> {/* Rendre l'icône plus grande et ronde */}
         <IconComponent className="text-white text-xl" /> {/* Ajuster la taille de l'icône */}
       </div>
-      <h3 className="font-extrabold text-xl text-white">{title}</h3> {/* Ajuster la taille et le poids du titre */}
+      <h3 className="font-extrabold text-xl text-white truncate">{title}</h3> {/* Ajuster la taille et le poids du titre */}
     </div>
     
     <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-gray-300"> {/* Ajuster l'espacement */}

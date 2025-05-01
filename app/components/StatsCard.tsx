@@ -29,7 +29,8 @@ export const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, isLoad
   const statType = getStatTypeFromTitle(title); // Get the specific type for the label
 
   return (
-    <div className={`bg-gray-800 p-2 rounded-lg shadow-lg border border-transparent hover:border-jdc-blue transition-all duration-300 ease-in-out flex flex-col items-center justify-center text-center space-y-1 ${height}`}>
+    // Appliquer le style de carte ici
+    <div className={`bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex flex-col items-center justify-center text-center space-y-2 ${height}`}> {/* Ajuster padding et space-y */}
       {/* Icon */}
       <div className="p-3 rounded-md bg-jdc-yellow/20 text-jdc-yellow border border-jdc-yellow/30 flex-shrink-0"> {/* Icône jaune, taille et padding ajustés */}
         {React.createElement(icon, { className: "h-6 w-6" })} {/* Utiliser React.createElement pour rendre l'icône */}

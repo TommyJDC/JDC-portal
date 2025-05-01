@@ -74,6 +74,17 @@ const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
 
 const JDC_LOGO_URL = "https://www.jdc.fr/images/logo_jdc_blanc.svg";
 
+// Nouvelles classes de base pour les tuiles de l'en-tête
+const headerTileBaseClasses = "flex items-center rounded-md shadow-sm transition-all duration-200 text-sm font-medium px-3 py-1.5 bg-gradient-to-br from-gray-800 to-gray-900 hover:shadow-md hover:from-gray-700 hover:to-gray-800";
+
+// Classes pour les liens NavLink actifs et inactifs dans l'en-tête
+const headerLinkActiveClass = `${headerTileBaseClasses} text-white border-b-2 border-jdc-yellow`;
+const headerLinkInactiveClass = `${headerTileBaseClasses} text-gray-300 hover:text-white border-b-2 border-transparent`;
+
+// Classe pour les boutons de menu dans l'en-tête (pas d'état actif/inactif basé sur la route)
+const headerMenuButtonClass = `${headerTileBaseClasses} text-gray-300 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 border-b-2 border-transparent`;
+
+
 export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMenu, onLoginClick, loadingAuth }) => {
   const [notifications, setNotifications] = useState<NotificationDisplay[]>([]);
   const [notificationCount, setNotificationCount] = useState(0);
@@ -204,9 +215,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
       console.error('Error marking all notifications as read:', error);
     }
   };
-  const linkActiveClass = "text-jdc-yellow font-semibold flex items-center transition-colors duration-200 ease-in-out hover:scale-105 text-lg";
-  const linkInactiveClass = "text-jdc-gray-300 hover:text-jdc-yellow font-semibold flex items-center transition-colors duration-200 ease-in-out hover:scale-105 text-lg";
-  const menuButtonClass = `text-jdc-gray-300 hover:text-jdc-yellow font-semibold flex items-center transition-colors duration-200 ease-in-out hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 text-lg`;
+  // Les classes linkActiveClass et linkInactiveClass sont maintenant définies en haut
   const menuItemBaseClass = 'group flex w-full items-center rounded-md px-2 py-2 text-sm';
 
   // Determine if the Admin link should be shown
@@ -221,9 +230,9 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
 
   return (
 <header className="bg-gray-900 p-4 shadow-lg border-b border-gray-800 sticky top-0 z-40">
-      <div className="flex justify-between items-center max-w-7xl mx-auto px-4">
+      <div className="flex justify-between items-center max-w-7xl mx-auto px-4 gap-6"> {/* Ajout de gap-6 */}
         {/* Logo */}
-        <div className="flex items-center">
+        <div className="flex items-center"> {/* Suppression de mr-6 */}
           <Link to={user ? "/dashboard" : "/"} className="flex-shrink-0">
             <img 
               src={JDC_LOGO_URL} 
@@ -243,6 +252,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
           >
             <FaBars className="w-5 h-5" />
           </button>
+        </div>
 
           {/* Desktop Navigation */}
           {user && !loadingAuth && (
@@ -252,11 +262,11 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={({ isActive }) => 
-                    `flex items-center px-3 py-2 rounded-md text-sm font-medium ${
-                      isActive 
-                        ? 'bg-gray-800 text-white' 
-                        : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  className={({ isActive }) =>
+                    `${headerLinkActiveClass} ${
+                      isActive
+                        ? 'text-white border-b-2 border-jdc-yellow'
+                        : 'text-gray-300 hover:text-white border-b-2 border-transparent'
                     }`
                   }
                   prefetch="intent"
@@ -269,7 +279,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
               {/* Technique Menu */}
               <Menu as="div" className="relative inline-block text-left">
                 <div>
-                  <Menu.Button className={menuButtonClass}>
+                  <Menu.Button className={headerMenuButtonClass}>
                     <span>Technique</span>
                     <FaChevronDown className="ml-1.5 h-4 w-4" aria-hidden="true" />
                   </Menu.Button>
@@ -285,7 +295,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
                 >
                   <Menu.Items className="absolute left-0 mt-2 w-48 origin-top-left divide-y divide-jdc-gray-700 rounded-md bg-jdc-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                     <div className="px-1 py-1">
-                      {techniqueItems.map((item) => 
+                      {techniqueItems.map((item) =>
                         item.subItems ? (
                           <div key={item.name} className="py-1">
                             <div className="px-3 py-1 text-xs font-semibold text-jdc-gray-400 uppercase">
@@ -331,7 +341,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
               {/* Logistique Menu */}
               <Menu as="div" className="relative inline-block text-left">
                 <div>
-                  <Menu.Button className={menuButtonClass}>
+                  <Menu.Button className={headerMenuButtonClass}>
                     <span>Logistique</span>
                     <FaChevronDown className="ml-1.5 h-4 w-4" aria-hidden="true" />
                   </Menu.Button>
@@ -370,7 +380,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
               {/* Commercial Menu */}
               <Menu as="div" className="relative inline-block text-left">
                 <div>
-                  <Menu.Button className={menuButtonClass}>
+                  <Menu.Button className={headerMenuButtonClass}>
                     <span>Commercial</span>
                     <FaChevronDown className="ml-1.5 h-4 w-4" aria-hidden="true" />
                   </Menu.Button>
@@ -416,7 +426,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
               {showAdminLink && (
                 <NavLink
                   to={adminItem.to}
-                  className={({ isActive }) => `${isActive ? linkActiveClass : linkInactiveClass} font-medium flex items-center transition-transform duration-200 ease-in-out hover:scale-105`}
+                  className={({ isActive }) => `${headerLinkActiveClass} ${isActive ? 'text-white border-b-2 border-jdc-yellow' : 'text-gray-300 hover:text-white border-b-2 border-transparent'} font-medium transition-transform duration-200 ease-in-out hover:scale-105`}
                 >
                   <adminItem.icon className="mr-1.5 w-5 h-5" />
                   {adminItem.name}
@@ -427,7 +437,7 @@ export const Header: React.FC<HeaderProps> = ({ user, profile, onToggleMobileMen
           )}
           {/* Loading Placeholder */}
           {loadingAuth && <div className="hidden md:block text-jdc-gray-400 text-sm">Chargement...</div>}
-        </div>
+        {/* Le div Right Section est déjà un sibling direct */}
 
         {/* Right Section: Search, Notifications, and User Actions */}
         <div className="flex items-center space-x-4">

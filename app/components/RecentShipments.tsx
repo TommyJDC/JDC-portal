@@ -43,19 +43,26 @@ export const RecentShipments: React.FC<RecentShipmentsProps> = ({ shipments, isL
       ) : uniqueClientNames.length === 0 ? (
         <p className="text-gray-400 text-center py-4">Aucun client trouvé dans les envois récents.</p>
       ) : (
-        <ul className="space-y-3 max-h-[calc(100%-4rem)] overflow-y-auto pr-2">
+        <div className="space-y-3 max-h-[calc(100%-4rem)] overflow-y-auto pr-2"> {/* Remplacer ul par div */}
           {uniqueClientNames.map((clientName) => (
-            <li key={clientName} className="text-sm p-3 bg-gray-700/30 rounded-md hover:bg-gray-700 transition-colors duration-150">
+            // Appliquer le style de carte à un div conteneur pour le lien
+            <div
+              key={clientName}
+              className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200"
+            >
               <Link
                 to={`/envois-ctn?client=${encodeURIComponent(getStringValue(clientName))}`}
-                className="flex items-center w-full"
+                className="flex items-center w-full p-4" // Ajouter le padding au lien pour qu'il remplisse la carte
               >
-                <FaBuilding className="mr-3 text-jdc-blue flex-shrink-0" />
-                <span className="font-medium text-yellow-400 truncate" title={getStringValue(clientName)}>{getStringValue(clientName)}</span>
+                <FaBuilding className="mr-3 text-jdc-blue flex-shrink-0 text-lg" /> {/* Icône un peu plus grande */}
+                <span className="font-semibold text-white text-base truncate" title={getStringValue(clientName)}> {/* Texte blanc et plus grand */}
+                  {getStringValue(clientName)}
+                </span>
+                {/* On pourrait ajouter une flèche ou un indicateur de lien ici si désiré */}
               </Link>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

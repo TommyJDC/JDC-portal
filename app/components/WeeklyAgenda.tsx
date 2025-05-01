@@ -83,7 +83,7 @@ export const WeeklyAgenda: React.FC<WeeklyAgendaProps> = ({ events, error, isLoa
     }
 
     return (
-        <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out flex flex-col">
+        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-6 hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex flex-col">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold text-white flex items-center">
                     <FaCalendarAlt className="mr-2 text-jdc-yellow" style={{ width: '13px', height: '13px' }} />

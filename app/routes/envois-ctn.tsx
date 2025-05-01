@@ -315,31 +315,36 @@ import type { MetaFunction } from "@remix-run/node";
                           ? `${shipment.articleNom.substring(0, 47)}...`
                           : shipment.articleNom;
 
+                        // Déterminer la couleur de la bordure
+                        let borderColor = '#333333'; // Default: jdc-gray-800
+                        if (statusStyle.bgColor === 'bg-green-700') {
+                          borderColor = '#15803d'; // green-700
+                        } else if (statusStyle.bgColor === 'bg-red-700') {
+                          borderColor = '#b91c1c'; // red-700
+                        }
+
                         // Parse dateCreation for display if needed, or format directly if possible
                         // const displayDate = shipment.dateCreation ? shipment.dateCreation.toLocaleDateString('fr-FR') : 'N/A';
 
                         return (
-                          <div key={shipment.id} className="flex items-center justify-between text-sm border-b border-gray-700 pb-2 last:border-b-0 gap-2">
-                            <div className="flex-1 min-w-0 mr-1">
-                              <span className="text-gray-200 block font-medium truncate" title={shipment.articleNom}>
-                                {truncatedArticle || 'Article non spécifié'}
-                              </span>
-                              <div className="flex items-center flex-wrap mt-1 space-x-2">
-                                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${statusStyle.bgColor} ${statusStyle.textColor}`}>
-                                    {shipment.statutExpedition || 'Inconnu'}
-                                  </span>
-                                  <span className="text-gray-500 text-xs whitespace-nowrap" title={`ID: ${shipment.id}`}>
-                                    ID: {shipment.id.substring(0, 8)}...
-                                  </span>
-                                   <span className="text-gray-500 text-xs whitespace-nowrap">
-                                     Secteur: {shipment.secteur || 'N/A'}
-                                   </span>
-                                   {/* Optionally display parsed dateCreation */}
-                                   {/* <span className="text-jdc-gray-500 text-xs whitespace-nowrap">Créé le: {displayDate}</span> */}
+                          // Appliquer le style de carte ici
+                          <div
+                            key={shipment.id}
+                            className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex flex-col space-y-3 border-l-4"
+                            style={{ borderLeftColor: borderColor }} // Utiliser la couleur du statut pour la bordure
+                          >
+                            {/* Header: Nom Article, Statut, Bouton Suivi */}
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center min-w-0">
+                                {/* Peut-être une icône pour l'article ? FaBoxOpen ? */}
+                                <span className="text-white font-semibold text-base mr-2 truncate" title={shipment.articleNom}>
+                                  {truncatedArticle || 'Article non spécifié'}
+                                </span>
+                                <span className={`ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyle.bgColor} ${statusStyle.textColor}`}>
+                                  {shipment.statutExpedition || 'Inconnu'}
+                                </span>
                               </div>
-                            </div>
-
-                            <div className="flex items-center flex-shrink-0 space-x-2">
+                              <div className="flex-shrink-0">
                                 {shipment.trackingLink && (
                                   <Button
                                     as="link"
@@ -350,11 +355,37 @@ import type { MetaFunction } from "@remix-run/node";
                                     size="sm"
                                     title="Suivre le colis"
                                     leftIcon={<FaExternalLinkAlt />}
+                                    className="text-jdc-blue border-jdc-blue hover:bg-jdc-blue hover:text-white"
                                   >
-                                    Suivi
+                                    <span className="hidden md:inline">Suivi</span>
                                   </Button>
                                 )}
+                              </div>
                             </div>
+
+                            {/* Body: ID, Secteur, Date (si disponible) */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-gray-400">
+                              <div className="flex items-center" title={`ID: ${shipment.id}`}>
+                                {/* Icône ID ? FaBarcode ? */}
+                                <span>ID: {shipment.id.substring(0, 8)}...</span>
+                              </div>
+                              <div className="flex items-center" title={`Secteur: ${shipment.secteur || 'N/A'}`}>
+                                {/* Icône Secteur ? FaMapPin ? */}
+                                <span>Secteur: {shipment.secteur || 'N/A'}</span>
+                              </div>
+                              {/* Afficher la date si disponible et parsée */}
+                              {/* {displayDate && (
+                                <div className="flex items-center" title={`Date Création: ${displayDate}`}>
+                                  <FaCalendarAlt className="mr-2 text-gray-500 w-4 flex-shrink-0" />
+                                  <span>{displayDate}</span>
+                                </div>
+                              )} */}
+                            </div>
+
+                            {/* Footer: Peut-être d'autres infos si nécessaires */}
+                            {/* <div className="border-t border-gray-700 pt-2 mt-2 space-y-1 text-xs text-gray-400">
+                              ...
+                            </div> */}
                           </div>
                         );
                       })}
