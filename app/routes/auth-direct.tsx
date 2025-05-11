@@ -48,14 +48,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   // Si on a un code d'autorisation
   if (code) {
+    console.log("[AUTH-DIRECT.TSX] Start processing with code...");
+    const startTime = Date.now();
+    let stepTime = startTime;
+
     try {
       // Échanger le code contre des tokens
+      console.log("[AUTH-DIRECT.TSX] Step 1: Creating OAuth client...");
       const oauthClient = createOAuthClient();
+      stepTime = Date.now();
+      console.log("[AUTH-DIRECT.TSX] Step 2: Exchanging code for tokens...");
       const { tokens } = await oauthClient.getToken(code);
+      console.log(`[AUTH-DIRECT.TSX] Step 2 completed in ${Date.now() - stepTime}ms. Tokens obtained.`);
       
       // Récupérer les infos de l'utilisateur
       oauthClient.setCredentials(tokens);
+      stepTime = Date.now();
+      console.log("[AUTH-DIRECT.TSX] Step 3: Getting user info from Google...");
       const userInfo = await getUserInfo(oauthClient);
+      console.log(`[AUTH-DIRECT.TSX] Step 3 completed in ${Date.now() - stepTime}ms. UserInfo: ${JSON.stringify(userInfo)}`);
       
       if (!userInfo || !userInfo.id) {
         throw new Error("Impossible de récupérer les informations utilisateur");
@@ -64,13 +75,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
       // Gérer l'utilisateur Firebase Auth
       let firebaseUid: string;
       let firebaseUserRecord;
-      const adminAuth = (await import("~/firebase.admin.config.server")).auth; // Importer dynamiquement pour éviter les problèmes d'initialisation potentiels
+      stepTime = Date.now();
+      console.log("[AUTH-DIRECT.TSX] Step 4: Importing Firebase Admin Auth...");
+      const adminAuth = (await import("~/firebase.admin.config.server")).auth;
+      console.log(`[AUTH-DIRECT.TSX] Step 4 completed in ${Date.now() - stepTime}ms.`);
 
       try {
+        stepTime = Date.now();
+        console.log(`[AUTH-DIRECT.TSX] Step 5: Getting Firebase user by email: ${userInfo.email}...`);
         firebaseUserRecord = await adminAuth().getUserByEmail(userInfo.email || "");
         firebaseUid = firebaseUserRecord.uid;
-        console.log(`[AUTH-DIRECT.TSX] Utilisateur Firebase trouvé par email. UID: ${firebaseUid}`);
-        // Optionnel: Mettre à jour l'utilisateur Firebase si son nom ou sa photo a changé
+        console.log(`[AUTH-DIRECT.TSX] Step 5 completed in ${Date.now() - stepTime}ms. Firebase user found. UID: ${firebaseUid}`);
+        
         const updates: { displayName?: string; photoURL?: string } = {};
         if (userInfo.name && firebaseUserRecord.displayName !== userInfo.name) {
           updates.displayName = userInfo.name;
@@ -79,11 +95,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
           updates.photoURL = userInfo.picture;
         }
         if (Object.keys(updates).length > 0) {
+          stepTime = Date.now();
+          console.log(`[AUTH-DIRECT.TSX] Step 5.1: Updating Firebase user ${firebaseUid}...`);
           await adminAuth().updateUser(firebaseUid, updates);
+          console.log(`[AUTH-DIRECT.TSX] Step 5.1 completed in ${Date.now() - stepTime}ms.`);
         }
       } catch (error: any) {
         if (error.code === 'auth/user-not-found') {
-          console.log(`[AUTH-DIRECT.TSX] Utilisateur Firebase non trouvé pour ${userInfo.email}. Création.`);
+          stepTime = Date.now();
+          console.log(`[AUTH-DIRECT.TSX] Step 5 Failed (user not found). Step 5.2: Creating Firebase user for ${userInfo.email}...`);
           const newFirebaseUser = await adminAuth().createUser({
             email: userInfo.email || "",
             emailVerified: userInfo.verified_email || false,
@@ -91,77 +111,74 @@ export async function loader({ request }: LoaderFunctionArgs) {
             photoURL: userInfo.picture || "",
           });
           firebaseUid = newFirebaseUser.uid;
-          console.log(`[AUTH-DIRECT.TSX] Nouvel utilisateur Firebase créé. UID: ${firebaseUid}`);
+          console.log(`[AUTH-DIRECT.TSX] Step 5.2 completed in ${Date.now() - stepTime}ms. New Firebase user created. UID: ${firebaseUid}`);
         } else {
-          console.error("[AUTH-DIRECT.TSX] Erreur lors de la gestion de l'utilisateur Firebase Auth:", error);
-          throw error; // Relancer pour être géré par le catch externe
+          console.error("[AUTH-DIRECT.TSX] Error managing Firebase Auth user (Step 5.x):", error);
+          throw error; 
         }
       }
       
-      // Vérifier si le profil Firestore existe déjà
+      stepTime = Date.now();
+      console.log(`[AUTH-DIRECT.TSX] Step 6: Getting Firestore profile for UID: ${firebaseUid}...`);
       let userProfile = await getUserProfileSdk(firebaseUid);
+      console.log(`[AUTH-DIRECT.TSX] Step 6 completed in ${Date.now() - stepTime}ms. Firestore profile: ${JSON.stringify(userProfile)}`);
       
       if (!userProfile) {
-        console.log(`[AUTH-DIRECT.TSX] Profil Firestore non trouvé pour UID: ${firebaseUid}. Création.`);
+        stepTime = Date.now();
+        console.log(`[AUTH-DIRECT.TSX] Step 7: Firestore profile not found. Creating...`);
         const newUserProfileData: UserProfile = {
-          uid: firebaseUid,
-          email: userInfo.email || "",
+          uid: firebaseUid, email: userInfo.email || "",
           displayName: userInfo.name || userInfo.email?.split('@')[0] || "",
-          role: userInfo.email === 'tommy.vilmen@jdc.fr' ? 'Admin' : 'Technician', // ou 'User'
+          role: userInfo.email === 'tommy.vilmen@jdc.fr' ? 'Admin' : 'Technician', 
           secteurs: userInfo.email === 'tommy.vilmen@jdc.fr' ? ['CHR', 'HACCP', 'Kezia', 'Tabac'] : [],
-          nom: userInfo.name || "",
-          phone: "",
-          createdAt: new Date(), // Restauré
-          updatedAt: new Date(), // Restauré
-          gmailAuthStatus: "active", // Supposant que l'auth directe implique l'activation
-          gmailAuthorizedScopes: [], // À remplir si des scopes spécifiques sont demandés et obtenus
+          nom: userInfo.name || "", phone: "", createdAt: new Date(), updatedAt: new Date(),
+          gmailAuthStatus: "active", gmailAuthorizedScopes: [], 
           googleRefreshToken: tokens.refresh_token || "",
-          isGmailProcessor: false,
-          labelSapClosed: "",
-          labelSapNoResponse: "",
-          labelSapRma: "",
-          jobTitle: "",
-          department: ""
+          isGmailProcessor: false, labelSapClosed: "", labelSapNoResponse: "", labelSapRma: "",
+          jobTitle: "", department: ""
         };
         userProfile = await createUserProfileSdk(newUserProfileData);
-        console.log(`[AUTH-DIRECT.TSX] Profil Firestore créé:`, userProfile);
+        console.log(`[AUTH-DIRECT.TSX] Step 7 completed in ${Date.now() - stepTime}ms. Firestore profile created.`);
       } else {
-        console.log(`[AUTH-DIRECT.TSX] Profil Firestore trouvé:`, userProfile);
-        // Optionnel: Mettre à jour le profil Firestore si nécessaire (ex: refreshToken)
-        if (tokens.refresh_token && userProfile.googleRefreshToken !== tokens.refresh_token) {
-          userProfile.googleRefreshToken = tokens.refresh_token;
-          // Note: updateUserProfileSdk mettra à jour updatedAt
+        // userProfile est garanti non-null dans ce bloc.
+        // Pour clarifier pour TypeScript, nous pouvons utiliser une nouvelle référence.
+        const existingUserProfile: UserProfile = userProfile; 
+        if (tokens.refresh_token && existingUserProfile.googleRefreshToken !== tokens.refresh_token) {
+          stepTime = Date.now();
+          console.log(`[AUTH-DIRECT.TSX] Step 7.1: Updating Firestore refresh token for UID: ${firebaseUid}...`);
           await updateUserProfileSdk(firebaseUid, { googleRefreshToken: tokens.refresh_token });
-          console.log(`[AUTH-DIRECT.TSX] Refresh token mis à jour dans Firestore.`);
+          // Mettre à jour la propriété de l'objet local.
+          existingUserProfile.googleRefreshToken = tokens.refresh_token; 
+          console.log(`[AUTH-DIRECT.TSX] Step 7.1 completed in ${Date.now() - stepTime}ms.`);
         }
       }
       
-      // Créer une session manuelle
-      const session = await sessionStorage.getSession();
-
-      if (!userProfile) {
+      if (!userProfile) { // userProfile est UserProfile | null ici. Cette vérification est cruciale.
         console.error("[AUTH-DIRECT.TSX] Critical: userProfile is null after Firestore operations. Cannot create session.");
         throw new Error("User profile could not be established in Firestore.");
       }
 
+      stepTime = Date.now();
+      console.log("[AUTH-DIRECT.TSX] Step 8: Getting Remix session...");
+      const session = await sessionStorage.getSession();
+      console.log(`[AUTH-DIRECT.TSX] Step 8 completed in ${Date.now() - stepTime}ms.`);
+
       const userSessionData: UserSessionData = {
-        userId: firebaseUid, // Utiliser l'UID Firebase
-        email: userProfile.email, // userProfile est maintenant garanti non-null
-        displayName: userProfile.displayName,
-        role: userProfile.role,
-        secteurs: userProfile.secteurs || [],
+        userId: firebaseUid, email: userProfile.email, displayName: userProfile.displayName,
+        role: userProfile.role, secteurs: userProfile.secteurs || [],
         googleRefreshToken: tokens.refresh_token || userProfile.googleRefreshToken || undefined,
       };
       session.set("user", userSessionData);
       
-      // Rediriger vers le dashboard avec la session
-      return redirect("/dashboard", {
-        headers: {
-          "Set-Cookie": await commitLongSession(session),
-        },
-      });
+      stepTime = Date.now();
+      console.log("[AUTH-DIRECT.TSX] Step 9: Committing session and redirecting to dashboard...");
+      const cookie = await commitLongSession(session);
+      console.log(`[AUTH-DIRECT.TSX] Step 9 (commit session) completed in ${Date.now() - stepTime}ms.`);
+      console.log(`[AUTH-DIRECT.TSX] Total processing time: ${Date.now() - startTime}ms.`);
+      
+      return redirect("/dashboard", { headers: { "Set-Cookie": cookie } });
     } catch (error) {
-      console.error("Erreur lors de l'authentification directe:", error); // Message d'erreur plus spécifique
+      console.error(`[AUTH-DIRECT.TSX] Error during direct authentication (Total time: ${Date.now() - startTime}ms):`, error);
       return json({ 
         authUrl: generateAuthUrl(),
         error: "Erreur lors de l'authentification Google" 
