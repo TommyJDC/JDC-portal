@@ -1,19 +1,22 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
+// import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
+import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Importer pour session manuelle
 import { deleteShipmentSdk, getUserProfileSdk } from "~/services/firestore.service.server"; // Need profile to check admin
-import type { UserSession } from "~/services/session.server";
+// import type { UserSession } from "~/services/session.server"; // Remplacé par UserSessionData
 
 export async function action({ request }: ActionFunctionArgs) {
-    const session: UserSession | null = await authenticator.isAuthenticated(request);
+    const sessionCookie = request.headers.get("Cookie");
+    const sessionStore = await sessionStorage.getSession(sessionCookie);
+    const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
 
-    if (!session?.userId) {
+    if (!userSession?.userId) {
         return json({ success: false, error: "Non authentifié." }, { status: 401 });
     }
 
     let isAdmin = false;
     try {
-        const profile = await getUserProfileSdk(session.userId);
+        const profile = await getUserProfileSdk(userSession.userId); // Utiliser userSession.userId
         isAdmin = profile?.role === 'Admin';
     } catch (e) {
         return json({ success: false, error: "Impossible de vérifier les permissions." }, { status: 500 });

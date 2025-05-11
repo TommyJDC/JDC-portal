@@ -1,9 +1,10 @@
-import { json, redirect } from "@remix-run/node"; // Importer redirect
+import { json, redirect } from "@remix-run/node"; 
+import type { LoaderFunctionArgs } from "@remix-run/node"; // Utiliser LoaderFunctionArgs
 import { useLoaderData } from "@remix-run/react";
-import { getGoogleAuthClient, readSheetData } from "~/services/google.server"; // Importer depuis google.server
-import { authenticator } from "~/services/auth.server"; // Importer l'authenticator
-import type { UserSession } from "~/services/session.server"; // Importer le type UserSession
-import { FaTruck, FaInfoCircle, FaBox, FaTag } from 'react-icons/fa'; // Importer des icônes pertinentes
+import { getGoogleAuthClient, readSheetData } from "~/services/google.server"; 
+// import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
+import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Importer pour session manuelle
+import { FaTruck, FaInfoCircle, FaBox, FaTag } from 'react-icons/fa'; 
 
 // Définir les indices des colonnes en fonction des en-têtes fournis
 const COLUMN_INDICES = {
@@ -49,29 +50,29 @@ type LogistiqueItem = {
 
 type LoaderData = {
   data: LogistiqueItem[];
-  error?: string; // Ajouter la propriété error
+  error?: string; 
 };
 
-export async function loader({ request }: { request: Request }) {
-  // Utiliser authenticator.isAuthenticated pour obtenir la session utilisateur
-  // Redirige vers /login si l'utilisateur n'est pas authentifié du tout
-  const userSession = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+export async function loader({ request }: LoaderFunctionArgs) { // Utiliser LoaderFunctionArgs
+  const sessionCookie = request.headers.get("Cookie");
+  const sessionStore = await sessionStorage.getSession(sessionCookie);
+  const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
+
+  if (!userSession || !userSession.userId) {
+    throw redirect("/login"); // Rediriger si non authentifié
+  }
 
   // Vérifier si le jeton d'actualisation Google est présent dans la session
-  if (!userSession || !userSession.googleRefreshToken) {
+  if (!userSession.googleRefreshToken) {
      console.error("Jeton d'actualisation Google manquant pour l'utilisateur authentifié.");
-     // Rediriger vers l'authentification Google pour forcer la ré-autorisation avec les scopes nécessaires
-     // Le paramètre 'reauth=true' peut être utilisé sur la route /auth/google pour forcer le prompt de consentement
-     throw redirect("/auth/google?reauth=true");
+     // Rediriger vers la page de connexion, qui mènera à /auth-direct pour une nouvelle authentification
+     throw redirect("/login?error=google_token_refresh_needed");
   }
 
   let authClient;
   try {
     // Tenter d'obtenir le client d'authentification Google avec les données utilisateur
-    // userSession est maintenant garanti d'être UserSession et d'avoir googleRefreshToken
-    authClient = await getGoogleAuthClient(userSession);
+    authClient = await getGoogleAuthClient(userSession); // userSession est UserSessionData
   } catch (error) {
     console.error("Erreur lors de l'obtention du client d'authentification Google:", error);
     // Gérer les erreurs qui pourraient survenir *après* l'obtention du client d'authentification

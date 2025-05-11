@@ -1,29 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Ajout de useEffect
 import { FaSave } from 'react-icons/fa';
 import { getStringValue } from '~/utils/firestoreUtils';
+import type { Installation as FirestoreInstallation, InstallationStatus } from '~/types/firestore.types'; // Import des types Firestore
 
 interface InstallationTileProps {
-  installation: {
-    id: string;
-    codeClient: string;
-    nom: string;
-    ville?: string;
-    contact?: string;
-    telephone?: string;
-    commercial?: string;
-    dateInstall?: string;
-    tech?: string;
-    status?: string;
-    commentaire?: string;
-  };
+  installation: FirestoreInstallation; // Utilisation du type Firestore
   hasCTN: boolean;
-  onSave: (values: Record<string, any>) => void;
+  onSave: (values: Partial<FirestoreInstallation>) => void; // Adapter le type de onSave
 }
 
 const InstallationTile: React.FC<InstallationTileProps> = ({ installation, hasCTN, onSave }) => {
-  const [localInstallation, setLocalInstallation] = useState(installation);
+  // Initialiser localInstallation avec les valeurs de la prop, en s'assurant que dateInstall est une chaîne
+  const [localInstallation, setLocalInstallation] = useState<FirestoreInstallation>({
+    ...installation,
+    dateInstall: installation.dateInstall instanceof Date 
+      ? installation.dateInstall.toISOString().split('T')[0] // Formater Date en YYYY-MM-DD
+      : getStringValue(installation.dateInstall, ''), // Garder la chaîne si c'en est une
+  });
+
+  // Mettre à jour localInstallation si la prop installation change
+  useEffect(() => {
+    setLocalInstallation({
+      ...installation,
+      dateInstall: installation.dateInstall instanceof Date
+        ? installation.dateInstall.toISOString().split('T')[0]
+        : getStringValue(installation.dateInstall, ''),
+    });
+  }, [installation]);
 
   console.log(`[InstallationTile][DEBUG] Received installation prop:`, installation);
+  console.log(`[InstallationTile][DEBUG] Initial localInstallation:`, localInstallation);
 
   return (
     <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out">
@@ -74,7 +80,10 @@ const InstallationTile: React.FC<InstallationTileProps> = ({ installation, hasCT
           <p className="flex items-center gap-2">
             <span className="text-gray-400 text-sm font-medium">Install.:</span>
             <span className="text-sm">
-              {getStringValue(installation.dateInstall, 'Non planifiée')}
+              { localInstallation.dateInstall instanceof Date
+                ? localInstallation.dateInstall.toLocaleDateString('fr-FR') // Afficher la date localisée si c'est un objet Date
+                : getStringValue(localInstallation.dateInstall, 'Non planifiée') // Sinon, utiliser getStringValue
+              }
             </span>
           </p>
           <p className="flex items-center gap-2">
@@ -104,11 +113,10 @@ const InstallationTile: React.FC<InstallationTileProps> = ({ installation, hasCT
             <label htmlFor={`dateInstall-${installation.id}`} className="block text-xs font-medium text-gray-400 mb-1">Date Install.</label>
             <input
               id={`dateInstall-${installation.id}`}
-              type="text"
+              type="date" // Changer le type en 'date' pour une meilleure UX
               className="w-full bg-gray-900 text-white rounded-md px-3 py-2 text-sm border border-gray-700 focus:ring-jdc-blue focus:border-jdc-blue"
-              value={localInstallation.dateInstall || ''}
+              value={getStringValue(localInstallation.dateInstall, '')} // Assurer que la valeur est une chaîne YYYY-MM-DD
               onChange={(e) => setLocalInstallation({ ...localInstallation, dateInstall: e.target.value })}
-              placeholder="JJ/MM/AAAA"
             />
           </div>
           {/* Technicien */}
@@ -129,13 +137,13 @@ const InstallationTile: React.FC<InstallationTileProps> = ({ installation, hasCT
             <select
               id={`status-${installation.id}`}
               className="w-full bg-gray-900 text-white rounded-md px-3 py-2 text-sm border border-gray-700 focus:ring-jdc-blue focus:border-jdc-blue"
-              value={localInstallation.status || 'rendez-vous à prendre'}
-              onChange={(e) => setLocalInstallation({ ...localInstallation, status: e.target.value })}
+              value={localInstallation.status as InstallationStatus || 'rendez-vous à prendre'}
+              onChange={(e) => setLocalInstallation({ ...localInstallation, status: e.target.value as InstallationStatus })}
             >
               <option value="rendez-vous à prendre">Rendez-vous à prendre</option>
               <option value="rendez-vous pris">Rendez-vous pris</option>
               <option value="installation terminée">Installation terminée</option>
-              <option value="installation en attente">Installation en attente</option>
+              {/* <option value="installation en attente">Installation en attente</option> */} {/* Cette option n'est pas dans InstallationStatus */}
             </select>
           </div>
         </div>
@@ -152,7 +160,16 @@ const InstallationTile: React.FC<InstallationTileProps> = ({ installation, hasCT
            />
         </div>
         <button
-          onClick={() => onSave(localInstallation)}
+          onClick={() => {
+            // Préparer les données à sauvegarder, en s'assurant que dateInstall est au bon format si modifié
+            const saveData: Partial<FirestoreInstallation> = { ...localInstallation };
+            if (typeof localInstallation.dateInstall === 'string' && localInstallation.dateInstall.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              // Si c'est une chaîne YYYY-MM-DD, on peut la convertir en Date ou la laisser en chaîne selon ce que onSave attend
+              // Pour l'instant, on la laisse en chaîne, onSave devra gérer la conversion si besoin pour Firestore.
+              saveData.dateInstall = localInstallation.dateInstall;
+            }
+            onSave(saveData);
+          }}
           className="w-full bg-jdc-blue hover:bg-jdc-blue-dark text-white font-bold py-2 px-4 rounded-md flex items-center justify-center gap-2 transition-colors duration-200"
         >
           <FaSave />

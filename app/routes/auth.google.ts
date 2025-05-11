@@ -1,3 +1,4 @@
+/*
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect, createCookieSessionStorage } from "@remix-run/node";
 import { authenticator } from "~/services/auth.server";
@@ -45,4 +46,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request, params, context }: ActionFunctionArgs) {
   return loader({ request, params, context });
+}
+*/
+
+// Cette route n'est plus utilisée car auth-direct.tsx gère le flux d'authentification.
+// Laisser un export par défaut pour éviter les erreurs si la route est encore appelée.
+export default function AuthGoogleRoute() {
+  return null; // Pas besoin d'afficher de contenu, les loaders/actions redirigent.
+}
+
+// Exporter des fonctions loader et action vides ou qui redirigent pour éviter les erreurs.
+import { redirect } from "@remix-run/node";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  return redirect("/login");
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  return redirect("/login");
 }

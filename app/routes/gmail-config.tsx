@@ -1,13 +1,14 @@
-import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
+import { json, type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/node"; // Ajout de redirect
 import { Form, useActionData, useLoaderData, useNavigation, Link } from "@remix-run/react";
-import { authenticator } from "~/services/auth.server";
+// import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
+import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Importer pour session manuelle
 import { getUserProfileSdk, getAllUserProfilesSdk, updateUserProfileSdk } from "~/services/firestore.service.server";
 import { getGoogleAuthClient } from "~/services/google.server";
 import type { UserProfile, GmailProcessingConfig } from "~/types/firestore.types";
 import { initializeFirebaseAdmin } from "~/firebase.admin.config.server";
-import type { UserSession } from "~/services/session.server";
+// import type { UserSession } from "~/services/session.server"; // Remplacé par UserSessionData
 import { google } from 'googleapis';
-import { Card, CardHeader, CardBody } from "~/components/ui/Card"; // Import Card components
+import { Card, CardHeader, CardBody } from "~/components/ui/Card";
 import { Input } from "~/components/ui/Input"; // Import Input component
 import { Button } from "~/components/ui/Button"; // Import Button component
 
@@ -39,12 +40,16 @@ type LoaderData = {
  */
 export async function loader({ request }: LoaderFunctionArgs) {
   // Vérifier l'authentification
-  const session = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login", // Redirect unauthenticated users
-  });
+  const sessionCookie = request.headers.get("Cookie");
+  const sessionStore = await sessionStorage.getSession(sessionCookie);
+  const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
+
+  if (!userSession || !userSession.userId) {
+    throw redirect("/login"); // Rediriger si non authentifié
+  }
 
   // Récupérer le profil de l'utilisateur authentifié
-  const userProfile = await getUserProfileSdk(session.userId);
+  const userProfile = await getUserProfileSdk(userSession.userId);
   // Note: We don't throw 403 here anymore, allowing non-admins to view.
   // The component and action will handle permissions for editing.
 
@@ -90,13 +95,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const usersWithLabels = await Promise.all(users.map(async (user) => {
     if (user.googleRefreshToken) {
       try {
-        const session: UserSession = {
+        // Construire un objet UserSessionData pour getGoogleAuthClient
+        const tempUserSession: UserSessionData = {
           userId: user.uid,
           email: user.email,
-          displayName: user.displayName,
+          displayName: user.displayName || '', // Assurer que displayName est une string
+          role: user.role, // Assurer que role est une string
+          secteurs: user.secteurs || [], // Assurer que secteurs est un array
           googleRefreshToken: user.googleRefreshToken
         };
-        const authClient = await getGoogleAuthClient(session);
+        const authClient = await getGoogleAuthClient(tempUserSession);
         
         const gmail = google.gmail({ version: 'v1', auth: authClient });
         const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
@@ -131,13 +139,16 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     // Vérifier l'authentification
-    const session = await authenticator.isAuthenticated(request);
-    if (!session) {
+    const sessionCookie = request.headers.get("Cookie");
+    const sessionStore = await sessionStorage.getSession(sessionCookie);
+    const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
+
+    if (!userSession || !userSession.userId) {
       return json({ success: false, error: "Non authentifié" }, { status: 401 });
     }
 
     // Récupérer le profil de l'utilisateur pour vérifier le rôle
-    const userProfile = await getUserProfileSdk(session.userId);
+    const userProfile = await getUserProfileSdk(userSession.userId);
     const isAdmin = userProfile?.role === "Admin";
 
     switch (action) {
@@ -189,7 +200,7 @@ export async function action({ request }: ActionFunctionArgs) {
         });
 
         // Update user-specific Gmail label fields
-        await updateUserProfileSdk(session.userId, {
+        await updateUserProfileSdk(userSession.userId, { // Utiliser userSession.userId
           labelSapClosed: formData.get("labelSapClosed") as string,
           labelSapRma: formData.get("labelSapRma") as string,
           labelSapNoResponse: formData.get("labelSapNoResponse") as string,

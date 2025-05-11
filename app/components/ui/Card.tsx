@@ -3,20 +3,25 @@ import React from 'react';
 interface CardProps {
   children: React.ReactNode;
   className?: string;
-  as?: keyof JSX.IntrinsicElements; // Allow specifying the element type (div, section, etc.)
+  header?: React.ReactNode;
+  footer?: React.ReactNode;
+  noPadding?: boolean;
 }
 
-export const Card: React.FC<CardProps> = ({ children, className = '', as = 'div' }) => {
-  const Tag = as;
-  // Added transition, hover transform, and hover shadow classes
-  const baseStyle = "bg-jdc-card rounded-lg shadow-lg overflow-hidden transition duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-xl";
-
+export const Card: React.FC<CardProps> = ({ children, className = '', header, footer, noPadding = false }) => {
   return (
-    <Tag className={`${baseStyle} ${className}`}>
+    <div
+      className={`bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 ${noPadding ? '' : 'p-6'} ${className}`}
+      style={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)' }}
+    >
+      {header && <div className="mb-4">{header}</div>}
       {children}
-    </Tag>
+      {footer && <div className="mt-4">{footer}</div>}
+    </div>
   );
 };
+
+export default Card;
 
 // Optional: Card Header, Body, Footer components for structure
 interface CardSectionProps {

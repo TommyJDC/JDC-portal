@@ -1,183 +1,113 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Link, useFetcher } from "@remix-run/react";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node"; // Ajout de ActionFunctionArgs
+import { json } from "@remix-run/node";
+import { useLoaderData, Link, useFetcher, useOutletContext } from "@remix-run/react";
 import { authenticator } from "~/services/auth.server";
-import { 
-  getInstallationsBySector, 
-  updateInstallation,
-  deleteInstallation,
-  bulkUpdateInstallations,
-  getAllShipments // Importer la fonction pour récupérer les envois
-} from "~/services/firestore.service.server";
-// Remplacer InstallationTile par InstallationListItem et InstallationDetails
-import InstallationListItem from "~/components/InstallationListItem"; 
-import InstallationDetails from "~/components/InstallationDetails"; 
-import type { Installation, Shipment } from "~/types/firestore.types"; // Importer les types
-import { formatFirestoreDate } from "~/utils/dateUtils"; // Importer la fonction de formatage
-import { COLUMN_MAPPINGS } from "~/routes/api.sync-installations"; // Importer les mappings
-import { useState } from 'react'; // Importer useState
+import { getInstallationsBySector } from "~/services/firestore.service.server";
+import InstallationListItem from "~/components/InstallationListItem";
+import InstallationDetails from "~/components/InstallationDetails";
+import type { Installation } from "~/types/firestore.types";
+import type { UserSession } from "~/services/session.server";
+import { useState, useEffect } from 'react';
+import { toast } from "react-hot-toast";
+
+type OutletContextType = {
+  user: UserSession | null;
+};
 
 interface ActionData {
   success?: boolean;
   error?: string;
+  installationId?: string;
+  _action?: string;
 }
 
-// Interface pour les données d'installation traitées, correspondant aux props de InstallationTile
-interface ProcessedInstallation {
-  id: string;
-  codeClient: string;
-  nom: string;
-  ville?: string;
-  contact?: string;
-  telephone?: string;
-  commercial?: string;
-  dateInstall?: string; // Doit être string ou undefined pour correspondre à Installation
-  tech?: string;
-  status?: string;
-  commentaire?: string;
-  hasCTN: boolean; // Propriété ajoutée
-  // Inclure d'autres champs si nécessaire, en s'assurant que les types correspondent
-}
+import { updateInstallation } from "~/services/firestore.service.server"; // Importer la fonction de mise à jour
 
-interface LoaderData {
-  installations: ProcessedInstallation[]; // Utiliser le type traité
-  error?: string;
-}
-
-export const action = async ({ request }: ActionFunctionArgs): Promise<Response> => {
-  const session = await authenticator.isAuthenticated(request);
-  if (!session) {
-    return json({ error: "Non authentifié" }, { status: 401 });
-  }
-
+export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
-  const id = formData.get("id");
-  const updates = JSON.parse(formData.get("updates") as string);
+  const installationId = formData.get("installationId") as string;
+  const updates = JSON.parse(formData.get("updates") as string) as Partial<Installation>;
 
-  if (!id || !updates) {
-    return json({ error: "Données manquantes" }, { status: 400 });
+  if (!installationId || !updates) {
+    return json({ success: false, error: "Données manquantes pour la mise à jour." }, { status: 400 });
   }
 
   try {
-    await updateInstallation(id as string, updates);
-    return json({ success: true });
+    await updateInstallation(installationId, updates);
+    return json({ success: true, installationId });
   } catch (error: any) {
-    console.error("[installations.chr Action] Error:", error);
-    return json({ error: error.message }, { status: 500 });
+    return json({ success: false, error: error.message || "Erreur lors de la mise à jour de l'installation." }, { status: 500 });
   }
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const session = await authenticator.isAuthenticated(request);
-  if (!session) {
-    return redirect("/?error=unauthenticated");
-  }
-
   try {
-    // 1. Récupérer tous les envois
-    const allShipments = await getAllShipments();
-    
-    // 2. Créer un Set des codeClient pour le secteur 'chr'
-    const chrShipmentClientCodes = new Set<string>();
-    allShipments.forEach((shipment: Shipment) => {
-      // Assurez-vous que les champs existent et correspondent au secteur 'chr'
-      if (shipment.secteur?.toLowerCase() === 'chr' && shipment.codeClient) {
-        chrShipmentClientCodes.add(shipment.codeClient);
-      }
-    });
-
-    // 3. Récupérer les installations CHR
-    const installationsRaw = await getInstallationsBySector('chr');
-
-    console.log(`[CHR Loader][DEBUG] installationsRaw from Firestore:`, installationsRaw);
-
-    const sector = 'chr';
-    const sectorMapping = COLUMN_MAPPINGS[sector];
-
-    // 4. Mapper les données brutes, formater la date et ajouter la propriété hasCTN à chaque installation
-    const installations: ProcessedInstallation[] = installationsRaw.map(installation => {
-      const data = installation as any; // Utiliser 'any' temporairement pour accéder aux champs par index si nécessaire, bien que les noms de champs Firestore devraient correspondre aux clés du mapping
-
-      // Accéder aux propriétés directement par leur nom, car les données de Firestore
-      // sont déjà mappées avec les clés correctes par la fonction de synchronisation.
-      return {
-        id: installation.id, // L'ID est toujours présent
-        codeClient: data.codeClient || '',
-        nom: data.nom || '',
-        ville: data.ville || '',
-        contact: data.contact || '',
-        telephone: data.telephone || '',
-        commercial: data.commercial || '',
-        tech: data.tech || '',
-        status: data.status || '',
-        commentaire: data.commentaire || '',
-        
-        // --- Champs traités ---
-        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : undefined, // Retourne string ou undefined
-        hasCTN: chrShipmentClientCodes.has(data.codeClient), 
-        
-        // Inclure d'autres champs spécifiques au secteur si nécessaire
-        configCaisse: data.configCaisse || '',
-        cdc: data.cdc || '',
-        integrationJalia: data.integrationJalia || '',
-        dossier: data.dossier || '',
-        heure: data.heure || '',
-        commentaireTech: data.commentaireTech || '',
-        materielLivre: data.materielLivre || '',
-        commentaireEnvoiBT: data.commentaireEnvoiBT || '',
-        techSecu: data.techSecu || '',
-      // --- Champs spécifiques CHR (peuvent être passés à InstallationDetails si nécessaire) ---
-      // configCaisse: data.configCaisse || '',
-      // cdc: data.cdc || '',
-      // integrationJalia: data.integrationJalia || '',
-      // dossier: data.dossier || '',
-      // heure: data.heure || '',
-      // commentaireTech: data.commentaireTech || '',
-      // materielLivre: data.materielLivre || '',
-      // commentaireEnvoiBT: data.commentaireEnvoiBT || '',
-      // techSecu: data.techSecu || '',
-      // techAffecte: data.techAffecte || '',
-    };
-  });
-
-    // Retourner les données formatées comme Installation pour correspondre à InstallationListItem/Details
-    const installationsTyped: Installation[] = installations.map(inst => ({
-      ...inst,
-      secteur: 'chr', // Ajouter le secteur explicitement si nécessaire
-      status: (inst.status || 'À planifier') as Installation['status'], // Fournir une valeur par défaut valide et caster
-      // Assurer que tous les champs requis par Installation sont présents
-      // Les champs spécifiques CHR ne sont pas dans le type Installation de base
-      // Ils pourraient être ajoutés à un type étendu ou gérés séparément si besoin dans Details
-    }));
-
-
-    return json<{ installations: Installation[], error?: string }>({ installations: installationsTyped });
+    // Récupérer les installations depuis Firestore, en utilisant la casse correcte pour le secteur
+    const installations = await getInstallationsBySector('chr'); // Modifié en minuscules
+    return json<{ installations: Installation[] }>({ installations });
   } catch (error: any) {
-    console.error("[installations.chr Loader] Error fetching data:", error);
-    return json<{ installations: Installation[], error?: string }>({ 
+    return json<{ installations: Installation[]; error: string }>({
       installations: [],
-      error: error.message || "Erreur lors du chargement des installations CHR." 
-    }, { status: 500 });
+      error: error.message || "Erreur lors du chargement des installations CHR depuis Firestore."
+    });
   }
 };
 
 export default function CHRInstallations() {
-  const { installations, error } = useLoaderData<{ installations: Installation[], error?: string }>(); // Utiliser le type Installation
+  const { user } = useOutletContext<OutletContextType>();
+  const { installations, error } = useLoaderData<{ installations: Installation[]; error: string }>();
   const fetcher = useFetcher<ActionData>();
   const [searchTerm, setSearchTerm] = useState(''); 
-  const [isModalOpen, setIsModalOpen] = useState(false); // État pour la modale
-  const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null); // État pour l'installation sélectionnée
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSave = async (id: string, updates: Partial<Installation>) => { // Utiliser Partial<Installation>
+  // Si l'utilisateur n'est pas connecté, afficher un message convivial
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#1a2250] to-[#1e2746] p-6 font-bold font-jetbrains">
+        <h1 className="text-3xl font-extrabold text-jdc-yellow drop-shadow-neon mb-4">Installations CHR</h1>
+        
+        <div className="bg-[#10182a] p-6 rounded-xl shadow-xl border-2 border-jdc-yellow/20 text-center">
+          <p className="text-jdc-yellow-200 mb-4">Vous devez être connecté pour accéder aux installations CHR.</p>
+          <Link 
+            to="/auth/google" 
+            className="inline-block bg-gradient-to-r from-jdc-blue to-jdc-blue-dark px-6 py-3 rounded-lg font-bold text-white shadow-lg hover:scale-105 transition-transform"
+          >
+            Se connecter avec Google
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSave = async (updatedInstallation: Partial<Installation>) => {
+    if (!selectedInstallation) return;
+
+    // Ne soumettre que les champs qui ont changé et qui sont pertinents pour la sauvegarde.
+    // L'ID est nécessaire pour identifier le document à mettre à jour.
+    const updatesToSubmit: Partial<Installation> = {
+      dateInstall: updatedInstallation.dateInstall,
+      tech: updatedInstallation.tech,
+      status: updatedInstallation.status,
+      commentaire: updatedInstallation.commentaire,
+    };
+
     fetcher.submit(
-      {
-        id,
-        updates: JSON.stringify(updates)
+      { 
+        installationId: selectedInstallation.id, 
+        updates: JSON.stringify(updatesToSubmit),
+        _action: "updateInstallation" // Pour identifier l'action si plusieurs existent
       },
       { method: "post" }
     );
-    // Optionnel: Fermer la modale après sauvegarde
-    // handleCloseModal(); 
+    // Fermer la modale après la soumission, le rechargement des données se fera via Remix
+    // ou manuellement si l'action retourne les données mises à jour.
+    // Pour l'instant, on ferme la modale. L'UI pourrait afficher un indicateur de chargement.
+    handleCloseModal(); 
+    // Afficher un toast de succès ou d'attente
+    toast.success("Mise à jour en cours..."); 
+    // Idéalement, le fetcher.data contiendrait le résultat de l'action pour un feedback plus précis.
   };
 
   const handleInstallationClick = (installation: Installation) => {
@@ -190,14 +120,14 @@ export default function CHRInstallations() {
     setSelectedInstallation(null);
   };
 
-
   // Filtrer les installations en fonction du terme de recherche
   const filteredInstallations = installations.filter(installation => {
+    if (!searchTerm.trim()) return true;
+    
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    // Utiliser l'opérateur ?. pour accéder aux propriétés potentiellement undefined
     return (
-      installation.nom.toLowerCase().includes(lowerCaseSearchTerm) ||
-      installation.codeClient.toLowerCase().includes(lowerCaseSearchTerm) ||
+      (installation.nom && installation.nom.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (installation.codeClient && installation.codeClient.toLowerCase().includes(lowerCaseSearchTerm)) ||
       (installation.ville && installation.ville.toLowerCase().includes(lowerCaseSearchTerm)) ||
       (installation.contact && installation.contact.toLowerCase().includes(lowerCaseSearchTerm)) ||
       (installation.telephone && installation.telephone.toLowerCase().includes(lowerCaseSearchTerm)) ||
@@ -208,46 +138,55 @@ export default function CHRInstallations() {
   });
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-white">Installations CHR</h1>
+    <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#1a2250] to-[#1e2746] p-6 font-bold font-jetbrains">
+      <h1 className="text-3xl font-extrabold text-jdc-yellow drop-shadow-neon mb-4">Installations CHR (Blockchain)</h1>
 
-      <Link to="/dashboard" className="text-jdc-blue hover:underline">
+      <Link to="/dashboard" className="text-jdc-blue font-bold hover:text-jdc-yellow transition-colors hover:underline drop-shadow-neon">
         &larr; Retour au Tableau de Bord
       </Link>
 
       {/* Champ de recherche */}
-      <div className="mb-4">
+      <div className="mb-4 mt-4">
         <input
           type="text"
           placeholder="Rechercher par nom, code client, ville, contact, téléphone, commercial, technicien ou commentaire..."
-          className="w-full px-3 py-2 bg-black text-white font-bold border rounded-md focus:outline-none focus:ring focus:border-blue-300"
+          className="w-full px-4 py-3 bg-[#10182a] text-jdc-yellow font-bold border-2 border-jdc-yellow/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-jdc-yellow/60 text-lg font-jetbrains placeholder-jdc-yellow/40"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
       {error && (
-        <div className="bg-red-900 bg-opacity-50 text-red-300 p-4 rounded-md">
-          <p className="font-semibold">Erreur :</p>
+        <div className="bg-red-900/80 text-jdc-yellow p-4 rounded-xl font-bold shadow-xl">
+          <p className="font-bold">Erreur :</p>
           <p>{error}</p>
         </div>
       )}
+      
+      {isLoading && (
+        <div className="bg-[#10182a] p-4 rounded-xl shadow-xl border-2 border-jdc-yellow/20 mt-4 text-center">
+          <p className="text-jdc-yellow-200">Chargement des données en cours...</p>
+        </div>
+      )}
 
-      {!error && filteredInstallations.length > 0 && (
-        <div className="space-y-4"> {/* Rétablir l'affichage en liste verticale */}
+      {!error && !isLoading && filteredInstallations.length > 0 && (
+        <div className="space-y-4 mt-4">
           {filteredInstallations.map((installation) => (
             <InstallationListItem 
               key={installation.id}
               installation={installation}
               onClick={handleInstallationClick} 
-              hasCTN={installation.hasCTN} 
+              hasCTN={installation.hasCTN ?? false}
             />
           ))}
         </div>
       )}
 
-      {!error && filteredInstallations.length === 0 && (
-        <p className="text-jdc-gray-400">Aucune installation CHR à afficher.</p>
+      {!error && !isLoading && filteredInstallations.length === 0 && (
+        <div className="bg-[#10182a] p-6 rounded-xl shadow-xl border-2 border-jdc-yellow/20 mt-4 text-center">
+          <p className="text-jdc-yellow-200 font-bold">Aucune installation CHR à afficher.</p>
+          {searchTerm && <p className="text-jdc-yellow-200 mt-2">Essayez avec d'autres termes de recherche.</p>}
+        </div>
       )}
 
       {/* Modale de détails */}
@@ -255,7 +194,7 @@ export default function CHRInstallations() {
         <InstallationDetails
           installation={selectedInstallation}
           onClose={handleCloseModal}
-          onSave={handleSave} // Passer la fonction handleSave
+          onSave={() => handleSave(selectedInstallation)} // Adapter pour passer l'objet complet ou les updates
         />
       )}
     </div>

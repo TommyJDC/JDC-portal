@@ -1,19 +1,24 @@
-import { json } from "@remix-run/node";
-import { getDb, initializeFirebaseAdmin } from "~/firebase.admin.config.server"; // Import getDb and initializeFirebaseAdmin
-import { authenticator } from "~/services/auth.server";
-import { getUserProfileSdk } from "~/services/firestore.service.server"; // Import getUserProfileSdk
-import type { Notification, UserProfile } from "~/types/firestore.types"; // Import Notification and UserProfile types
-import type { DocumentData, QueryDocumentSnapshot } from 'firebase-admin/firestore'; // Import Firestore types
+import { json, redirect } from "@remix-run/node"; // Ajout de redirect
+import type { ActionFunctionArgs } from "@remix-run/node"; // Utiliser ActionFunctionArgs
+import { getDb, initializeFirebaseAdmin } from "~/firebase.admin.config.server";
+// import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
+import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Importer pour session manuelle
+import { getUserProfileSdk } from "~/services/firestore.service.server";
+import type { Notification, UserProfile } from "~/types/firestore.types";
+import type { DocumentData, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
-export async function action({ request }: { request: Request }) {
+export async function action({ request }: ActionFunctionArgs) { // Utiliser ActionFunctionArgs
   console.log('api.notifications.clear: Action function started.');
-  const userSession = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
   
-  if (!userSession) {
-    console.log('api.notifications.clear: User session not found.');
+  const session = await sessionStorage.getSession(request.headers.get("Cookie"));
+  const userSession: UserSessionData | null = session.get("user") ?? null;
+
+  if (!userSession || !userSession.userId) {
+    console.log('api.notifications.clear: User session not found or invalid.');
+    // Pour une API, retourner une erreur 401 est souvent préférable à une redirection.
     return json({ success: false, error: 'User not authenticated' }, { status: 401 });
+    // Alternativement, si une redirection est souhaitée (comme avec failureRedirect):
+    // throw redirect("/login");
   }
 
   console.log('api.notifications.clear: User session found for userId:', userSession.userId);

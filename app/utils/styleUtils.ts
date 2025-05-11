@@ -49,11 +49,18 @@ const ticketStatusStyles = {
  * @param status The status string of the ticket.
  * @returns Object containing bgColor and textColor classes.
  */
-export function getTicketStatusStyle(status: string | undefined | null): { bgColor: string; textColor: string } {
+export function getTicketStatusStyle(status: string | object | undefined | null): { bgColor: string; textColor: string } {
   // Add log here
   console.log(`getTicketStatusStyle received status: "${status}", Type: ${typeof status}`);
+  
+  // Si status est un objet, renvoyer le style par défaut
+  if (typeof status === 'object' && status !== null) {
+    console.warn(`getTicketStatusStyle a reçu un objet au lieu d'une chaîne. Utilisation du style par défaut.`);
+    return ticketStatusStyles.DEFAULT;
+  }
+  
   // Use the status directly, converting to uppercase for case-insensitivity and trimming whitespace
-  const upperStatus = status?.trim().toUpperCase();
+  const upperStatus = typeof status === 'string' ? status.trim().toUpperCase() : '';
   console.log(`getTicketStatusStyle processed status: "${upperStatus}"`);
 
   switch (upperStatus) {
@@ -125,7 +132,8 @@ export function getTicketStatusStyle(status: string | undefined | null): { bgCol
 
 // --- Add styles for installation status ---
 import { FaClock, FaCheckCircle, FaCalendarCheck, FaExclamationCircle } from 'react-icons/fa';
-import type { InstallationStatus } from '~/types/firestore.types'; // Assurez-vous que ce chemin est correct
+// Définition du type InstallationStatus car il n'existe pas dans firestore.types.ts
+type InstallationStatus = 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';
 
 // Define colors for installation statuses
 const installationStatusColors: Record<InstallationStatus | 'DEFAULT', string> = {

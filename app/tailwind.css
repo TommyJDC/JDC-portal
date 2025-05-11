@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+body {
+  @apply bg-jdc-black text-jdc-yellow;
+  font-size: 0.875rem; /* Réduire la taille de la police de base */
+}
+
+/* Styles pour rendre les éléments plus petits */
+.btn {
+  @apply py-1 px-2 text-sm; /* Boutons plus petits */
+}
+
+input, select, textarea {
+  @apply py-1 px-2 text-sm; /* Champs de formulaire plus petits */
+}
+
 @keyframes pulse-once {
   0%, 100% {
     opacity: 1;

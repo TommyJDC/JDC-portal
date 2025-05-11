@@ -1,140 +1,48 @@
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
-
-export interface SapTicket {
-  id: string;
-  date: Date | null; // Correction du type
-  client?: { stringValue: string };
-  raisonSociale?: { stringValue: string };
-  description?: { stringValue: string };
-  statut?: { stringValue: string };
-  secteur: 'CHR' | 'HACCP' | 'Kezia' | 'Tabac';
-  demandeSAP?: { stringValue: string };
-  numeroSAP?: { stringValue: string };
-  deducedSalesperson?: string;
-  adresse?: { stringValue: string };
-  telephone?: { stringValue: string };
-  codeClient?: { stringValue: string };
-  priorite?: { stringValue: string };
-  origine?: { stringValue: string };
-  type?: { stringValue: string };
-  descriptionProbleme?: { stringValue: string };
-  statutSAP?: string;
-  commentaires?: string[];
-  summary?: string;
-  solution?: string;
-  technicianNotes?: string;
-  materialDetails?: string;
-  mailId: string;
-  status: 'open' | 'closed' | 'pending' | 'archived' | 'rma_request' | 'material_sent';
-  materialType?: 'RMA' | 'envoi-materiel';
-  contactAttempts?: Array<{
-    date: Date | null; // Correction du type pour permettre null
-    method: 'email' | 'phone';
-    success: boolean;
-  }>;
-  aiSummary?: string;
-  gmailLabels?: string[];
-  mailFrom?: string;
-  mailTo?: string[];
-  mailCc?: string[];
-  mailSubject?: string;
-  mailThreadId?: string;
-  mailMessageId?: string;
-  mailReferences?: string;
-  mailDate?: string;
-}
-
-// Définir et exporter le type pour les statuts de ticket SAP
-export type SapTicketStatus = 'open' | 'closed' | 'pending' | 'archived' | 'rma_request' | 'material_sent';
-
-export type NotificationType =
-  | 'ticket_created'
-  | 'ticket_closed'
-  | 'shipment'
-  | 'installation'
-  | 'installation_closed';
-
-export type UserRole = 'Admin' | 'Technician' | 'Logistics' | 'Client' | string;
-
-export interface Notification {
-  id: string;
-  userId?: string;
-  type: NotificationType;
-  sector?: string[];
-  targetRoles?: UserRole[];
-  title: string; // Added title property
-  message: string;
-  metadata?: Record<string, any>;
-  createdAt: Timestamp | Date;
-  read: boolean;
-  link?: string;
-}
-
 export interface UserProfile {
   uid: string;
   email: string;
-  role: 'Admin' | 'Technician' | string;
+  role: string;
   secteurs: string[];
-  faity?: string;
   displayName: string;
   nom: string;
-  createdAt?: Timestamp | Date;
-  updatedAt?: Timestamp | Date;
+  phone: string;
+  address?: string;
+  blockchainAddress?: string;
+  jobTitle?: string;
+  department?: string;
   googleRefreshToken?: string;
   isGmailProcessor?: boolean;
   gmailAuthorizedScopes?: string[];
-  gmailAuthStatus?: 'active' | 'expired' | 'unauthorized';
-  phone?: string;
-  address?: string;
-  labelSapClosed?: string; // Added for Gmail config
-  labelSapRma?: string; // Added for Gmail config
-  labelSapNoResponse?: string; // Added for Gmail config
-}
-
-export interface Shipment {
-  id: string;
-  codeClient: string;
-  nomClient: string;
-  adresse: string;
-  ville: string;
-  codePostal: string;
-  statutExpedition: 'OUI' | 'NON' | string;
-  secteur: string;
-  dateCreation?: Date; // Changed type to Date
-  articleNom?: string; // Added articleNom
-  trackingLink?: string; // Added trackingLink
-}
-
-export type InstallationStatus = 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';
-
-export interface InstallationFilters { // Exportation ajoutée
-  status?: InstallationStatus;
-  dateRange?: { start: Date; end: Date };
-  commercial?: string;
-  technicien?: string;
-  ville?: string;
-  searchTerm?: string;
+  gmailAuthStatus?: string;
+  labelSapClosed?: string;
+  labelSapNoResponse?: string;
+  labelSapRma?: string;
+  encryptedWallet?: string;
+  createdAt?: Date; // Réintroduit
+  updatedAt?: Date; // Réintroduit
 }
 
 export interface Installation {
   id: string;
-  secteur: 'CHR' | 'HACCP' | 'Tabac' | 'Kezia' | string;
+  secteur: string;
   codeClient: string;
   nom: string;
-  ville?: string; // Rendre optionnel
-  contact?: string; // Rendre optionnel
-  telephone?: string; // Rendre optionnel
-  commercial?: string; // Rendre optionnel
-  tech?: string; // Rendre optionnel
-  status: InstallationStatus;
-  dateInstall?: string; // Déjà optionnel, mais vérifier
-  commentaire?: string; // Rendre optionnel
-  adresse?: string; // Déjà optionnel, mais vérifier
-  codePostal?: string; // Déjà optionnel, mais vérifier
-  hasCTN?: boolean; // Ajouter la propriété hasCTN (optionnelle car elle n'est pas toujours présente dans les données brutes)
+  ville: string;
+  contact?: string;
+  telephone?: string;
+  commercial?: string;
+  tech?: string;
+  status: 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée' | string;
+  commentaire?: string;
+  dateInstall: Date | string;
+  adresse?: string;
+  codePostal?: string;
+  hasCTN?: boolean;
 }
 
-export interface InstallationsSnapshot { // Exportation ajoutée
+export type InstallationStatus = 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';
+
+export interface InstallationsSnapshot {
   total: number;
   byStatus: Record<InstallationStatus, number>;
   bySector: Record<string, {
@@ -143,69 +51,154 @@ export interface InstallationsSnapshot { // Exportation ajoutée
   }>;
 }
 
-export interface GmailProcessingConfig {
-  maxEmailsPerRun: number;
-  processedLabelName: string;
-  refreshInterval: number;
-  sectorCollections: Record<string, {
-    enabled: boolean;
-    labels: string[];
-    responsables: string[];
+export interface SapTicket {
+  id: string;
+  secteur: string;
+  numeroSAP: string;
+  client: string | { stringValue: string };
+  raisonSociale: string | { stringValue: string };
+  description: string | { stringValue: string };
+  date: Date | null;
+  status: string | { stringValue: string };
+  statut: string | { stringValue: string };
+  priority?: string | { stringValue: string };
+  assignedTo?: string | { stringValue: string };
+  resolution?: string | { stringValue: string };
+  telephone?: string | { stringValue: string };
+  adresse?: string | { stringValue: string };
+  codeClient?: string | { stringValue: string };
+  deducedSalesperson?: string | { stringValue: string };
+  demandeSAP?: string | { stringValue: string };
+  descriptionProbleme?: string | { stringValue: string };
+  mailId?: string; // Ajouté pour la cohérence avec SAPArchive et l'utilisation dans firestore.service
+  contactAttempts?: Array<{
+    date: Date | null;
+    notes: string;
+    outcome: string;
   }>;
 }
 
-export interface StatsSnapshot {
+export interface Notification {
   id: string;
-  timestamp: string;
-  totalTickets: number;
-  activeClients: number;
+  title: string;
+  message: string;
+  type: string;
+  userId: string;
+  isRead: boolean;
+  createdAt: Date;
+  link?: string;
+  targetRoles?: UserRole[]; // Ajouté pour le ciblage par rôle
+  sector?: string[]; // Ajouté pour le ciblage par secteur
+  metadata?: Record<string, any>; // Pour des données additionnelles spécifiques au type
+  sourceId?: string; // ID de l'entité source (ticket, installation, etc.)
+}
+
+// Définition des types de notification
+export type NotificationType = 
+  | 'installation' 
+  | 'installation_closed' 
+  | 'new_ticket' 
+  | 'ticket_update' // Pour les mises à jour de tickets
+  | 'ticket_closed' // Pour les clôtures de tickets
+  | 'new_shipment'  // Pour les nouveaux envois CTN
+  | 'info'            // Notification générale
+  | 'warning'
+  | 'error'
+  | 'success';
+
+// Définition des rôles utilisateur
+export type UserRole = 'Admin' | 'Technician' | 'Logistics' | 'Client' | 'Viewer' | string; // string pour flexibilité
+
+export interface SAPArchive {
+  originalTicketId: string;
+  archivedDate: number;
+  closureReason: 'resolved' | 'no-response';
+  technicianNotes: string;
+  technician: string;
+  client: string | { stringValue: string };
+  raisonSociale: string | { stringValue: string };
+  description: string | { stringValue: string };
+  secteur: 'CHR' | 'HACCP' | 'Kezia' | 'Tabac';
+  numeroSAP: string | { stringValue: string };
+  mailId?: string;
+  documents: string[];
+}
+
+export interface Article {
+  id?: string; // identifiant unique Firestore
+  code: string;
+  designation: string;
+  type: string;
+  category: string;
+  images?: string[];
+  // secret?: string; // décommenter si utilisé côté Firestore
+}
+
+export interface Shipment {
+  id?: string;
+  codeClient?: string;
+  numeroCTN?: string;
+  client?: string;
+  secteur?: string;
+  dateLivraison?: Date | string;
+  statut?: string;
+  produits?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface StatsSnapshot {
+  id?: string;
+  timestamp: Date;
+  clientCount: number;
+  clientEvolution: number;
+  installations: any; // Define a more specific type if possible
+  ticketCounts: Record<string, number>;
+}
+
+// Ajout des types pour les statistiques d'installations du dashboard
+interface SectorInstallationsStats {
+  total: number;
+  enAttente: number; // correspond à 'rendez-vous à prendre'
+  planifiees: number; // correspond à 'rendez-vous pris'
+  terminees: number; // correspond à 'installation terminée'
 }
 
 export interface InstallationsDashboardStats {
-  haccp: {
-    total: number;
-    enAttente: number;
-    planifiees: number;
-    terminees: number;
-  };
-  chr: {
-    total: number;
-    enAttente: number;
-    planifiees: number;
-    terminees: number;
-  };
-  tabac: {
-    total: number;
-    enAttente: number;
-    planifiees: number;
-    terminees: number;
-  };
-  kezia: {
-    total: number;
-    enAttente: number;
-    planifiees: number;
-    terminees: number;
-  };
+  haccp: SectorInstallationsStats;
+  chr: SectorInstallationsStats;
+  tabac: SectorInstallationsStats;
+  kezia: SectorInstallationsStats;
 }
 
-export interface Article { // Exportation ajoutée
-  id: string;
-  Code: string; // Utiliser le nom de champ correct
-  Désignation: string; // Utiliser le nom de champ correct
-  imageUrls?: string[];
+export interface InstallationFilters {
+  status?: InstallationStatus;
+  dateRange?: { start: Date; end: Date };
+  commercial?: string;
+  technicien?: string;
+  ville?: string;
+  searchTerm?: string;
 }
 
-export interface SAPArchive { // Exportation ajoutée
-  originalTicketId: string;
-  archivedDate: Timestamp;
-  closureReason: 'resolved' | 'no-response' | string;
-  technicianNotes: string;
-  technician: string;
-  client: { stringValue: string };
-  raisonSociale: { stringValue: string };
-  description: { stringValue: string };
-  secteur: 'CHR' | 'HACCP' | 'Kezia' | 'Tabac';
-  numeroSAP: { stringValue: string };
-  mailId?: string;
-  documents?: string[];
+// Configuration pour le traitement Gmail
+interface SectorGmailConfig {
+  enabled: boolean;
+  labels: string[];       // Labels Gmail à surveiller pour ce secteur
+  responsables: string[]; // UID des utilisateurs responsables du traitement pour ce secteur
+}
+
+export interface GmailProcessingConfig {
+  maxEmailsPerRun: number;        // Nombre max d'emails à traiter par exécution
+  processedLabelName: string;   // Nom du label Gmail à appliquer après traitement
+  refreshInterval: number;        // Intervalle de rafraîchissement pour la tâche planifiée (en minutes)
+  sectorCollections: {
+    kezia: SectorGmailConfig;
+    haccp: SectorGmailConfig;
+    chr: SectorGmailConfig;
+    tabac: SectorGmailConfig;
+  };
+  // Champs pour les templates d'IA (utilisés dans gmail-config.tsx)
+  aiClosureTemplate?: string;
+  aiRmaTemplate?: string;
+  aiNoResponseTemplate?: string;
 }

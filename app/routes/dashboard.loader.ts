@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
+// import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
+import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Importer sessionStorage et UserSessionData
 import { getGoogleAuthClient, getCalendarEvents } from "~/services/google.server";
 import { getCache, setCache } from "~/services/cache.server";
 import { getWeekDateRangeForAgenda } from "~/utils/dateUtils";
@@ -16,7 +17,7 @@ import {
   getSapTicketCountBySectorSdk
 } from "~/services/firestore.service.server";
 import type { SapTicket, Shipment, StatsSnapshot, UserProfile, InstallationsDashboardStats, Installation } from "~/types/firestore.types";
-import type { UserSession } from "~/services/session.server";
+// import type { UserSession } from "~/services/session.server"; // Remplacé par UserSessionData
 
 interface CalendarEvent {
     id: string;
@@ -45,7 +46,10 @@ export interface DashboardLoaderData {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const session = await authenticator.isAuthenticated(request);
+  const cookieHeader = request.headers.get("Cookie");
+  const sessionStore = await sessionStorage.getSession(cookieHeader);
+  const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
+
   const data: DashboardLoaderData = {
     userProfile: null,
     calendarEvents: [],
@@ -59,44 +63,56 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     sapTicketCountsBySector: null
   };
 
-  if (!session?.userId) return json(data);
+  if (!userSession?.userId) return json(data); // Utiliser userSession
 
   // Déclencher les tâches planifiées simulées
   await triggerScheduledTasks();
 
   try {
-    data.userProfile = await getUserProfileSdk(session.userId);
-    if (!data.userProfile) return redirect("/user-profile");
+    data.userProfile = await getUserProfileSdk(userSession.userId); // Utiliser userSession
+    if (!data.userProfile) return redirect("/user-profile"); // Rediriger si le profil n'est pas trouvé après une session valide
 
     const userSectors = data.userProfile.secteurs || [];
     const sectorsForTickets = data.userProfile.role === 'Admin' ? ['CHR', 'HACCP', 'Kezia', 'Tabac'] : userSectors;
-    const sectorsForShipments = data.userProfile.role === 'Admin' ? ['haccp', 'chr', 'tabac', 'kezia'] : userSectors;
+    const sectorsForShipments = data.userProfile.role === 'Admin' ? ['haccp', 'chr', 'tabac', 'kezia'] : userSectors; // Garder la casse si nécessaire pour Firestore
 
     // Chargement des données en parallèle
-  // Chargement optimisé avec cache de 5 secondes pour les données fréquentes
-  const cacheKey = `dashboard:${session.userId}`;
-  const cachedData = await getCache(cacheKey);
-  
-  if (cachedData) {
-    return json(cachedData);
-  }
+    // Chargement optimisé avec cache de 5 secondes pour les données fréquentes
+    const cacheKey = `dashboard:${userSession.userId}`; // Utiliser userSession
+    const cachedData = await getCache(cacheKey);
+    
+    if (cachedData) {
+      console.log(`[dashboard.loader] Cache hit for ${cacheKey}`);
+      return json(cachedData);
+    }
+    console.log(`[dashboard.loader] Cache miss for ${cacheKey}`);
 
-  const [calendarData, firestoreData] = await Promise.allSettled([
-    loadCalendarData(session),
-    loadFirestoreData(data.userProfile, sectorsForTickets, sectorsForShipments)
-  ]);
+    const [calendarData, firestoreData] = await Promise.allSettled([
+      loadCalendarData(userSession), // Utiliser userSession
+      loadFirestoreData(data.userProfile, sectorsForTickets, sectorsForShipments)
+    ]);
 
   // Cache les données non sensibles pendant 5s
-  await setCache(cacheKey, data, 5);
+  await setCache(cacheKey, data, 5); // 'data' sera mis à jour ci-dessous
 
     if (calendarData.status === 'fulfilled') {
       data.calendarEvents = calendarData.value.events;
       data.calendarError = calendarData.value.error;
+    } else {
+      console.error("[dashboard.loader] Erreur loadCalendarData:", calendarData.reason);
+      data.calendarError = getCalendarErrorMessage(calendarData.reason);
     }
 
-    if (firestoreData.status === 'fulfilled') {
+    if (firestoreData.status === 'fulfilled' && firestoreData.value) {
       Object.assign(data, firestoreData.value);
+    } else if (firestoreData.status === 'rejected') {
+      console.error("[dashboard.loader] Erreur loadFirestoreData:", firestoreData.reason);
+      data.clientError = "Erreur de chargement des données Firestore";
     }
+    
+    // Mettre en cache les données finales après assignation
+    await setCache(cacheKey, data, 5);
+
 
   } catch (error) {
     console.error("Erreur principale du loader:", error);
@@ -106,9 +122,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return json(data);
 };
 
-async function loadCalendarData(session: UserSession) {
+async function loadCalendarData(session: UserSessionData) { // Changer UserSession en UserSessionData
   try {
-    const authClient = await getGoogleAuthClient(session);
+    const authClient = await getGoogleAuthClient(session); // getGoogleAuthClient doit accepter UserSessionData
     const today = new Date();
     const { start, end } = getWeekDateRangeForAgenda(today);
     const rawEvents = await getCalendarEvents(authClient, start.toISOString(), end.toISOString());
@@ -183,8 +199,9 @@ function filterInstallations(installations: Installation[], userProfile: UserPro
 }
 
 function calculateClientEvolution(currentCount: number | null, snapshot?: StatsSnapshot) {
-  return currentCount && snapshot?.activeClients 
-    ? currentCount - snapshot.activeClients 
+  // Utiliser clientCount de StatsSnapshot au lieu de activeClients
+  return currentCount !== null && snapshot && typeof snapshot.clientCount === 'number' 
+    ? currentCount - snapshot.clientCount 
     : null;
 }
 

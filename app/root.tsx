@@ -10,30 +10,24 @@ import {
   useNavigation,
 } from "@remix-run/react";
 import type { LinksFunction, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node"; // Removed redirect as it's not used
+import { json } from "@remix-run/node";
 import * as NProgress from 'nprogress';
 import tailwindStylesHref from "~/tailwind.css?url";
 import globalStylesHref from "~/styles/global.css?url";
 import nProgressStylesHref from "nprogress/nprogress.css?url";
 import mapboxStylesHref from 'mapbox-gl/dist/mapbox-gl.css?url';
 
-
-
-
-
-
-import { Header } from "~/components/Header";
 import { DebugAuth } from "~/components/DebugAuth";
 import { MobileMenu } from "~/components/MobileMenu";
 import { AuthModal } from "~/components/AuthModal";
 import ToastContainer from '~/components/Toast';
-import { ToastProvider } from '~/context/ToastContext'; // Removed useToast as it's not used directly here
-import type { UserProfile } from '~/types/firestore.types'; // Use the original UserProfile type
-import { authenticator } from "~/services/auth.server";
-import type { UserSession } from "~/services/session.server";
-import { getUserProfileSdk } from '~/services/firestore.service.server';
+import { ToastProvider } from '~/context/ToastContext';
+import type { UserProfile } from '~/types/firestore.types';
+import type { UserSessionData } from "~/services/session.server";
+import { sessionStorage } from "~/services/session.server";
+import { getUserProfileSdk, createUserProfileSdk } from "~/services/firestore.service.server";
+import { Sidebar, MobileNavBar } from "~/components/Sidebar";
 
-// Define a serializable version of UserProfile for loader return type
 type SerializableUserProfile = Omit<UserProfile, 'createdAt' | 'updatedAt'> & {
   createdAt: string | null;
   updatedAt: string | null;
@@ -51,43 +45,117 @@ export const links: LinksFunction = () => [
   { rel: "apple-touch-icon", href: "/icons/ios/180.png" },
 ];
 
-// --- Root Loader: Load user session AND profile server-side ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  console.log("Root Loader: Checking authentication state via remix-auth.");
-  const userSession = await authenticator.isAuthenticated(request);
-
-  let profile: UserProfile | null = null;
-
-  if (userSession) {
-    console.log(`Root Loader: User authenticated (ID: ${userSession.userId}). Fetching profile server-side.`);
-    try {
-      profile = await getUserProfileSdk(userSession.userId);
-      console.log("Root Loader: Profile fetched successfully server-side.");
-    } catch (error: any) {
-      console.error("Root Loader: Error fetching profile server-side:", error.message);
-      if (error.message?.includes("User profile not found")) {
-        console.warn(`Root Loader: Profile not found in Firestore for user ID: ${userSession.userId}`);
-      }
-      profile = null;
+  console.log("\n--- DÉBUT Root Loader ---");
+  console.log("Root Loader: URL de la requête:", request.url);
+  
+  const cookieHeader = request.headers.get("Cookie");
+  console.log("Root Loader: Cookies présents:", cookieHeader ? "Oui" : "Non");
+  if (cookieHeader) {
+    console.log("Root Loader: Cookie header length:", cookieHeader.length);
+    const sessionCookieMatch = cookieHeader.match(/__session=([^;]+)/);
+    if (sessionCookieMatch) {
+      console.log("Root Loader: __session cookie trouvé, longueur:", sessionCookieMatch[1].length);
+    } else {
+      console.log("Root Loader: __session cookie NON trouvé dans l'en-tête");
     }
-  } else {
-    console.log("Root Loader: User not authenticated.");
   }
-
-  // Convert Date objects to ISO strings for serialization
-  const serializableProfile: SerializableUserProfile | null = profile ? {
-    ...profile,
-    // Ensure properties exist before accessing them
-    createdAt: profile.createdAt instanceof Date ? profile.createdAt.toISOString() : null,
-    updatedAt: profile.updatedAt instanceof Date ? profile.updatedAt.toISOString() : null,
-  } : null;
-
-  console.log("Root Loader: Returning data:", { user: userSession, profile: serializableProfile });
-  // Return the serializable profile
-  return json({ user: userSession, profile: serializableProfile });
+  
+  try {
+    let userSessionData: UserSessionData | null = null;
+    
+    if (cookieHeader) {
+      try {
+        const directSession = await sessionStorage.getSession(cookieHeader);
+        console.log("Root Loader: Contenu brut de directSession.data:", JSON.stringify(directSession.data, null, 2));
+        const userFromSession = directSession.get("user"); 
+        if (userFromSession && userFromSession.userId) {
+          console.log("Root Loader: Session valide trouvée via directSession.get('user'). UserID:", userFromSession.userId);
+          userSessionData = userFromSession;
+        } else {
+          console.log("Root Loader: Aucune donnée utilisateur (valide) trouvée dans la session via la clé 'user'.");
+        }
+      } catch (e: any) {
+        console.error("Root Loader: Erreur lors de la vérification directe du cookie:", e.message);
+      }
+    }
+    
+    let profile: UserProfile | null = null;
+    
+    if (userSessionData) {
+      console.log(`Root Loader: Utilisateur authentifié (ID: ${userSessionData.userId})`);
+      console.log(`Root Loader: Email: ${userSessionData.email}`);
+      console.log(`Root Loader: Display Name: ${userSessionData.displayName}`);
+      console.log(`Root Loader: Role: ${userSessionData.role}`);
+      
+      try { // Try pour toute la logique de récupération/création de profil Firestore
+        let firestoreProfile = await getUserProfileSdk(userSessionData.userId);
+        
+        if (firestoreProfile) {
+          profile = firestoreProfile;
+          console.log("Root Loader: Profil Firestore récupéré avec succès");
+          console.log(`Root Loader: Rôle Firestore: ${profile.role}, Secteurs: ${profile.secteurs?.join(', ') || 'aucun'}`);
+        } else {
+          console.warn(`Root Loader: Profil Firestore non trouvé pour ${userSessionData.userId}, tentative de création.`);
+          const isAdmin = userSessionData.email === 'tommy.vilmen@jdc.fr';
+          const newProfileData: UserProfile = {
+            uid: userSessionData.userId,
+            email: userSessionData.email || "",
+            displayName: userSessionData.displayName || "",
+            role: userSessionData.role || (isAdmin ? 'Admin' : 'User'),
+            secteurs: userSessionData.secteurs || (isAdmin ? ['CHR', 'HACCP', 'Kezia', 'Tabac'] : []),
+            nom: userSessionData.displayName || "",
+            phone: "",
+            address: "",
+            blockchainAddress: "",
+            department: "",
+            encryptedWallet: "",
+            gmailAuthStatus: "unauthorized",
+            gmailAuthorizedScopes: [],
+            googleRefreshToken: userSessionData.googleRefreshToken || "",
+            isGmailProcessor: false,
+            jobTitle: "",
+            labelSapClosed: "",
+            labelSapNoResponse: "",
+            labelSapRma: "",
+            // createdAt et updatedAt seront gérés par createUserProfileSdk lors de l'écriture
+          };
+          await createUserProfileSdk(newProfileData); // Laisser createUserProfileSdk gérer les timestamps
+          profile = await getUserProfileSdk(userSessionData.userId); // Relire pour obtenir le profil complet avec timestamps
+          if (profile) {
+               console.log("Root Loader: Profil créé et relu avec succès:", JSON.stringify(profile, null, 2));
+          } else {
+              console.error("Root Loader: Profil créé mais relecture a échoué pour UID:", userSessionData.userId);
+          }
+        }
+      } catch (error: any) { 
+        console.error("Root Loader: Erreur lors de la gestion du profil Firestore (récupération/création):", error.message, error);
+        profile = null; 
+      }
+    } else {
+      console.log("Root Loader: Utilisateur non authentifié (userSessionData est null).");
+    }
+    
+    const serializableProfile: SerializableUserProfile | null = profile ? {
+      ...profile,
+      createdAt: profile.createdAt instanceof Date ? profile.createdAt.toISOString() : null,
+      updatedAt: profile.updatedAt instanceof Date ? profile.updatedAt.toISOString() : null,
+    } : null;
+    
+    console.log("Root Loader: Données retournées:", {
+      user: userSessionData, 
+      profile: serializableProfile 
+    });
+    console.log("--- FIN Root Loader ---\n");
+    
+    return json({ user: userSessionData, profile: serializableProfile });
+  } catch (error: any) {
+    console.error("Root Loader: Erreur critique:", error.message, error);
+    console.log("--- FIN Root Loader (avec erreur) ---\n");
+    return json({ user: null, profile: null });
+  }
 };
 
-// --- Root Action ---
 export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const action = formData.get("_action");
@@ -95,20 +163,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return json({ ok: false, error: "Invalid root action" }, { status: 400 });
 };
 
-// --- Client-side Profile Fetch Function (REMOVED) ---
-
-// Main App Component wrapped with ToastProvider
 function App({ children }: { children: ReactNode }) {
-  // Get user session AND profile from the root loader
-  // Use the SerializableUserProfile type here as returned by the loader
-  const { user, profile } = useLoaderData<{ user: UserSession | null; profile: SerializableUserProfile | null }>();
+  const { user, profile } = useLoaderData<{ user: UserSessionData | null; profile: SerializableUserProfile | null }>();
   const location = useLocation();
   const navigation = useNavigation();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // NProgress loading indicator logic (simplified)
   useEffect(() => {
     if (navigation.state === 'idle') {
       NProgress.done();
@@ -121,45 +183,37 @@ function App({ children }: { children: ReactNode }) {
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
 
-  const isDashboard = location.pathname === '/dashboard';
-
-  // Cast the serializable profile back to UserProfile for components that expect it
-  // Note: Dates will still be strings, but the structure matches.
-  // Components needing actual Date objects would need further adjustment or client-side parsing.
   const profileForComponents = profile as UserProfile | null;
 
   return (
     <>
-      <Header
+      <Sidebar
         user={user}
-        profile={profileForComponents} // Pass casted profile
-        onToggleMobileMenu={toggleMobileMenu}
-        onLoginClick={openAuthModal}
-        loadingAuth={navigation.state !== 'idle'}
+        profile={profileForComponents}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
       <MobileMenu
         isOpen={isMobileMenuOpen}
         onClose={toggleMobileMenu}
         user={user}
-        profile={profileForComponents} // Pass casted profile
+        profile={profileForComponents}
         onLoginClick={openAuthModal}
         loadingAuth={navigation.state !== 'idle'}
       />
       <AuthModal isOpen={isAuthModalOpen} onClose={closeAuthModal} />
-      {/* Removed container and mx-auto to allow full width */}
-      <main className={`px-4 py-6 ${isDashboard ? 'mt-0' : 'mt-16 md:mt-20'}`}>
-        {/* Pass casted profile to Outlet context */}
+      <main className={`px-4 py-6 mt-4 md:mt-0 transition-all duration-300 md:ml-64`}>
         <Outlet context={{ user, profile: profileForComponents }} />
       </main>
       <ToastContainer />
+      <MobileNavBar profile={profileForComponents} />
     </>
   );
 }
 
-// Document structure
 export default function Document() {
   return (
-    <html lang="fr" className="h-full bg-jdc-blue-dark" suppressHydrationWarning={true}>
+    <html lang="fr" className="h-full" suppressHydrationWarning={true}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -171,7 +225,7 @@ export default function Document() {
         <Meta />
         <Links />
       </head>
-      <body className="h-full font-sans text-jdc-gray-300">
+      <body className="h-full font-sans">
         <ToastProvider>
           <App>
             <Suspense fallback={<div>Chargement de l'application...</div>}>
@@ -204,9 +258,7 @@ export default function Document() {
   );
 }
 
-// Error Boundary
 export function ErrorBoundary() {
-  // Basic error boundary, consider enhancing
   return (
     <html lang="fr" className="h-full bg-jdc-blue-dark">
       <head>

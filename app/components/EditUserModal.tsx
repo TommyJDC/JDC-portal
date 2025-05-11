@@ -28,21 +28,33 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const [formData, setFormData] = useState<Partial<UserProfile>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     if (user && isOpen) {
+      // Vérifier que l'utilisateur a un ID valide
+      if (!user.uid || user.uid.trim() === '') {
+        console.error('EditUserModal: Utilisateur avec ID manquant ou invalide', user);
+        setError('ID utilisateur manquant ou invalide. Cette modification pourrait échouer.');
+        setValidationErrors({ uid: 'ID utilisateur manquant ou invalide' });
+      } else {
+        setError(null);
+        setValidationErrors({});
+      }
+
       setFormData({
-        uid: user.uid,
+        uid: user.uid?.trim(), // S'assurer que l'ID n'a pas d'espaces
         email: user.email,
         displayName: user.displayName || '',
         role: formData.role || user.role || 'Technician', // Use formData.role if set, otherwise user.role, fallback to Technician
         secteurs: user.secteurs || [], // Initialize with current sectors
+        blockchainAddress: user.blockchainAddress || '', // Préserver l'adresse blockchain si présente
       });
-      setError(null);
     } else if (!isOpen) {
       setFormData({});
       setIsSaving(false);
       setError(null);
+      setValidationErrors({});
     }
   }, [user, isOpen]); // formData.role is intentionally not a dependency here to prevent infinite loops on state updates
 
@@ -65,8 +77,6 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
         // Add the sector
         newSectors = [...currentSectors, sector];
       }
-      // Sort for consistent comparison later if needed
-      // newSectors.sort();
       return { ...prev, secteurs: newSectors };
     });
   };
@@ -74,6 +84,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    // Valider la présence d'un ID utilisateur
+    if (!user.uid || user.uid.trim() === '') {
+      setError('Impossible de sauvegarder: ID utilisateur manquant ou invalide');
+      return;
+    }
 
     setIsSaving(true);
     setError(null);
@@ -84,16 +100,34 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       displayName: formData.displayName || user.displayName,
       role: formData.role || user.role, // Use formData.role if set, otherwise user.role
       secteurs: formData.secteurs || [], // Use the updated sectors array
-      uid: user.uid,
+      uid: user.uid.trim(), // Ensure the ID is trimmed of any whitespace
       email: user.email,
+      blockchainAddress: user.blockchainAddress || formData.blockchainAddress, // Inclure l'adresse blockchain pour la mise à jour
     };
+
+    // Log pour débogage
+    console.log('[EditUserModal] Données avant sauvegarde:', {
+      uid: updatedUserData.uid,
+      displayName: updatedUserData.displayName,
+      role: updatedUserData.role,
+      secteurs: updatedUserData.secteurs,
+      blockchainAddress: updatedUserData.blockchainAddress, 
+    });
 
     try {
       await onSave(updatedUserData);
       // Parent component (admin.tsx) handles closing on success
     } catch (err: any) { // Using 'any' for error type as it can be varied
       console.error("Error saving user:", err);
-      setError(err.message || "Erreur lors de la sauvegarde.");
+      
+      // Messages d'erreur spécifiques
+      if (err.message && err.message.includes('ID utilisateur manquant')) {
+        setError('ID utilisateur manquant ou invalide. Rafraîchissez la page et réessayez.');
+      } else if (err.message && err.message.includes('non trouvé sur la blockchain')) {
+        setError(`${err.message}. Vérifiez que l'ID ou l'adresse blockchain est correcte.`);
+      } else {
+        setError(err.message || "Erreur lors de la sauvegarde.");
+      }
     } finally {
       setIsSaving(false);
     }
@@ -116,7 +150,36 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </button>
         </div>
 
+        {/* Afficher les messages d'erreur de validation en haut du formulaire */}
+        {Object.keys(validationErrors).length > 0 && (
+          <div className="bg-red-900/30 border border-red-700 rounded p-2 mb-4">
+            <ul className="text-sm text-red-400">
+              {Object.entries(validationErrors).map(([field, message]) => (
+                <li key={field}>{message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* UID (Debug visualisation) */}
+          <div>
+            <label className="block text-sm font-medium text-jdc-gray-300 mb-1">ID Utilisateur</label>
+            <p className="text-sm text-white bg-jdc-gray-800 px-3 py-2 rounded border border-gray-700">
+              {formData.uid || 'Manquant'}
+            </p>
+          </div>
+
+          {/* Blockchain Address (Debug visualisation) */}
+          {user.blockchainAddress && (
+            <div>
+              <label className="block text-sm font-medium text-jdc-gray-300 mb-1">Adresse Blockchain</label>
+              <p className="text-sm text-white bg-jdc-gray-800 px-3 py-2 rounded border border-gray-700 truncate">
+                {user.blockchainAddress}
+              </p>
+            </div>
+          )}
+
           {/* Email (Read-only) */}
           <div>
             <label className="block text-sm font-medium text-jdc-gray-300 mb-1">Email</label>
@@ -156,7 +219,6 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </Select>
           </div>
 
-
           {/* Sector Buttons */}
           <div>
             <label className="block text-sm font-medium text-jdc-gray-300 mb-2">Secteurs</label>
@@ -184,7 +246,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-400 mt-2">{error}</p>}
+          {error && (
+            <div className="bg-red-900/30 border border-red-700 rounded p-2">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 pt-4">
             <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
@@ -192,10 +258,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </Button>
             <button
               type="submit"
-              disabled={isSaving}
-              className="w-full px-4 py-2 text-sm font-medium text-black bg-jdc-yellow rounded-md hover:bg-yellow-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75"
+              disabled={isSaving || Object.keys(validationErrors).length > 0}
+              className={`w-full px-4 py-2 text-sm font-medium text-black bg-jdc-yellow rounded-md hover:bg-yellow-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
+                isSaving || Object.keys(validationErrors).length > 0 ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              Sauvegarder les modifications
+              {isSaving ? 'Sauvegarde en cours...' : 'Sauvegarder les modifications'}
             </button>
           </div>
         </form>

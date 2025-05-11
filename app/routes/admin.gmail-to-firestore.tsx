@@ -1,6 +1,8 @@
-import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
+import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node"; // Response supprimée de l'import
 import { Form, useActionData, useNavigation } from "@remix-run/react";
-import { authenticator } from "~/services/auth.server";
+// import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
+import { requireAdminUser } from "~/services/auth-utils.server"; // Pour le loader
+import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Pour l'action
 import { getUserProfileSdk } from "~/services/firestore.service.server";
 import { getGoogleAuthClient } from "~/services/google.server";
 import { processGmailToFirestore } from "~/services/gmail.service.server";
@@ -11,18 +13,18 @@ import type { GmailProcessingConfig } from "~/types/firestore.types";
  * Loader pour vérifier l'authentification et les autorisations
  */
 export async function loader({ request }: LoaderFunctionArgs) {
-  // Vérifier l'authentification
-  const session = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
-
-  // Vérifier si l'utilisateur a le rôle Admin
-  const userProfile = await getUserProfileSdk(session.userId);
-  if (!userProfile || userProfile.role !== "Admin") {
-    throw new Response("Accès non autorisé", { status: 403 });
+  try {
+    await requireAdminUser(request); // Vérifie l'authentification et le rôle Admin, lance une Response en cas d'échec
+    return json({ ok: true });
+  } catch (error) {
+    // Si requireAdminUser lance une Response (redirection ou erreur), la relancer
+    if (error instanceof Response) {
+      throw error;
+    }
+    // Gérer d'autres erreurs potentielles du loader
+    console.error("[admin.gmail-to-firestore] Erreur inattendue dans le loader:", error);
+    throw new Response("Erreur interne du serveur", { status: 500 });
   }
-
-  return json({ ok: true });
 }
 
 /**
@@ -30,20 +32,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
  */
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    // Vérifier l'authentification
-    const session = await authenticator.isAuthenticated(request);
-    if (!session) {
-      return json({ success: false, error: "Non authentifié" }, { status: 401 });
+    // Vérifier l'authentification manuellement pour l'action
+    const cookie = request.headers.get("Cookie");
+    const sessionStore = await sessionStorage.getSession(cookie);
+    const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
+
+    if (!userSession || !userSession.userId) {
+      return json({ success: false, error: "Non authentifié (session manuelle)" }, { status: 401 });
     }
 
     // Vérifier si l'utilisateur a le rôle Admin
-    const userProfile = await getUserProfileSdk(session.userId);
-    if (!userProfile || userProfile.role !== "Admin") {
+    const userProfile = await getUserProfileSdk(userSession.userId);
+    if (!userProfile || userProfile.role?.toLowerCase() !== "admin") {
       return json({ success: false, error: "Accès non autorisé. Rôle Admin requis." }, { status: 403 });
     }
 
-    // Obtenir le client Google authentifié
-    const authClient = await getGoogleAuthClient(session);
+    // Obtenir le client Google authentifié en utilisant userSession
+    const authClient = await getGoogleAuthClient(userSession);
     if (!authClient) {
       return json({ success: false, error: "Impossible d'obtenir le client Google authentifié" }, { status: 500 });
     }

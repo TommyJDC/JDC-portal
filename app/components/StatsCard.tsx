@@ -29,31 +29,20 @@ export const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, isLoad
   const statType = getStatTypeFromTitle(title); // Get the specific type for the label
 
   return (
-    // Appliquer le style de carte ici
-    <div className={`bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex flex-col items-center justify-center text-center space-y-2 ${height}`}> {/* Ajuster padding et space-y */}
-      {/* Icon */}
-      <div className="p-3 rounded-md bg-jdc-yellow/20 text-jdc-yellow border border-jdc-yellow/30 flex-shrink-0"> {/* Icône jaune, taille et padding ajustés */}
-        {React.createElement(icon, { className: "h-6 w-6" })} {/* Utiliser React.createElement pour rendre l'icône */}
+    <div className={`backdrop-blur-md bg-white/10 border border-white/20 shadow-2xl p-5 rounded-2xl flex flex-col items-center justify-center text-center space-y-3 transition-all duration-300 hover:scale-105 hover:shadow-yellow-400/30 hover:bg-white/20 ${height} animate-fade-in`}> 
+      <div className="p-4 rounded-full bg-gradient-to-br from-jdc-yellow/30 to-jdc-yellow/10 text-jdc-yellow border-2 border-jdc-yellow/30 flex-shrink-0 shadow-lg">
+        {React.createElement(icon, { className: "h-8 w-8" })}
       </div>
-
-      {/* Title, Value, and Evolution */}
-      <div className="flex-grow flex flex-col items-center justify-center space-y-1"> {/* Centrer le contenu texte verticalement et horizontalement, espacement légèrement augmenté */}
-        <p className="text-base text-gray-400 font-medium">{getStringValue(title)}</p> {/* Taille du titre augmentée */}
-        <p className="text-3xl font-bold text-white">{value}</p> {/* Taille de la valeur augmentée */}
-
-        {/* Evolution Display (Text format, below value, smaller) */}
-        {!isLoading && showEvolution && (
-          <p className={`text-sm font-medium ${evolutionColor}`}> {/* Taille de l'évolution augmentée */}
-            évolution {statType} (24h) : {evolutionArrow} {isPositive ? '+' : ''}{evolutionValue}
-          </p>
-        )}
-        {/* Supprimer l'affichage de l'évolution en pourcentage si l'évolutionValue est déjà le nombre */}
-         {!isLoading && !showEvolution && (
-            <p className="text-sm font-medium text-transparent h-[1em]"> {/* Invisible placeholder ajusté */}
-                &nbsp; {/* Non-breaking space to maintain height */}
-            </p>
-         )}
-      </div>
+      <p className="text-lg text-white font-semibold drop-shadow-lg">{getStringValue(title)}</p>
+      <p className="text-4xl font-extrabold text-jdc-yellow drop-shadow-xl">{value}</p>
+      {!isLoading && showEvolution && (
+        <p className={`text-base font-semibold ${evolutionColor} animate-bounce`}> 
+          évolution {statType} (24h) : {evolutionArrow} {isPositive ? '+' : ''}{evolutionValue}
+        </p>
+      )}
+      {!isLoading && !showEvolution && (
+        <p className="text-base font-medium text-transparent h-[1em]">&nbsp;</p>
+      )}
     </div>
   );
 };

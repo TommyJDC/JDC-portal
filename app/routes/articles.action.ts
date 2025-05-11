@@ -3,21 +3,27 @@ import { json } from '@remix-run/node';
 import { addArticleImageUrl, deleteArticleImageUrl, uploadImageToCloudinary } from '~/services/firestore.service.server';
 import { requireAdminUser } from '~/services/auth-utils.server'; // Assuming admin rights needed to modify articles
 
+/**
+ * Action pour gérer les images des articles
+ * Même si l'article est stocké sur la blockchain, les images restent sur Firestore car
+ * la blockchain n'est pas adaptée au stockage d'images
+ */
 export async function action({ request }: ActionFunctionArgs) {
   // Ensure user is authenticated and authorized if necessary
   // await requireAdminUser(request); // Uncomment if only admins can modify
 
   const formData = await request.formData();
   const intent = formData.get('intent') as string;
-  const articleId = formData.get('articleId') as string;
+  // Renommer articleId par articleCode pour plus de clarté
+  const articleCode = formData.get('articleId') as string;
   const imageUrl = formData.get('imageUrl') as string;
 
   if (!intent) {
-    return json({ success: false, error: 'Missing intent.' }, { status: 400 });
+    return json({ success: false, error: 'Intent manquant.' }, { status: 400 });
   }
 
-  if ((intent === 'add_image' || intent === 'delete_image') && (!articleId || !imageUrl)) {
-    return json({ success: false, error: 'Article ID and Image URL are required.' }, { status: 400 });
+  if ((intent === 'add_image' || intent === 'delete_image') && (!articleCode || !imageUrl)) {
+    return json({ success: false, error: 'Code article et URL de l\'image requis.' }, { status: 400 });
   }
 
   try {
@@ -29,19 +35,21 @@ export async function action({ request }: ActionFunctionArgs) {
         const buffer = Buffer.from(await file.arrayBuffer());
         imageUrlToAdd = await uploadImageToCloudinary(buffer, file.name);
       }
-      await addArticleImageUrl(articleId, imageUrlToAdd);
-      return json({ success: true, message: 'Image added successfully.', imageUrl: imageUrlToAdd });
+      // On utilise toujours Firestore pour stocker les URLs des images
+      // car c'est plus adapté que la blockchain pour ce type de données
+      await addArticleImageUrl(articleCode, imageUrlToAdd);
+      return json({ success: true, message: 'Image ajoutée avec succès.', imageUrl: imageUrlToAdd });
     } else if (intent === 'delete_image') {
-      await deleteArticleImageUrl(articleId, imageUrl);
-      return json({ success: true, message: 'Image deleted successfully.' });
+      await deleteArticleImageUrl(articleCode, imageUrl);
+      return json({ success: true, message: 'Image supprimée avec succès.' });
     } else {
-      return json({ success: false, error: 'Invalid intent.' }, { status: 400 });
+      return json({ success: false, error: 'Intent invalide.' }, { status: 400 });
     }
   } catch (error: any) {
-    console.error(`[Articles Action] Error processing intent ${intent}:`, error);
+    console.error(`[Articles Action] Erreur lors du traitement de l'intent ${intent}:`, error);
     return json({
       success: false,
-      error: error.message || 'Failed to process image operation.'
+      error: error.message || 'Échec de l\'opération sur l\'image.'
     }, { status: 500 });
   }
 }

@@ -4,7 +4,7 @@ import { useFetcher, Form } from '@remix-run/react'; // Import Form
 import useGeminiSummary from '~/hooks/useGeminiSummary';
 import ReactMarkdown from 'react-markdown';
 import { FaSpinner, FaChevronDown, FaChevronUp, FaTimes, FaBuilding, FaInfoCircle, FaCalendarAlt, FaUserTie, FaPhone, FaMapMarkerAlt, FaCommentDots, FaSave } from 'react-icons/fa'; // Ajouter les icônes nécessaires
-import type { SapTicket, SapTicketStatus } from '~/types/firestore.types'; // Importer SapTicketStatus
+import type { SapTicket } from '~/types/firestore.types'; // Importer SapTicket
 import { Timestamp } from 'firebase/firestore';
 import { convertFirestoreDate, formatFirestoreDate } from '~/utils/dateUtils';
 import { AnimatedTicketSummary } from '~/components/AnimatedTicketSummary';
@@ -27,6 +27,9 @@ interface TicketSAPDetailsProps {
 // Type guard for Firestore string value
 const isFirestoreStringValue = (val: any): val is { stringValue: string } =>
     typeof val === 'object' && val !== null && 'stringValue' in val;
+
+// Ajout du type local SapTicketStatus (non exporté globalement)
+type SapTicketStatus = 'open' | 'pending' | 'closed' | 'rma_request' | 'material_sent' | 'archived';
 
 // Utiliser SapTicketStatus pour le type de retour
 const getInitialSAPStatus = (ticket: SapTicket | null): SapTicketStatus => {
@@ -139,9 +142,9 @@ const TicketSAPDetails: React.FC<TicketSAPDetailsProps> = ({ ticket, onClose, se
     useEffect(() => {
         if (!ticket?.id) return;
         setCurrentStatus(getInitialSAPStatus(ticket));
-        setTechnicianNotes(getStringValueWithFallback(ticket.technicianNotes, ''));
-        setMaterialType(getStringValueWithFallback(ticket.materialType, ''));
-        setMaterialDetails(getStringValueWithFallback(ticket.materialDetails, '')); // Initialize material details
+        setTechnicianNotes((ticket as any).technicianNotes ?? '');
+        setMaterialType((ticket as any).materialType ?? '');
+        setMaterialDetails((ticket as any).materialDetails ?? ''); // Initialize material details
     }, [ticket]); // Simplifier les dépendances
 
     const generationAttempted = useRef<string | null>(null);
@@ -243,240 +246,207 @@ const TicketSAPDetails: React.FC<TicketSAPDetailsProps> = ({ ticket, onClose, se
     const statusStyle = getTicketStatusStyle(currentStatus); // Obtenir le style du statut actuel
 
     const modalContent = (
-        // Appliquer le style de la modale InstallationDetails
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={handleClose}>
-            {/* Utiliser fetcher.Form pour la soumission */}
-            <fetcher.Form method="post" onSubmit={handleFormSubmit} className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative text-white flex flex-col">
-                {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b border-gray-700 sticky top-0 bg-gradient-to-r from-gray-800 to-gray-850 z-10">
-                    <h2 className="text-xl font-semibold text-jdc-blue flex items-center">
-                        <FaBuilding className="mr-2" /> Détails Ticket SAP - {getStringValue(ticket.raisonSociale, 'N/A')} (SAP #{getStringValue(ticket.numeroSAP, 'N/A')})
-                        {isLoadingAction && <FaSpinner className="ml-3 text-jdc-yellow animate-spin" title="Sauvegarde en cours..." />}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-br from-[#0a1120] via-[#1a2250] to-[#1e2746] animate-gradient-x backdrop-blur-2xl font-bold font-jetbrains">
+            <fetcher.Form method="post" onSubmit={handleFormSubmit} onClick={e => e.stopPropagation()} className="relative w-full max-w-3xl max-h-[95vh] overflow-y-auto rounded-3xl shadow-2xl border-2 border-jdc-blue/80 bg-jdc-blue/10 backdrop-blur-xl before:absolute before:inset-0 before:rounded-3xl before:bg-gradient-to-br before:from-jdc-blue/20 before:via-[#1a2250]/40 before:to-[#10182a]/30 before:blur-2xl before:opacity-80 before:-z-10">
+                {/* Header avant-gardiste */}
+                <div className="flex items-center justify-between px-8 py-6 border-b-2 border-jdc-yellow/60 bg-gradient-to-r from-[#10182a]/95 via-[#1a2250]/95 to-[#1e2746]/95 rounded-t-3xl shadow-lg font-bold">
+                    <h2 className="text-3xl font-extrabold text-jdc-yellow drop-shadow-neon tracking-wide select-text font-mono">
+                        {getStringValue(ticket.raisonSociale, 'N/A')}
                     </h2>
-                    <button type="button" onClick={handleClose} className="text-gray-400 hover:text-white transition-colors">
-                        <FaTimes size={20} />
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <span className={`px-4 py-1 rounded-full text-base font-bold border-2 border-jdc-yellow/80 bg-gradient-to-r from-jdc-yellow/90 to-jdc-blue/80 text-[#10182a] animate-pulse shadow-neon`}>{(() => {const label = ticketStatuses.find(s => s.value === currentStatus)?.label;return label || currentStatus;})()}</span>
+                        <button type="button" onClick={handleClose} className="text-jdc-yellow hover:text-jdc-blue text-3xl p-2 rounded-full bg-jdc-blue/10 hover:bg-jdc-yellow/20 shadow-glassy transition-all duration-200 backdrop-blur-md">
+                            <FaTimes />
+                        </button>
+                    </div>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 space-y-6 flex-grow">
-                    {/* Section Informations Ticket */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-start space-x-3">
-                            <FaInfoCircle className="text-jdc-blue mt-1 flex-shrink-0" />
-                            <div>
-                                <p className="font-semibold text-gray-300">Client / Code</p>
-                                <p>{getStringValue(ticket.raisonSociale, 'N/A')} / {getStringValue(ticket.codeClient, 'N/A')}</p>
-                            </div>
-                        </div>
-                         <div className="flex items-start space-x-3">
-                            <FaMapMarkerAlt className="text-jdc-blue mt-1 flex-shrink-0" />
-                            <div>
-                                <p className="font-semibold text-gray-300">Adresse</p>
-                                <p>{getStringValue(ticket.adresse, 'Non trouvé')}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-start space-x-3">
-                            <FaPhone className="text-jdc-blue mt-1 flex-shrink-0" />
-                            <div>
-                                <p className="font-semibold text-gray-300">Téléphone</p>
-                                <p>{getStringValue(ticket.telephone, 'N/A')}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-start space-x-3">
-                            <FaCalendarAlt className="text-jdc-blue mt-1 flex-shrink-0" />
-                            <div>
-                                <p className="font-semibold text-gray-300">Date Ticket</p>
-                                <p>{formatTicketDate(ticket.date)}</p>
-                            </div>
-                        </div>
-                        {ticket.deducedSalesperson && (
-                            <div className="flex items-start space-x-3">
-                                <FaUserTie className="text-jdc-blue mt-1 flex-shrink-0" />
-                                <div>
-                                    <p className="font-semibold text-gray-300">Commercial</p>
-                                    <p>{ticket.deducedSalesperson}</p>
-                                </div>
-                            </div>
-                        )}
-                         <div className="flex items-start space-x-3">
-                            <FaInfoCircle className="text-jdc-blue mt-1 flex-shrink-0" />
-                            <div>
-                                <p className="font-semibold text-gray-300">Secteur</p>
-                                <p>{getStringValue(ticket.secteur, 'N/A')}</p>
-                            </div>
-                        </div>
-                        {/* Ajouter Type, Priorité, Origine si nécessaire */}
+                {/* Infos client en chips */}
+                <div className="flex flex-wrap gap-3 px-8 py-4 border-b border-jdc-yellow/30 bg-gradient-to-r from-[#10182a]/90 to-[#1a2250]/90 rounded-b-xl font-bold">
+                    <div className="flex items-center gap-2 chip-glow group cursor-pointer transition-all">
+                        <FaUserTie className="text-jdc-yellow group-hover:scale-110 group-hover:text-jdc-blue transition-all" />
+                        <span className="px-3 py-1 rounded-full bg-jdc-blue/30 text-jdc-yellow font-semibold shadow-chip">{getStringValue(ticket.client, 'N/A')}</span>
                     </div>
-
-                    <hr className="border-gray-700" />
-
-                    {/* Section Description & AI */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Description */}
-                        <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-700">
-                            <button
-                                type="button"
-                                className="flex items-center justify-between w-full text-left font-bold text-lg text-jdc-yellow focus:outline-none mb-2"
-                                onClick={() => setIsDescriptionOpen(!isDescriptionOpen)}
-                                aria-expanded={isDescriptionOpen}
-                            >
-                                Description du problème
-                                {isDescriptionOpen ? <FaChevronUp /> : <FaChevronDown />}
-                            </button>
-                            {isDescriptionOpen && (
-                                <div className="mt-2 text-white text-sm prose prose-invert max-w-none">
-                                    <ReactMarkdown>{problemDescriptionForAI || '*Aucune description fournie*'}</ReactMarkdown>
-                                </div>
-                            )}
+                    {ticket.codeClient && (
+                        <div className="flex items-center gap-2 chip-glow group cursor-pointer transition-all">
+                            <span className="px-3 py-1 rounded-full bg-jdc-yellow/30 text-jdc-blue font-semibold shadow-chip">{getStringValue(ticket.codeClient)}</span>
                         </div>
-
-                        {/* AI Content */}
-                        <div className="space-y-4">
-                            <AnimatedTicketSummary
-                                ticket={ticket}
-                                summary={generatedSummary}
-                                isLoading={isSummaryLoading}
-                                error={summaryError}
-                            />
-                            <AnimatedSolution
-                                ticket={ticket}
-                                solution={generatedSolution}
-                                isLoading={isSolutionLoading}
-                                error={solutionError}
-                            />
+                    )}
+                    {ticket.deducedSalesperson && (
+                        <div className="flex items-center gap-2 chip-glow group cursor-pointer transition-all">
+                            <FaUserTie className="text-jdc-yellow group-hover:scale-110 group-hover:text-jdc-blue transition-all" />
+                            <span className="px-3 py-1 rounded-full bg-purple-900/40 text-jdc-yellow font-semibold shadow-chip">{getStringValue(ticket.deducedSalesperson)}</span>
                         </div>
+                    )}
+                    <div className="flex items-center gap-2 chip-glow group cursor-pointer transition-all">
+                        <FaMapMarkerAlt className="text-jdc-yellow group-hover:scale-110 group-hover:text-jdc-blue transition-all" />
+                        <span className="px-3 py-1 rounded-full bg-jdc-blue/30 text-jdc-yellow font-semibold shadow-chip">{getStringValue(ticket.adresse, 'N/A')}</span>
                     </div>
-
-                    <hr className="border-gray-700" />
-
-                    {/* Section Actions */}
-                    <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-700 space-y-4">
-                        <h4 className="font-bold text-lg text-jdc-yellow">Actions Ticket</h4>
-
-                        {/* Statut Select */}
-                        <div className="flex items-center space-x-2">
-                             {/* Utiliser une icône dynamique basée sur le statut */}
-                             {/* <StatusIcon className="w-5 h-5 flex-shrink-0" style={{ color: statusStyle.textColor }} /> */}
-                             <label htmlFor="status" className="font-semibold text-gray-300 w-20">Statut:</label>
-                             <select
-                                id="status"
-                                name="status"
-                                value={currentStatus}
-                                onChange={(e) => setCurrentStatus(e.target.value as SapTicketStatus)}
-                                // Combiner les classes statiques et dynamiques
-                                className={`block w-full rounded-md bg-gray-700 border-gray-600 focus:border-jdc-blue focus:ring focus:ring-jdc-blue focus:ring-opacity-50 py-1 pl-2 pr-8 text-sm ${statusStyle.textColor}`}
-                                // Appliquer la couleur via style uniquement si ce n'est pas une classe Tailwind (au cas où)
-                                style={{ color: statusStyle.textColor.startsWith('text-') ? undefined : statusStyle.textColor }}
-                             >
-                                {ticketStatuses.map(statusInfo => (
-                                    <option key={statusInfo.value} value={statusInfo.value}> {/* Enlever l'espace superflu avant > */}
-                                        {statusInfo.label}
-                                    </option>
-                                ))}
-                             </select>
+                    {ticket.telephone && (
+                        <div className="flex items-center gap-2 chip-glow group cursor-pointer transition-all">
+                            <FaPhone className="text-jdc-yellow group-hover:scale-110 group-hover:text-jdc-blue transition-all" />
+                            <span className="px-3 py-1 rounded-full bg-jdc-yellow/30 text-jdc-blue font-semibold shadow-chip">{getStringValue(ticket.telephone)}</span>
                         </div>
-
-                        {/* Notes Technicien */}
-                        <div>
-                            <label htmlFor="technicianNotes" className="block text-sm font-medium text-gray-300 mb-1 flex items-center">
-                                <FaCommentDots className="mr-2 text-jdc-blue" /> Notes Technicien
-                            </label>
-                            <Textarea
-                                id="technicianNotes"
-                                name="technicianNotes"
-                                value={technicianNotes}
-                                onChange={(e) => setTechnicianNotes(e.target.value)}
-                                className="bg-gray-700 text-white border-gray-600 focus:border-jdc-blue focus:ring-jdc-blue w-full"
-                                rows={3}
-                                placeholder="Notes pour résumé AI, clôture, ou suivi..."
-                            />
-                        </div>
-
-                        {/* Matériel (conditionnel) */}
-                        {(currentStatus === 'rma_request' || currentStatus === 'material_sent' || (currentStatus === 'open' && materialType)) && (
-                            <div className="space-y-4 p-3 border border-dashed border-gray-600 rounded-md">
-                                <h5 className="text-sm font-semibold text-gray-400">Détails Matériel</h5>
-                                <div>
-                                    <label htmlFor="materialType" className="block text-sm font-medium text-gray-400 mb-1">Type</label>
-                                    <select
-                                        id="materialType"
-                                        name="materialType"
-                                        value={materialType}
-                                        onChange={(e) => setMaterialType(e.target.value)}
-                                        className="select select-bordered w-full bg-gray-700 text-white border-gray-600 focus:border-jdc-blue focus:ring-jdc-blue rounded-lg text-sm"
-                                    >
-                                        <option value="">-- Sélectionner --</option>
-                                        <option value="RMA">RMA</option>
-                                        <option value="envoi-materiel">Envoi Matériel</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label htmlFor="materialDetails" className="block text-sm font-medium text-gray-400 mb-1">Détails (Réf, Qté...)</label>
-                                    <Textarea
-                                        id="materialDetails"
-                                        name="materialDetails"
-                                        value={materialDetails}
-                                        onChange={(e) => setMaterialDetails(e.target.value)}
-                                        rows={2}
-                                        className="textarea textarea-bordered w-full bg-gray-700 text-white border-gray-600 focus:border-jdc-blue focus:ring-jdc-blue rounded-lg text-sm"
-                                        placeholder="Spécifier le matériel..."
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Bouton de soumission unique */}
-                         <Button
-                            type="submit"
-                            disabled={isLoadingAction}
-                            className="w-full bg-jdc-blue hover:bg-blue-600"
-                         >
-                            {isLoadingAction ? <FaSpinner className="animate-spin mr-2" /> : <FaSave className="mr-2" />}
-                            Mettre à jour le Statut
-                         </Button>
-
-                        {/* Affichage des erreurs/succès */}
-                        {fetcher.data && (
-                            <div className={`mt-4 p-3 rounded-md text-sm ${
-                                hasMessageProperty(fetcher.data)
-                                    ? "bg-green-900 bg-opacity-50 text-green-300 border border-green-700"
-                                    : hasErrorProperty(fetcher.data)
-                                        ? "bg-red-900 bg-opacity-50 text-red-300 border border-red-700"
-                                        : ""
-                            }`}>
-                                {hasMessageProperty(fetcher.data) && fetcher.data.message}
-                                {hasErrorProperty(fetcher.data) && fetcher.data.error}
-                            </div>
-                        )}
+                    )}
+                    <div className="flex items-center gap-2 chip-glow group cursor-pointer transition-all">
+                        <span className="px-3 py-1 rounded-full bg-gradient-to-r from-jdc-blue/40 to-purple-900/40 text-jdc-yellow font-semibold shadow-chip">Secteur : {ticket.secteur || 'N/A'}</span>
                     </div>
+                </div>
 
-                    {/* Tentatives de Contact */}
-                    {ticket.contactAttempts && ticket.contactAttempts.length > 0 && (
-                        <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-700">
-                            <h4 className="font-bold text-lg mb-3 text-jdc-yellow">Tentatives de Contact</h4>
-                            <ul className="space-y-2 text-sm text-gray-300">
-                                {(ticket.contactAttempts || []).map((attempt: { date: Date | null; method: 'email' | 'phone'; success: boolean; }, index: number) => (
-                                    <li key={index} className="flex items-center gap-2">
-                                        <span className="font-medium">{attempt.date ? formatFirestoreDate(attempt.date) : 'N/A'}</span>
-                                        <span>•</span>
-                                        <span>{attempt.method}</span>
-                                        <span>•</span>
-                                        <span className={`font-bold ${attempt.success ? 'text-green-400' : 'text-red-400'}`}>
-                                            {attempt.success ? 'Succès' : 'Échec'}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
+                {/* Description effet terminal dans un tiroir */}
+                <div className="px-8 pt-6">
+                    <button
+                        type="button"
+                        className="flex items-center gap-2 text-jdc-yellow font-bold text-lg mb-2 focus:outline-none focus:ring-2 focus:ring-jdc-yellow/60"
+                        onClick={() => setIsDescriptionOpen(v => !v)}
+                    >
+                        <FaInfoCircle className="text-jdc-yellow animate-pulse" />
+                        <span>Description du problème</span>
+                        {isDescriptionOpen ? (
+                            <FaChevronUp className="ml-2" />
+                        ) : (
+                            <FaChevronDown className="ml-2" />
+                        )}
+                    </button>
+                    {isDescriptionOpen && (
+                        <div className="border-b-2 border-jdc-yellow/30 bg-gradient-to-br from-[#10182a]/95 via-[#1a2250]/95 to-[#1e2746]/95 rounded-xl mt-2 shadow-inner-terminal font-mono text-base text-jdc-yellow relative overflow-hidden font-bold p-6 animate-fade-in-up">
+                            <div className="relative">
+                                <span className="absolute right-0 top-0 animate-terminal-cursor text-jdc-yellow text-lg">▍</span>
+                                <span className="whitespace-pre-line text-jdc-yellow/90">
+                                    {getStringValue(ticket.demandeSAP, '') || getStringValue(ticket.descriptionProbleme, '') || getStringValue(ticket.description, '') || 'Aucune description.'}
+                                </span>
+                            </div>
                         </div>
                     )}
                 </div>
 
-                {/* Footer (peut rester simple ou être retiré si le bouton est dans le body) */}
-                 <div className="p-4 border-t border-gray-700 flex justify-end space-x-3 sticky bottom-0 bg-gradient-to-r from-gray-800 to-gray-850">
-                    {/* Le bouton de sauvegarde est maintenant dans le formulaire */}
-                    <Button type="button" onClick={handleClose} variant="secondary" disabled={isLoadingAction}>Fermer</Button>
-                 </div>
+                {/* Résumé/Solution IA avant-gardiste */}
+                {(generatedSummary || generatedSolution) && (
+                    <div className="px-8 py-6 border-b-2 border-jdc-yellow/30 bg-gradient-to-br from-[#0e1a2b]/95 via-[#1a2250]/95 to-[#1e2746]/95 rounded-xl mt-4 shadow-xl relative overflow-hidden font-bold">
+                        <div className="absolute inset-0 pointer-events-none z-0">
+                            {/* Micro-icônes circuit ou effet scan en SVG ou divs animées ici si besoin */}
+                        </div>
+                        {generatedSummary && (
+                            <div className="mb-6 p-5 rounded-2xl border-2 border-jdc-blue/80 bg-gradient-to-br from-[#10182a]/90 to-[#1a2250]/90 shadow-xl flex items-start gap-4 relative z-10 animate-fade-in-up">
+                                <span className="bg-jdc-yellow/90 text-jdc-blue font-bold px-3 py-1 rounded-full text-base mr-2 animate-pulse-glow shadow-chip">AI</span>
+                                <div className="flex-1 text-white text-lg font-mono">
+                                    <AnimatedTicketSummary
+                                        ticket={ticket}
+                                        summary={generatedSummary}
+                                        isLoading={isSummaryLoading}
+                                        error={summaryError}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        {generatedSolution && (
+                            <div className="p-5 rounded-2xl border-2 border-green-400/80 bg-gradient-to-br from-green-900/90 to-blue-900/90 shadow-xl flex items-start gap-4 relative z-10 animate-fade-in-up">
+                                <span className="bg-green-400/90 text-green-900 font-bold px-3 py-1 rounded-full text-base mr-2 animate-pulse-glow shadow-chip">AI</span>
+                                <div className="flex-1 text-green-200 text-lg font-mono">
+                                    <AnimatedSolution
+                                        ticket={ticket}
+                                        solution={generatedSolution}
+                                        isLoading={isSolutionLoading}
+                                        error={solutionError}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Actions avant-gardistes */}
+                <div className="px-8 py-10 border-b-2 border-jdc-yellow/30 bg-gradient-to-br from-[#10182a]/95 via-[#1a2250]/95 to-[#1e2746]/95 rounded-xl mt-6 flex flex-col gap-8 shadow-xl font-bold text-lg min-h-[180px]">
+                    <div className="w-full">
+                        <label className="block text-xl font-bold text-jdc-yellow mb-2 tracking-wider">Statut du ticket</label>
+                        <select
+                            name="status"
+                            value={currentStatus}
+                            onChange={e => setCurrentStatus(e.target.value as SapTicketStatus)}
+                            className="block w-full rounded-2xl bg-gradient-to-r from-jdc-blue/80 to-gray-900/80 border-2 border-jdc-yellow/40 focus:border-jdc-yellow focus:ring focus:ring-jdc-yellow/40 text-jdc-yellow py-5 pl-6 pr-12 text-2xl shadow focus:shadow-neon transition-all duration-200 font-mono font-bold min-h-[60px] appearance-none custom-select-menu"
+                            disabled={isLoadingAction}
+                        >
+                            {ticketStatuses.map(s => (
+                                <option key={s.value} value={s.value}>{s.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="w-full">
+                        <label className="block text-xl font-bold text-jdc-yellow mb-2 tracking-wider">Notes technicien</label>
+                        <Textarea
+                            name="technicianNotes"
+                            value={technicianNotes}
+                            onChange={e => setTechnicianNotes(e.target.value)}
+                            className="bg-gradient-to-r from-[#10182a] via-[#1a2250] to-[#0a1120] text-jdc-yellow border-4 border-jdc-yellow/70 rounded-2xl w-full text-2xl font-mono font-bold focus:shadow-neon focus:border-jdc-yellow transition-all duration-200 min-h-[160px] py-6 px-7 text-[1.35rem] outline-none ring-2 ring-jdc-yellow/30 focus:ring-jdc-yellow/60"
+                            disabled={isLoadingAction}
+                            placeholder="Ajouter une note technique..."
+                        />
+                    </div>
+                </div>
+                {(currentStatus === 'rma_request' || currentStatus === 'material_sent') && (
+                    <div className="px-8 py-6 border-b-2 border-jdc-yellow/30 bg-gradient-to-br from-[#10182a]/95 via-[#1a2250]/95 to-[#1e2746]/95 rounded-xl mt-4 flex flex-col md:flex-row md:gap-8 gap-4 shadow-xl font-bold">
+                        <div className="flex-1">
+                            <label className="block text-base font-bold text-jdc-yellow mb-1 tracking-wider">Type de matériel</label>
+                            <Input
+                                name="materialType"
+                                value={materialType}
+                                onChange={e => setMaterialType(e.target.value)}
+                                className="bg-gradient-to-r from-gray-900/80 to-jdc-blue/80 text-jdc-yellow border-2 border-jdc-yellow/40 rounded-xl w-full text-lg font-mono focus:shadow-neon focus:border-jdc-yellow transition-all duration-200"
+                                disabled={isLoadingAction}
+                                placeholder="Ex : Box, TPE, etc."
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-base font-bold text-jdc-yellow mb-1 tracking-wider">Détails matériel</label>
+                            <Input
+                                name="materialDetails"
+                                value={materialDetails}
+                                onChange={e => setMaterialDetails(e.target.value)}
+                                className="bg-gradient-to-r from-gray-900/80 to-jdc-blue/80 text-jdc-yellow border-2 border-jdc-yellow/40 rounded-xl w-full text-lg font-mono focus:shadow-neon focus:border-jdc-yellow transition-all duration-200"
+                                disabled={isLoadingAction}
+                                placeholder="Numéro de série, accessoires, etc."
+                            />
+                        </div>
+                    </div>
+                )}
+                <div className="px-8 py-6 flex justify-end bg-transparent font-bold">
+                    <Button
+                        type="submit"
+                        variant="glass"
+                        size="lg"
+                        isLoading={isLoadingAction}
+                        className="text-jdc-yellow border-jdc-yellow hover:bg-jdc-yellow hover:text-gray-900 neon-btn shadow-neon px-8 py-3 text-xl font-bold font-mono tracking-widest rounded-2xl transition-all duration-200"
+                    >
+                        <FaSave className="mr-3 animate-pulse-glow" />Enregistrer
+                    </Button>
+                </div>
+
+                {/* Timeline/historique avant-gardiste */}
+                {ticket.contactAttempts && ticket.contactAttempts.length > 0 && (
+                    <div className="px-8 py-6 bg-gradient-to-br from-[#10182a]/95 via-[#1a2250]/95 to-[#1e2746]/95 rounded-b-3xl mt-4 shadow-xl font-bold">
+                        <div className="font-bold text-jdc-yellow mb-4 flex items-center gap-3 text-lg tracking-wider"><FaCommentDots className="text-jdc-yellow animate-pulse" /> Historique des contacts</div>
+                        <div className="relative pl-6">
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-jdc-yellow/60 to-jdc-blue/60 rounded-full animate-gradient-y" />
+                            <ul className="space-y-6">
+                                {ticket.contactAttempts.map((attempt, idx) => (
+                                    <li key={idx} className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-2 group">
+                                        <span className="absolute -left-6 top-2 w-4 h-4 rounded-full bg-gradient-to-br from-jdc-yellow/80 to-jdc-blue/80 border-2 border-white shadow-neon animate-pulse-glow" />
+                                        <div className="flex items-center gap-2 text-xs text-jdc-yellow min-w-[110px] font-mono">
+                                            <FaCalendarAlt className="text-jdc-yellow" />
+                                            <span>{formatTicketDate(attempt.date)}</span>
+                                        </div>
+                                        <div className="flex-1 text-sm text-white font-mono bg-gradient-to-r from-jdc-blue/40 to-gray-900/40 rounded-xl px-4 py-2 shadow-inner-terminal group-hover:scale-[1.02] transition-transform duration-200">
+                                            {attempt.notes}
+                                        </div>
+                                        <div className="text-xs font-bold px-3 py-1 rounded-full border-2 border-jdc-yellow/40 bg-jdc-yellow/20 text-jdc-yellow-200 min-w-[80px] text-center shadow-chip group-hover:scale-110 transition-transform duration-200">
+                                            {attempt.outcome}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
             </fetcher.Form>
         </div>
     );
@@ -484,7 +454,19 @@ const TicketSAPDetails: React.FC<TicketSAPDetailsProps> = ({ ticket, onClose, se
     if (!isClient) return null;
     const portalRoot = document.getElementById('modal-root');
     if (!portalRoot) { console.error("Modal root element #modal-root not found."); return null; }
-    return ReactDOM.createPortal(modalContent, portalRoot);
+    return ReactDOM.createPortal(
+        <>
+            {modalContent}
+            <style>{`
+                select.custom-select-menu option {
+                    background: #000 !important;
+                    color: #ffe600 !important;
+                    font-weight: bold;
+                }
+            `}</style>
+        </>,
+        portalRoot
+    );
 };
 
 export default TicketSAPDetails;

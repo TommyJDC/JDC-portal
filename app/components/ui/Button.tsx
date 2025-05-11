@@ -1,12 +1,9 @@
 import React from 'react';
 import { Link, type LinkProps } from '@remix-run/react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'link' | 'outline';
-type ButtonSize = 'sm' | 'md' | 'lg' | 'icon'; // Ajout de la taille 'icon' si nécessaire
-
 interface ButtonBaseProps {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'link' | 'outline' | 'glass';
+  size?: 'sm' | 'md' | 'lg' | 'icon'; // Ajout de la taille 'icon' si nécessaire
   isLoading?: boolean;
   disabled?: boolean;
   leftIcon?: React.ReactElement;
@@ -28,40 +25,51 @@ interface LinkElementProps extends ButtonBaseProps, Omit<LinkProps, 'children' |
   to: LinkProps['to']; // 'to' is required for 'link'
 }
 
-type ButtonProps = ButtonElementProps | LinkElementProps;
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'link' | 'outline' | 'glass';
+  size?: 'sm' | 'md' | 'lg' | 'icon';
+  isLoading?: boolean;
+  disabled?: boolean;
+  leftIcon?: React.ReactElement;
+  rightIcon?: React.ReactElement;
+  children: React.ReactNode;
+  className?: string;
+}
 
 // Added active:scale-95 and transition-transform for click animation
 const baseStyles = "inline-flex items-center justify-center font-semibold rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-jdc-black transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed transition-transform duration-100 ease-in-out active:scale-95";
 
-const variantStyles: Record<ButtonVariant, string> = {
-  primary: "bg-jdc-yellow text-jdc-black hover:bg-yellow-300 focus:ring-jdc-yellow",
-  secondary: "bg-jdc-card text-jdc-gray-300 border border-jdc-gray-800 hover:bg-jdc-gray-800 focus:ring-jdc-gray-400",
-  danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
-  ghost: "bg-transparent text-jdc-gray-300 hover:bg-jdc-gray-800 focus:ring-jdc-gray-400",
-  link: "text-primary underline-offset-4 hover:underline", // Style pour la variante 'link'
-  outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground", // Style pour la variante 'outline'
+const variantClasses: Record<string, string> = {
+  primary: 'bg-jdc-yellow text-gray-900 hover:bg-yellow-400 hover:text-black',
+  secondary: 'bg-white/10 text-jdc-blue border border-jdc-blue hover:bg-jdc-blue hover:text-white',
+  danger: 'bg-red-600 text-white hover:bg-red-700',
+  glass: 'bg-white/20 backdrop-blur-md text-white border border-white/30 hover:bg-white/30',
+  ghost: 'bg-transparent text-jdc-gray-300 hover:bg-jdc-gray-800 focus:ring-jdc-gray-400',
+  link: 'text-primary underline-offset-4 hover:underline',
+  outline: '',
 };
 
-const sizeStyles: Record<ButtonSize, string> = {
-  sm: "h-9 px-3", // Ajusté pour inclure la hauteur
-  md: "h-10 px-4 py-2", // Ajusté pour inclure la hauteur
-  lg: "h-11 px-8", // Ajusté pour inclure la hauteur
-  icon: "h-10 w-10", // Style pour la taille 'icon'
+const sizeStyles: Record<string, string> = {
+  sm: 'px-3 py-1.5 text-sm',
+  md: 'px-5 py-2 text-base',
+  lg: 'px-7 py-3 text-lg',
+  icon: 'p-2 text-base',
 };
 
-export const Button: React.FC<ButtonProps> = ({
-  as = 'button',
+export const Button = ({
   variant = 'primary',
   size = 'md',
-  isLoading = false,
-  disabled = false,
+  className = '',
   leftIcon,
   rightIcon,
+  isLoading = false,
   children,
-  className = '',
+  as = 'button',
   ...props
-}) => {
-  const combinedClassName = `${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`;
+}: ButtonProps & { as?: keyof JSX.IntrinsicElements }) => {
+  const safeVariant = variant as keyof typeof variantClasses;
+  const safeSize = size as keyof typeof sizeStyles;
+  const combinedClassName = `${baseStyles} ${(variantClasses[safeVariant] || variantClasses['primary'])} ${(sizeStyles[safeSize] || sizeStyles['md'])} ${className}`;
 
   const content = (
     <>
@@ -94,8 +102,8 @@ export const Button: React.FC<ButtonProps> = ({
         preventScrollReset={preventScrollReset}
         relative={relative}
         className={combinedClassName}
-        aria-disabled={disabled || isLoading}
-        // onClick={(e) => (disabled || isLoading) && e.preventDefault()} // Prevent navigation if disabled
+        aria-disabled={props.disabled || isLoading}
+        // onClick={(e) => (props.disabled || isLoading) && e.preventDefault()} // Prevent navigation if disabled
         {...restLinkProps} // Pass remaining valid LinkProps
       >
         {content}
@@ -110,7 +118,7 @@ export const Button: React.FC<ButtonProps> = ({
     <button
       type={type}
       className={combinedClassName}
-      disabled={disabled || isLoading}
+      disabled={props.disabled || isLoading}
       onClick={onClick}
       {...restButtonProps} // Pass remaining valid button attributes
     >

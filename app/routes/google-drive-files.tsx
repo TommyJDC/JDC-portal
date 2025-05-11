@@ -1,8 +1,8 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, Link } from "@remix-run/react";
-import { authenticator } from "~/services/auth.server";
-import type { UserSession } from "~/services/session.server";
+// import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
+import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Importer pour session manuelle
 
 // Define the expected structure of the Google Drive API response (simplified)
 interface GoogleDriveFile {
@@ -26,23 +26,26 @@ interface GoogleDriveFilesListResponse {
 // Loader function to fetch files from Google Drive
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Ensure the user is authenticated
-  const userSession = await authenticator.isAuthenticated(request);
-  if (!userSession) {
+  const session = await sessionStorage.getSession(request.headers.get("Cookie"));
+  const userSession: UserSessionData | null = session.get("user") ?? null;
+
+  if (!userSession || !userSession.userId) {
     // Redirect to login or homepage if not authenticated
-    // Maybe add a message indicating why they were redirected
-    return redirect("/?error=unauthenticated");
+    return redirect("/login?error=unauthenticated_drive_access");
   }
 
-  const accessToken = userSession.googleAccessToken;
+  // IMPORTANT: UserSessionData ne contient pas googleAccessToken par défaut.
+  // Il contient googleRefreshToken. Si googleAccessToken est nécessaire,
+  // il faudrait l'ajouter à UserSessionData et le stocker lors de la connexion.
+  // Pour l'instant, on suppose qu'il pourrait être ajouté à UserSessionData.
+  const accessToken = (userSession as any).googleAccessToken; // Cast temporaire
 
   if (!accessToken) {
     // This might happen if the token expired and we haven't implemented refresh logic yet,
     // or if it wasn't obtained correctly during login.
     console.error("[google-drive-files Loader] No access token found in session.");
     // For now, redirect to re-authenticate. Later, implement refresh token logic.
-    // You might want a specific error page or message.
-    // Consider destroying the session here? authenticator.logout(request, { redirectTo: "/auth/google" });
-    return redirect("/auth/google?error=token_missing"); // Force re-auth
+    return redirect("/login?error=token_missing_drive"); // Rediriger vers /login
   }
 
   console.log("[google-drive-files Loader] Access token found. Fetching Drive files...");
@@ -65,8 +68,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       // Specific check for invalid credentials (token expired/revoked)
       if (response.status === 401) {
          // Token is likely invalid/expired. Redirect to re-authenticate.
-         // Consider destroying the session here? authenticator.logout(request, { redirectTo: "/auth/google" });
-         return redirect("/auth/google?error=token_invalid");
+         return redirect("/login?error=token_invalid_drive"); // Rediriger vers /login
       }
       // Throw a generic error for other API issues
       throw new Error(`Google Drive API request failed: ${response.statusText}`);
@@ -103,8 +105,8 @@ export default function GoogleDriveFiles() {
           <p className="font-semibold">Erreur lors de la récupération des fichiers :</p>
           <p>{error}</p>
           <p className="mt-2 text-sm">Cela peut être dû à un jeton expiré ou à des permissions insuffisantes. Essayez de vous reconnecter via Google.</p>
-           <Link to="/auth/google" className="text-jdc-yellow hover:underline font-semibold mt-1 block">
-             Se reconnecter avec Google
+           <Link to="/login" className="text-jdc-yellow hover:underline font-semibold mt-1 block">
+             Se reconnecter
            </Link>
         </div>
       )}

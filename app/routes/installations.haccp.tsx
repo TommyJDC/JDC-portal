@@ -1,148 +1,118 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Link, useFetcher } from "@remix-run/react";
+import React from "react";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node"; // Ajout de ActionFunctionArgs
+import { json } from "@remix-run/node";
+import { useLoaderData, Link, useFetcher, useOutletContext } from "@remix-run/react"; // Ajout de useFetcher
 import { authenticator } from "~/services/auth.server";
-import { 
-  getInstallationsBySector, 
-  updateInstallation,
-  deleteInstallation,
-  bulkUpdateInstallations,
-  getAllShipments // Importer la fonction pour récupérer les envois
-} from "~/services/firestore.service.server";
-import { useState } from "react"; // useEffect et useMemo ne sont plus nécessaires ici
-// Remplacer InstallationHACCPTile par InstallationListItem et InstallationDetails
-import InstallationListItem from "~/components/InstallationListItem"; 
-import InstallationDetails from "~/components/InstallationDetails"; 
-import type { Installation, Shipment } from "~/types/firestore.types"; // Importer Shipment
-import { formatFirestoreDate } from "~/utils/dateUtils"; // Importer la fonction de formatage
-import { COLUMN_MAPPINGS } from "~/routes/api.sync-installations"; // Importer les mappings
+import { getInstallationsBySector } from "~/services/firestore.service.server";
+import InstallationListItem from "~/components/InstallationListItem";
+import InstallationDetails from "~/components/InstallationDetails";
+import type { Installation } from "~/types/firestore.types";
+import type { UserSession } from "~/services/session.server";
+import { useState } from 'react';
+import { toast } from "react-hot-toast";
+
+type OutletContextType = {
+  user: UserSession | null;
+};
 
 interface ActionData {
   success?: boolean;
   error?: string;
+  installationId?: string;
+  _action?: string;
 }
 
-// Plus besoin de ProcessedInstallationHACCP, on utilise Installation directement
+import { updateInstallation } from "~/services/firestore.service.server"; // Importer la fonction de mise à jour
 
-// Le loader retourne directement des Installations
-interface LoaderData {
-  installations: Installation[]; 
-  error?: string;
-}
-
-// Action pour la sauvegarde
-export const action = async ({ request }: ActionFunctionArgs): Promise<Response> => {
-  const session = await authenticator.isAuthenticated(request);
-  if (!session) {
-    return json({ error: "Non authentifié" }, { status: 401 });
-  }
-
+export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
-  const id = formData.get("id");
-  const updates = JSON.parse(formData.get("updates") as string);
+  const installationId = formData.get("installationId") as string;
+  const updates = JSON.parse(formData.get("updates") as string) as Partial<Installation>;
 
-  if (!id || !updates) {
-    return json({ error: "Données manquantes" }, { status: 400 });
+  if (!installationId || !updates) {
+    return json({ success: false, error: "Données manquantes pour la mise à jour." }, { status: 400 });
   }
 
   try {
-    await updateInstallation(id as string, updates);
-    return json({ success: true });
+    await updateInstallation(installationId, updates);
+    return json({ success: true, installationId });
   } catch (error: any) {
-    console.error("[installations.haccp Action] Error:", error);
-    return json({ error: error.message }, { status: 500 });
+    return json({ success: false, error: error.message || "Erreur lors de la mise à jour de l'installation." }, { status: 500 });
   }
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const session = await authenticator.isAuthenticated(request);
-  if (!session) {
-    return redirect("/?error=unauthenticated");
-  }
-
   try {
-    // 1. Récupérer tous les envois
-    const allShipments = await getAllShipments();
-    
-    // 2. Créer un Set des codeClient pour le secteur 'haccp'
-    const haccpShipmentClientCodes = new Set<string>();
-    allShipments.forEach((shipment: Shipment) => {
-      if (shipment.secteur?.toLowerCase() === 'haccp' && shipment.codeClient) {
-        haccpShipmentClientCodes.add(shipment.codeClient);
-      }
-    });
-
-    // 3. Récupérer les installations HACCP
-    const installationsRaw = await getInstallationsBySector('haccp');
-    const sector = 'haccp';
-    const sectorMapping = COLUMN_MAPPINGS[sector];
-
-    // 4. Mapper les données brutes au type Installation standard
-    const installations: Installation[] = installationsRaw.map(installation => {
-      const data = installation as any; // Utiliser 'any' temporairement
-
-      return {
-        id: installation.id, 
-        codeClient: data.codeClient || '',
-        nom: data.nom || '',
-        ville: data.ville || '',
-        contact: data.contact || '', 
-        telephone: data.telephone || '', 
-        commercial: data.commercial || '',
-        tech: data.tech || '', 
-        // status: data.status || '', // Supprimer cette ligne dupliquée
-        commentaire: data.commentaire || '',
-
-        // Champs spécifiques HACCP (non inclus dans le type Installation de base)
-        // dateSignatureCde: data.dateSignatureCde ? formatFirestoreDate(data.dateSignatureCde) : undefined, 
-        // dateCdeMateriel: data.dateCdeMateriel ? formatFirestoreDate(data.dateCdeMateriel) : undefined, 
-        // materielPreParametrage: data.materielPreParametrage || '',
-        // dossier: data.dossier || '',
-        // materielLivre: data.materielLivre || '',
-        // numeroColis: data.numeroColis || '',
-        // commentaireInstall: data.commentaireInstall || '',
-        // identifiantMotDePasse: data.identifiantMotDePasse || '',
-        // numerosSondes: data.numerosSondes || '',
-        // install: data.install || 'Non', 
-
-        // Champs traités pour correspondre à Installation
-        dateInstall: data.dateInstall ? formatFirestoreDate(data.dateInstall) : undefined, 
-        status: (data.status || 'À planifier') as Installation['status'], // Valeur par défaut et cast
-        hasCTN: haccpShipmentClientCodes.has(data.codeClient), // Ajouter la logique hasCTN
-        secteur: 'haccp', // Ajouter le secteur
-      };
-    });
-
-    return json<LoaderData>({ installations });
+    // Récupérer les installations depuis Firestore
+    const installations = await getInstallationsBySector('haccp'); // Modifié en minuscules
+    return json<{ installations: Installation[] }>({ installations });
   } catch (error: any) {
-    console.error("[installations.haccp Loader] Error:", error);
-    return json<LoaderData>({ 
+    return json<{ installations: Installation[]; error: string }>({
       installations: [],
-      error: error.message || "Erreur lors du chargement des installations HACCP." 
-    }, { status: 500 });
+      error: error.message || "Erreur lors du chargement des installations HACCP depuis Firestore."
+    });
   }
 };
 
-// --- Component ---
 export default function HACCPInstallations() {
-  const { installations, error } = useLoaderData<LoaderData>(); // Utiliser LoaderData qui contient Installation[]
-  const fetcher = useFetcher<ActionData>();
+  const { user } = useOutletContext<OutletContextType>();
+  const { installations, error } = useLoaderData<{ installations: Installation[]; error: string }>();
+  const fetcher = useFetcher<ActionData>(); // Ajout du fetcher
   const [searchTerm, setSearchTerm] = useState(''); 
-  const [isModalOpen, setIsModalOpen] = useState(false); // État pour la modale
-  const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null); // État pour l'installation sélectionnée
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
 
-  const handleSave = async (id: string, updates: Partial<Installation>) => {
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#1a2250] to-[#1e2746] p-6 font-bold font-jetbrains">
+        <h1 className="text-3xl font-extrabold text-jdc-yellow drop-shadow-neon mb-4">Installations HACCP</h1>
+        <div className="bg-[#10182a] p-6 rounded-xl shadow-xl border-2 border-jdc-yellow/20 text-center">
+          <p className="text-jdc-yellow-200 mb-4">Vous devez être connecté pour accéder aux installations HACCP.</p>
+          <Link 
+            to="/auth/google" 
+            className="inline-block bg-gradient-to-r from-jdc-blue to-jdc-blue-dark px-6 py-3 rounded-lg font-bold text-white shadow-lg hover:scale-105 transition-transform"
+          >
+            Se connecter avec Google
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSave = async (updatedInstallation: Partial<Installation>) => {
+    if (!selectedInstallation) return;
+
+    const updatesToSubmit: Partial<Installation> = {
+      dateInstall: updatedInstallation.dateInstall,
+      tech: updatedInstallation.tech,
+      status: updatedInstallation.status,
+      commentaire: updatedInstallation.commentaire,
+    };
+
     fetcher.submit(
-      {
-        id,
-        updates: JSON.stringify(updates)
+      { 
+        installationId: selectedInstallation.id, 
+        updates: JSON.stringify(updatesToSubmit),
+        _action: "updateInstallation"
       },
       { method: "post" }
     );
+    handleCloseModal(); 
+    toast.success("Mise à jour en cours..."); 
   };
 
-  // Filtrer les installations en fonction du terme de recherche
+  const handleInstallationClick = (installation: Installation) => {
+    setSelectedInstallation(installation);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedInstallation(null);
+  };
+
   const filteredInstallations = installations.filter(installation => {
+    if (!searchTerm.trim()) return true;
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     return (
       (installation.nom && installation.nom.toLowerCase().includes(lowerCaseSearchTerm)) ||
@@ -156,65 +126,50 @@ export default function HACCPInstallations() {
     );
   });
 
-  const handleInstallationClick = (installation: Installation) => {
-    setSelectedInstallation(installation);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedInstallation(null);
-  };
-
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-white">Installations HACCP</h1>
-
-      <Link to="/dashboard" className="text-jdc-blue hover:underline">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#1a2250] to-[#1e2746] p-6 font-bold font-jetbrains">
+      <h1 className="text-3xl font-extrabold text-jdc-yellow drop-shadow-neon mb-4">Installations HACCP</h1>
+      <Link to="/dashboard" className="text-jdc-blue font-bold hover:text-jdc-yellow transition-colors hover:underline drop-shadow-neon">
         &larr; Retour au Tableau de Bord
       </Link>
-
-      {/* Champ de recherche */}
-      <div className="mb-4">
+      <div className="mb-4 mt-4">
         <input
           type="text"
           placeholder="Rechercher par nom, code client, ville, contact, téléphone, commercial, technicien ou commentaire..."
-          className="w-full px-3 py-2 bg-black text-white font-bold border rounded-md focus:outline-none focus:ring focus:border-blue-300"
+          className="w-full px-4 py-3 bg-[#10182a] text-jdc-yellow font-bold border-2 border-jdc-yellow/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-jdc-yellow/60 text-lg font-jetbrains placeholder-jdc-yellow/40"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-
       {error && (
-        <div className="bg-red-900 bg-opacity-50 text-red-300 p-4 rounded-md">
-          <p className="font-semibold">Erreur :</p>
+        <div className="bg-red-900/80 text-jdc-yellow p-4 rounded-xl font-bold shadow-xl">
+          <p className="font-bold">Erreur :</p>
           <p>{error}</p>
         </div>
       )}
-
       {!error && filteredInstallations.length > 0 && (
-        <div className="space-y-4"> {/* Rétablir l'affichage en liste verticale */}
+        <div className="space-y-4 mt-4">
           {filteredInstallations.map((installation) => (
             <InstallationListItem 
               key={installation.id}
               installation={installation}
               onClick={handleInstallationClick} 
-              hasCTN={installation.hasCTN} 
+              hasCTN={installation.hasCTN ?? false}
             />
           ))}
         </div>
       )}
-
       {!error && filteredInstallations.length === 0 && (
-        <p className="text-jdc-gray-400">Aucune installation HACCP à afficher.</p>
+        <div className="bg-[#10182a] p-6 rounded-xl shadow-xl border-2 border-jdc-yellow/20 mt-4 text-center">
+          <p className="text-jdc-yellow-200 font-bold">Aucune installation HACCP à afficher.</p>
+          {searchTerm && <p className="text-jdc-yellow-200 mt-2">Essayez avec d'autres termes de recherche.</p>}
+        </div>
       )}
-
-      {/* Modale de détails */}
       {isModalOpen && selectedInstallation && (
         <InstallationDetails
           installation={selectedInstallation}
           onClose={handleCloseModal}
-          onSave={handleSave} // Passer la fonction handleSave
+          onSave={() => handleSave(selectedInstallation)}
         />
       )}
     </div>

@@ -7,12 +7,13 @@ import { Label } from "~/components/ui/Label"; // Chemin corrigé
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/Select"; // Chemin corrigé + imports spécifiques
 import { Switch } from "~/components/ui/Switch"; // Ajout du Switch
 import { DriveFilePicker } from "~/components/DriveFilePicker"; // Import du composant Picker
-import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node"; // Import pour les actions/loaders Remix
+import { json, type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/node"; // Ajout de redirect
 import { saveHeuresDraft, getHeuresDraft } from "~/services/firestore.service.server";
 import { getISOWeekNumber } from "~/utils/dateUtils";
-import { authenticator } from "~/services/auth.server"; // Pour obtenir l'utilisateur connecté
+// import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
+import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Importer pour session manuelle
 import { useLoaderData } from "@remix-run/react"; // Pour récupérer les données du loader
-import { updateHeuresSheet } from "~/services/sheets.service.server"; // Import de la fonction de mise à jour Sheets
+import { updateHeuresSheet } from "~/services/sheets.service.server";
 import { sendHeuresEmail } from "~/services/gmail.service.server"; // Import de la fonction d'envoi d'email
 
 // TODO: Implémenter la logique de soumission (Update Sheet + Email)
@@ -73,16 +74,24 @@ const initializeMonthData = () => {
 
 // Action Remix pour gérer les requêtes POST (sauvegarde brouillon, soumission)
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login", // Rediriger si non authentifié
-  });
+  const sessionCookie = request.headers.get("Cookie");
+  const sessionStore = await sessionStorage.getSession(sessionCookie);
+  const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
+
+  if (!userSession || !userSession.userId) {
+    // Pour une action, retourner une erreur JSON est souvent préférable à une redirection.
+    return json({ success: false, error: "Non authentifié." }, { status: 401 });
+  }
 
   const body = await request.json();
-  const { action, fileId, data, sendEmail } = body; // Récupérer sendEmail du body
+  const { action, fileId, data, sendEmail } = body;
 
   // Utiliser l'ID utilisateur de la session authentifiée
-  const userId = user.userId;
-  const accessToken = user.googleAccessToken; // Récupérer le token d'accès
+  const userId = userSession.userId;
+  // IMPORTANT: UserSessionData ne contient pas googleAccessToken par défaut.
+  // Il contient googleRefreshToken. Si googleAccessToken est nécessaire,
+  // il faudrait l'ajouter à UserSessionData et le stocker lors de la connexion.
+  const accessToken = (userSession as any).googleAccessToken; // Cast temporaire
 
   if (action === "saveDraft") {
     if (!userId || !fileId || !data) {
@@ -152,23 +161,26 @@ export async function action({ request }: ActionFunctionArgs) {
 
 // Loader Remix pour charger les données initiales (utilisateur, brouillon existant)
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login", // Rediriger si non authentifié
-  });
+  const sessionCookie = request.headers.get("Cookie");
+  const sessionStore = await sessionStorage.getSession(sessionCookie);
+  const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
+
+  if (!userSession || !userSession.userId) {
+    // Rediriger si non authentifié
+    // Note: authenticator le faisait avec failureRedirect. Ici, il faut le faire explicitement.
+    throw redirect("/login"); 
+  }
 
   let draft = null;
   // Tenter de charger un brouillon existant pour cet utilisateur et le mois actuel
-  if (user.userId) {
-    // Pour l'instant, on utilise le mois actuel comme partie de l'ID du brouillon
-    // Cela suppose que chaque utilisateur a un brouillon par mois.
-    const currentMonthName = months[new Date().getMonth()];
-    const draftId = `${user.userId}_${currentMonthName}`; // Exemple d'ID de brouillon
-    draft = await getHeuresDraft(user.userId, draftId); // Utiliser la fonction getHeuresDraft
-    console.log(`Tentative de chargement du brouillon pour ${user.userId} et ${currentMonthName}:`, draft);
-  }
+  // userSession.userId est garanti d'exister ici.
+  const currentMonthName = months[new Date().getMonth()];
+  const draftId = `${userSession.userId}_${currentMonthName}`; // Exemple d'ID de brouillon
+  draft = await getHeuresDraft(userSession.userId, draftId); 
+  console.log(`Tentative de chargement du brouillon pour ${userSession.userId} et ${currentMonthName}:`, draft);
 
-
-  return json({ user, draft });
+  // Retourner userSession (qui est UserSessionData) au lieu de l'ancien objet user de l'authenticator
+  return json({ user: userSession, draft });
 }
 
 

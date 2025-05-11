@@ -16,7 +16,7 @@ export const getNotifications = async (userId: string) => {
     const db = await ensureDb();
     const notificationsRef = db.collection('notifications')
       .where('userId', '==', userId)
-      .orderBy('timestamp', 'desc')
+      .orderBy('createdAt', 'desc') // Utiliser createdAt pour le tri, si timestamp n'existe pas/plus
       .limit(50);
 
     const snapshot = await notificationsRef.get();
@@ -34,7 +34,7 @@ export const markNotificationAsRead = async (notificationId: string) => {
   try {
     const db = await ensureDb();
     await db.collection('notifications').doc(notificationId).update({
-      read: true
+      isRead: true // Utiliser isRead
     });
     return true;
   } catch (error) {
@@ -49,11 +49,11 @@ export const markAllNotificationsAsRead = async (userId: string) => {
     const batch = db.batch();
     const notificationsRef = await db.collection('notifications')
       .where('userId', '==', userId)
-      .where('read', '==', false)
+      .where('isRead', '==', false) // Utiliser isRead
       .get();
 
     notificationsRef.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
-      batch.update(doc.ref, { read: true });
+      batch.update(doc.ref, { isRead: true }); // Utiliser isRead
     });
 
     await batch.commit();
@@ -64,13 +64,13 @@ export const markAllNotificationsAsRead = async (userId: string) => {
   }
 };
 
-export const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
+export const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => { // Omettre isRead
   try {
     const db = await ensureDb();
     const notificationData = {
       ...notification,
-      createdAt: new Date(), // Utiliser createdAt
-      read: false
+      createdAt: new Date(),
+      isRead: false // Initialiser isRead
     };
 
     const docRef = await db.collection('notifications').add(notificationData);
@@ -100,7 +100,7 @@ export const getUnreadNotificationsCount = async (userId: string) => {
     const db = await ensureDb();
     const snapshot = await db.collection('notifications')
       .where('userId', '==', userId)
-      .where('read', '==', false)
+      .where('isRead', '==', false) // Utiliser isRead
       .count()
       .get();
 
@@ -123,32 +123,36 @@ export async function notifySapFromInstallations() {
     const data = doc.data();
     // Notification pour nouvelle installation (status 'rendez-vous pris' et pas encore notifié)
     if (data.status === 'rendez-vous pris' && !data.sapNotificationSent) {
-      const notificationData = {
-        type: 'installation' as NotificationType, // Caster explicitement
-        sector: [data.secteur as string], // Caster explicitement
-        targetRoles: ['Admin', 'Technician'] as UserRole[], // Caster explicitement
+      const notificationData: Omit<Notification, 'id' | 'createdAt' | 'isRead'> = { // Typer l'objet
+        type: 'installation', 
+        userId: 'system', // Ou un ID spécifique si la notification est pour un utilisateur/rôle
+        sector: [data.secteur as string], 
+        targetRoles: ['Admin', 'Technician'], 
         title: `Nouvelle installation ${data.secteur}`,
         message: `Nouvelle installation (${data.secteur}) - ${data.nom || data.codeClient} - ${data.commentaire || 'Rendez-vous pris'}`,
-        metadata: { installationId: doc.id },
-        link: `/installations/${(data.secteur as string).toLowerCase()}-firestore?id=${doc.id}` // Caster explicitement
+        metadata: { installationId: doc.id, codeClient: data.codeClient, nomClient: data.nom },
+        sourceId: doc.id,
+        link: `/installations/${(data.secteur as string).toLowerCase()}-firestore?id=${doc.id}`
       };
       await createNotification(notificationData);
-      await doc.ref.update({ sapNotificationSent: true }); // Marquer comme notifié
+      await doc.ref.update({ sapNotificationSent: true }); 
       notifiedCount++;
     }
     // Notification pour clôture d'installation (status 'installation terminée' et pas encore notifié de clôture)
     if (data.status === 'installation terminée' && !data.installationClosedNotificationSent) {
-       const notificationData = {
-        type: 'installation_closed' as NotificationType, // Caster explicitement
-        sector: [data.secteur as string], // Caster explicitement
-        targetRoles: ['Admin', 'Client'] as UserRole[], // Caster explicitement
+       const notificationData: Omit<Notification, 'id' | 'createdAt' | 'isRead'> = { // Typer l'objet
+        type: 'installation_closed', 
+        userId: 'system', // Ou un ID spécifique
+        sector: [data.secteur as string], 
+        targetRoles: ['Admin', 'Client'], 
         title: `Installation terminée ${data.secteur}`,
         message: `Installation terminée (${data.secteur}) - ${data.nom || data.codeClient}`,
-        metadata: { installationId: doc.id },
-        link: `/installations/${(data.secteur as string).toLowerCase()}-firestore?id=${doc.id}` // Caster explicitement
+        metadata: { installationId: doc.id, codeClient: data.codeClient, nomClient: data.nom },
+        sourceId: doc.id,
+        link: `/installations/${(data.secteur as string).toLowerCase()}-firestore?id=${doc.id}`
       };
       await createNotification(notificationData);
-      await doc.ref.update({ installationClosedNotificationSent: true }); // Marquer comme notifié de clôture
+      await doc.ref.update({ installationClosedNotificationSent: true }); 
       notifiedCount++;
     }
   }

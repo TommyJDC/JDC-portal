@@ -1,10 +1,12 @@
-import { dbAdmin } from '~/firebase.admin.config.server';
+import { getDb } from '~/firebase.admin.config.server'; // Modifié pour importer getDb
 import type { SapTicket, Notification, UserProfile } from '~/types/firestore.types';
 import { createNotification } from './notifications.service.server';
+import type { QuerySnapshot, DocumentChange } from 'firebase-admin/firestore'; // Importer les types pour onSnapshot
 
 // Fonction pour obtenir tous les admins et techniciens
 async function getNotifiableUsers(): Promise<UserProfile[]> {
-  const usersRef = dbAdmin.collection('users');
+  const db = getDb(); // Obtenir l'instance de db
+  const usersRef = db.collection('users');
   const snapshot = await usersRef
     .where('role', 'in', ['Admin', 'Technician'])
     .get();
@@ -27,9 +29,10 @@ export async function notifyNewSapTicket(ticket: SapTicket) {
           userId: user.uid,
           title: `Nouveau ticket SAP - ${ticket.secteur}`,
           message: `${ticket.raisonSociale || ticket.client} - ${ticket.description}`,
-          type: 'ticket',
+          type: 'new_ticket', // Corrigé pour correspondre à NotificationType
           sourceId: ticket.id,
           link: `/tickets-sap?id=${ticket.id}`
+          // Les champs optionnels comme targetRoles, sector, metadata peuvent être ajoutés si nécessaire
         });
       }
       return null;
@@ -55,9 +58,10 @@ export async function notifyNewCTN(shipment: any) {
           userId: user.uid,
           title: `Nouvel envoi CTN - ${shipment.secteur}`,
           message: `${shipment.nomClient} - ${shipment.ville}`,
-          type: 'shipment',
+          type: 'new_shipment', // Corrigé pour correspondre à NotificationType
           sourceId: shipment.id,
           link: `/envois-ctn?id=${shipment.id}`
+          // Les champs optionnels comme targetRoles, sector, metadata peuvent être ajoutés si nécessaire
         });
       }
       return null;
@@ -73,22 +77,43 @@ export async function notifyNewCTN(shipment: any) {
 
 // Fonction pour configurer les triggers Firestore
 export async function setupNotificationTriggers() {
-  // Surveiller les nouveaux tickets SAP
-  dbAdmin.collection('tickets-sap').onSnapshot(snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type === 'added') {
-        const ticket = {
-          id: change.doc.id,
-          ...change.doc.data()
-        } as SapTicket;
-        notifyNewSapTicket(ticket);
-      }
+  // Note: L'utilisation de onSnapshot côté serveur pour des tâches de fond peut ne pas être fiable
+  // dans tous les environnements de déploiement. Des tâches planifiées ou des appels explicites
+  // après la création d'entités sont souvent plus robustes.
+
+  // Les tickets SAP sont dans des collections par secteur, ex: 'CHR', 'HACCP', etc.
+  // Il faudrait un listener par collection de secteur pour les tickets.
+  const ticketSectors = ['CHR', 'HACCP', 'Kezia', 'Tabac']; 
+  const db = getDb(); // Obtenir l'instance de db
+  ticketSectors.forEach(sector => {
+    db.collection(sector).onSnapshot((snapshot: QuerySnapshot) => { // Typer snapshot
+      snapshot.docChanges().forEach((change: DocumentChange) => { // Typer change
+        if (change.type === 'added') {
+          const ticketData = change.doc.data();
+          const ticket = {
+            id: change.doc.id,
+            ...ticketData
+          } as SapTicket;
+          // S'assurer que le ticket a bien un champ 'secteur' pour la logique dans notifyNewSapTicket
+          if (!ticket.secteur && ticketData.secteur) ticket.secteur = ticketData.secteur as string;
+          else if (!ticket.secteur) ticket.secteur = sector; 
+          notifyNewSapTicket(ticket);
+        }
+        // On pourrait ajouter des notifications pour 'modified' (clôture, mise à jour) ici aussi
+        // if (change.type === 'modified') {
+        //   const ticketData = change.doc.data();
+        //   const ticket = ticketData as SapTicket;
+        //   if (ticket.status === 'closed' /* ou une condition pour la clôture */) {
+        //     // Envoyer une notification de clôture de ticket
+        //   }
+        // }
+      });
     });
   });
 
-  // Surveiller les nouveaux envois CTN
-  dbAdmin.collection('envois-ctn').onSnapshot(snapshot => {
-    snapshot.docChanges().forEach(change => {
+  // Surveiller les nouveaux envois CTN (collection 'Envoi')
+  db.collection('Envoi').onSnapshot((snapshot: QuerySnapshot) => { // Typer snapshot
+    snapshot.docChanges().forEach((change: DocumentChange) => { // Typer change
       if (change.type === 'added') {
         const shipment = {
           id: change.doc.id,

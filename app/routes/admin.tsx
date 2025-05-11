@@ -7,223 +7,159 @@ import {
   Outlet,
   useLocation
 } from '@remix-run/react';
-import { loader } from './admin.loader';
-import { action } from './admin.action';
-import type { AppUser, UserProfile } from '~/types/firestore.types';
+import type { LoaderFunctionArgs } from '@remix-run/node';
+import { json, redirect } from '@remix-run/node'; // Ajout de redirect
+import { getAllUserProfilesSdk } from '~/services/firestore.service.server'; // getUserProfileSdk n'est plus utilisé directement ici
+// import { authenticator } from '~/services/auth.server'; // Remplacé par requireAdminUser
+// import { getSessionFromCookie } from '~/services/session-utils.server'; // Non utilisé ici
+import { requireAdminUser } from '~/services/auth-utils.server'; // Importer requireAdminUser
+import { action } from './admin.action'; // Assurez-vous que admin.action est aussi à jour si besoin
+import type { UserProfile } from '~/types/firestore.types';
 import { Card, CardHeader, CardBody } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { EditUserModal } from '~/components/EditUserModal';
 import { DebugAuth } from '~/components/DebugAuth';
 import { useToast } from '~/context/ToastContext';
-import type { UserSession } from '~/services/session.server';
+import type { UserSessionData } from '~/services/session.server'; // Utiliser UserSessionData
+import { UserManagementPanel } from '~/components/UserManagementPanel';
+import { StatsPanel } from '~/components/StatsPanel';
+import { LogsPanel } from '~/components/LogsPanel';
+import { NotificationPanel } from '~/components/NotificationPanel';
+import { FaCogs, FaUsers, FaChartBar, FaBell, FaBug } from 'react-icons/fa';
 
-interface OutletContext {
-  user: AppUser | null;
-  profile: UserProfile | null;
-  loadingAuth: boolean;
-}
-
-const AVAILABLE_SECTORS = ['CHR', 'HACCP', 'Kezia', 'Tabac'];
-const AVAILABLE_ROLES = ['Admin', 'Technician', 'Viewer'];
-
-export default function AdminPanel() {
-  const location = useLocation();
-  const { user, profile, loadingAuth } = useOutletContext<OutletContext>();
-  const { addToast } = useToast();
-  // Handle potential null data from loader
-  const loaderData = useLoaderData<typeof loader>();
-  const initialUsers = loaderData?.users; 
-  const fetcher = useFetcher();
-
-  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
-  const [users, setUsers] = useState<UserProfile[]>(
-    initialUsers?.map(u => ({
-      ...u,
-      createdAt: u.createdAt ? (typeof u.createdAt === 'string' ? new Date(u.createdAt) : new Date(u.createdAt.seconds * 1000)) : undefined,
-      updatedAt: u.updatedAt ? (typeof u.updatedAt === 'string' ? new Date(u.updatedAt) : new Date(u.updatedAt.seconds * 1000)) : undefined
-    })) || []
-  );
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-
-  useEffect(() => {
-    if (loadingAuth) {
-      setIsAuthorized(null);
-      return;
+// Loader Firestore uniquement
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    await requireAdminUser(request); // Vérifie l'authentification et le rôle Admin
+    const users = await getAllUserProfilesSdk();
+    return json({ users });
+  } catch (error) {
+    // requireAdminUser lance une Response en cas d'échec, qui sera gérée par Remix (typiquement une redirection)
+    // Si une autre erreur se produit, la relancer ou la gérer
+    if (error instanceof Response) {
+      throw error;
     }
-    const isAdmin = user && profile?.role?.toLowerCase() === 'admin';
-    setIsAuthorized(isAdmin);
-  }, [user, profile, loadingAuth]);
+    console.error("Erreur dans le loader admin:", error);
+    // Rediriger vers login en cas d'erreur inattendue
+    return redirect("/login"); 
+  }
+};
 
-  const handleOpenEditModal = (userToEdit: UserProfile) => {
-    setEditingUser(userToEdit);
+export default function Admin() {
+  const { users: serialisedUsers } = useLoaderData<{ users: UserProfile[] }>();
+  const fetcher = useFetcher(); // Initialiser useFetcher
+  const { addToast } = useToast(); // Pour les notifications
+
+  // Parser les dates sérialisées en objets Date
+  const users: UserProfile[] = React.useMemo(() => serialisedUsers.map(u => ({
+    ...u,
+    createdAt: u.createdAt ? new Date(u.createdAt) : undefined,
+    updatedAt: u.updatedAt ? new Date(u.updatedAt) : undefined,
+  })), [serialisedUsers]);
+  
+  const context = useOutletContext<{ user: UserSessionData | null }>(); 
+  const user = context?.user;
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const location = useLocation();
+
+  const handleEditUser = (userToEdit: UserProfile) => {
+    setSelectedUser(userToEdit);
     setIsEditModalOpen(true);
   };
 
-  const handleCloseEditModal = () => {
+  const handleCloseModal = () => {
     setIsEditModalOpen(false);
-    setEditingUser(null);
+    setSelectedUser(null);
   };
 
-  const handleSaveUser = async (updatedUser: UserProfile) => {
-    if (!editingUser) return;
+  const handleSaveUser = async (updatedUserData: Partial<UserProfile>) => {
+    if (!selectedUser) return;
 
-    const dataToUpdate: Partial<UserProfile> = {};
-    if (updatedUser.displayName !== editingUser.displayName) {
-      dataToUpdate.displayName = updatedUser.displayName;
-    }
-    if (updatedUser.role !== editingUser.role) {
-      dataToUpdate.role = updatedUser.role;
-    }
-    const sortedCurrentSectors = [...(editingUser.secteurs || [])].sort();
-    const sortedUpdatedSectors = [...(updatedUser.secteurs || [])].sort();
-    if (JSON.stringify(sortedCurrentSectors) !== JSON.stringify(sortedUpdatedSectors)) {
-      dataToUpdate.secteurs = updatedUser.secteurs || [];
+    const formData = new FormData();
+    formData.append('userId', selectedUser.uid);
+    // Ne pas inclure uid dans l'objet updates lui-même
+    const updatesForAction = { ...updatedUserData };
+    delete updatesForAction.uid; 
+    
+    formData.append('updates', JSON.stringify(updatesForAction));
+    // Si vous avez une action spécifique pour la mise à jour depuis le modal, utilisez-la.
+    // Sinon, si admin.action.tsx gère cela, utilisez son chemin.
+    // Pour l'instant, on suppose que admin.action.tsx peut gérer cela.
+    fetcher.submit(formData, { method: 'POST', action: '/admin/action' });
+    
+    // Gérer la réponse du fetcher
+    // Ceci est un exemple, adaptez selon la réponse de votre action
+    if (fetcher.data && (fetcher.data as any).success) {
+        addToast({ type: 'success', message: (fetcher.data as any).message || 'Utilisateur mis à jour avec succès!' });
+        // Revalider les données du loader pour mettre à jour la liste des utilisateurs
+        // navigate(location.pathname, { replace: true }); // Ou utiliser useRevalidator
+    } else if (fetcher.data && (fetcher.data as any).error) {
+        addToast({ type: 'error', message: (fetcher.data as any).error || 'Erreur lors de la mise à jour.' });
     }
 
-    if (Object.keys(dataToUpdate).length === 0) {
-      addToast({ type: "info", message: "Aucune modification détectée." });
-      handleCloseEditModal();
-      return;
-    }
-
-    fetcher.submit(
-      {
-        userId: editingUser.uid,
-        updates: JSON.stringify(dataToUpdate)
-      },
-      { method: "POST" }
-    );
-
-    handleCloseEditModal();
-    addToast({ type: "success", message: "Utilisateur mis à jour avec succès." });
+    handleCloseModal();
   };
 
-  if (loadingAuth || isAuthorized === null) {
-    return <div className="flex justify-center items-center h-64"><p className="text-jdc-gray-400 animate-pulse">Vérification de l'accès...</p></div>;
-  }
-
-  if (!isAuthorized) {
-    return (
-      <div className="text-center py-10">
-        <h1 className="text-2xl font-bold text-red-500 mb-4">Accès Refusé</h1>
-        <p className="text-jdc-gray-300">Vous n'avez pas les permissions nécessaires.</p>
-        <Link to="/dashboard" className="text-jdc-yellow hover:underline mt-4 inline-block">Retour au tableau de bord</Link>
-      </div>
-    );
-  }
-
+  // Panels d'administration (sans blockchain)
   return (
-    <div className="space-y-8">
-      {location.pathname === "/admin" ? (
-        <>
-          <h1 className="text-3xl font-bold text-white mb-6">Panneau d'Administration</h1>
-
-      <Card>
-        <CardHeader><h2 className="text-lg font-medium text-white">Informations Administrateur</h2></CardHeader>
-        <CardBody>
-            <p className="text-jdc-gray-300">Connecté en tant que : <span className="font-medium text-white">{profile?.email}</span></p>
-            <p className="text-jdc-gray-300">Rôle : <span className="font-medium text-white">{profile?.role}</span></p>
-            
-            <div className="mt-4 border-t border-jdc-gray-700 pt-4">
-              <h3 className="text-md font-medium text-white mb-2">Outils d'administration</h3>
-              <div className="flex gap-4">
-                <Link 
-                  to="gmail-config" 
-                  className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
-                >
-                  Configuration Gmail
-                </Link>
-                <Link 
-                  to="gmail-to-firestore" 
-                  className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
-                >
-                  Traitement Gmail → Firestore
-                </Link>
-                <Link 
-                  to="notifications" 
-                  className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
-                >
-                  Créer une notification
-                </Link>
-                <Link 
-                  to="/debug-index" 
-                  className="inline-block bg-jdc-blue hover:bg-jdc-blue-dark text-white px-4 py-2 rounded-md transition-colors"
-                >
-                  Diagnostic
-                </Link>
-              </div>
-              
-              {profile?.role === 'Admin' && (
-                <div className="mt-4">
-                  <DebugAuth 
-                    user={user as unknown as UserSession}
-                    profile={profile}
-                    loadingAuth={loadingAuth}
-                  />
-                </div>
-              )}
+    <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#1a2250] to-[#1e2746] p-6 font-bold font-jetbrains">
+      <h1 className="text-3xl font-extrabold text-jdc-yellow drop-shadow-neon mb-4">Administration</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center text-white">
+              <FaUsers className="mr-3 h-5 w-5 text-jdc-blue" />
+              <span className="font-semibold text-lg">Utilisateurs</span>
             </div>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-medium text-white">Gestion des Utilisateurs Existants</h2>
-          <p className="mt-1 text-sm text-jdc-gray-400">Modifier les rôles et les secteurs des utilisateurs.</p>
-        </CardHeader>
-        <CardBody>
-          {users.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-jdc-gray-700">
-                <thead className="bg-jdc-gray-800/50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-jdc-gray-300 uppercase tracking-wider">Nom</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-jdc-gray-300 uppercase tracking-wider">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-jdc-gray-300 uppercase tracking-wider">Rôle</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-jdc-gray-300 uppercase tracking-wider">Secteurs</th>
-                    <th className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                  </tr>
-                </thead>
-                <tbody className="bg-jdc-card divide-y divide-jdc-gray-700">
-                  {users.map((u) => (
-                    <tr key={u.uid}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{u.displayName || <i className="text-jdc-gray-500">Non défini</i>}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-jdc-gray-300">{u.email}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-jdc-gray-300">{u.role}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-jdc-gray-300">{u.secteurs?.join(', ') || <i className="text-jdc-gray-500">Aucun</i>}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleOpenEditModal(u)}
-                        >
-                          Modifier
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          </CardHeader>
+          <CardBody>
+            <UserManagementPanel users={users} onEditUser={handleEditUser} />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center text-white">
+              <FaChartBar className="mr-3 h-5 w-5 text-jdc-blue" />
+              <span className="font-semibold text-lg">Statistiques</span>
             </div>
-          ) : (
-            <div className="text-center py-4 text-jdc-gray-400"><p>Aucun utilisateur trouvé.</p></div>
-          )}
-        </CardBody>
-      </Card>
-
-          <EditUserModal
-            isOpen={isEditModalOpen}
-            onClose={handleCloseEditModal}
-            user={editingUser}
-            onSave={handleSaveUser}
-            availableRoles={AVAILABLE_ROLES}
-            availableSectors={AVAILABLE_SECTORS}
-          />
-        </>
-      ) : (
-        <Outlet context={{ user, profile, loadingAuth }} />
+          </CardHeader>
+          <CardBody>
+            <StatsPanel />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center text-white">
+              <FaBell className="mr-3 h-5 w-5 text-jdc-blue" />
+              <span className="font-semibold text-lg">Notifications</span>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <NotificationPanel />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center text-white">
+              <FaBug className="mr-3 h-5 w-5 text-jdc-blue" />
+              <span className="font-semibold text-lg">Logs</span>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <LogsPanel />
+          </CardBody>
+        </Card>
+      </div>
+      {selectedUser && isEditModalOpen && ( // S'assurer que isEditModalOpen est aussi vrai
+        <EditUserModal 
+          user={selectedUser} 
+          isOpen={isEditModalOpen}
+          onClose={handleCloseModal}
+          onSave={handleSaveUser} 
+        />
       )}
+      <Outlet />
     </div>
   );
 }
