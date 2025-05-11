@@ -11,6 +11,35 @@ const ensureDb = async () => {
   return db;
 };
 
+// Helper function for retrying async operations
+async function retryAsyncOperation<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelayMs: number = 1000,
+  shouldRetry: (error: any) => boolean = (error) => error.code === 4 // Default to retry on DEADLINE_EXCEEDED (gRPC code 4)
+): Promise<T> {
+  let attempts = 0;
+  let delayMs = initialDelayMs;
+  while (attempts < maxRetries) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      attempts++;
+      if (attempts >= maxRetries || !shouldRetry(error)) {
+        console.error(`Operation failed after ${attempts} attempts or condition not met for retry. Original error:`, error);
+        throw error;
+      }
+      console.warn(`Attempt ${attempts} failed with code ${error.code}. Retrying in ${delayMs}ms... Error: ${error.message}`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      delayMs *= 2; // Exponential backoff
+    }
+  }
+  // This line should ideally not be reached if maxRetries > 0,
+  // as the loop's catch block would rethrow.
+  // Adding it for type safety / exhaustive check.
+  throw new Error('Operation failed after maximum retries.');
+}
+
 export const getNotifications = async (userId: string) => {
   try {
     const db = await ensureDb();
@@ -73,13 +102,17 @@ export const createNotification = async (notification: Omit<Notification, 'id' |
       isRead: false // Initialiser isRead
     };
 
-    const docRef = await db.collection('notifications').add(notificationData);
+    // Wrap the Firestore add operation with retry logic
+    const operation = () => db.collection('notifications').add(notificationData);
+    const docRef = await retryAsyncOperation(operation); // Default retries (3) for DEADLINE_EXCEEDED
+
     return {
       id: docRef.id,
       ...notificationData
     } as Notification; // Caster pour assurer le type de retour complet
   } catch (error) {
-    console.error('Error creating notification:', error);
+    // The error here will be the one after retries have been exhausted or if it's not a retriable error
+    console.error('Error creating notification after potential retries:', error);
     return null;
   }
 };
