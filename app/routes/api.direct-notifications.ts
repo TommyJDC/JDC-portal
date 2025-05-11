@@ -50,8 +50,8 @@ export async function action({ request }: ActionFunctionArgs) {
           userId,
           title,
           message,
-          type,
-          isRead: false
+          type
+          // isRead: false // Supprimé car géré par createNotification
         });
         if (notif) {
           return json({ success: true, message: `Notification créée avec succès avec ID: ${notif.id}`, id: notif.id });

@@ -1,4 +1,4 @@
-import { initializeFirebaseAdmin } from "~/services/firestore.service.server";
+import { getDb } from "~/firebase.admin.config.server"; // Modifié l'import
 import type { SAPArchive } from "~/types/firestore.types";
 import { Timestamp } from 'firebase/firestore'; // Import Timestamp from firebase/firestore
 import type { LoaderFunctionArgs } from "@remix-run/node"; // Importer le type LoaderFunctionArgs
@@ -20,7 +20,7 @@ function getSafeStringValue(prop: { stringValue: string } | string | undefined |
 
 async function getArchivedSapTickets(): Promise<SAPArchive[]> {
   try {
-    const db = await initializeFirebaseAdmin(); // Utiliser la fonction exportée
+    const db = getDb(); // Remplacé initializeFirebaseAdmin par getDb et supprimé await
     const snapshot = await db.collection("sap-archive").get();
 
     const archivedTickets: SAPArchive[] = [];

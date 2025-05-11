@@ -1,400 +1,306 @@
 import type { MetaFunction } from "@remix-run/node";
-    import { useState, useMemo, useCallback, useEffect } from "react";
-    import { useOutletContext, useSearchParams, useLoaderData, useFetcher } from "@remix-run/react";
-    import { Timestamp } from 'firebase/firestore'; // Import Timestamp for type checking/conversion
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useOutletContext, useSearchParams, useLoaderData, useFetcher } from "@remix-run/react";
+import { Timestamp } from 'firebase/firestore';
 
-    // Import loader and action
-    import { loader } from "./envois-ctn.loader";
-    import type { EnvoisCtnLoaderData } from "./envois-ctn.loader";
-    import { action } from "./envois-ctn.action";
+import { loader } from "./envois-ctn.loader";
+// type EnvoisCtnLoaderData n'est pas utilisé directement ici, mais gardé pour référence si le loader change
+// import type { EnvoisCtnLoaderData } from "./envois-ctn.loader"; 
+import { action } from "./envois-ctn.action";
 
-    import type { Shipment, UserProfile } from "~/types/firestore.types";
-    import type { UserSession } from "~/services/session.server"; // Import UserSession
-    import { Input } from "~/components/ui/Input";
-    import { Button } from "~/components/ui/Button";
-    import { FaShippingFast, FaFilter, FaSearch, FaBuilding, FaChevronRight, FaExternalLinkAlt, FaSpinner, FaTrash, FaExclamationTriangle } from 'react-icons/fa'; // Import React Icons
-    import { getShipmentStatusStyle } from "~/utils/styleUtils";
-    import { useToast } from "~/context/ToastContext";
+import type { Shipment, UserProfile } from "~/types/firestore.types";
+import type { UserSessionData } from "~/services/session.server";
+import { Input } from "~/components/ui/Input";
+import { Button } from "~/components/ui/Button";
+import { FaShippingFast, FaFilter, FaSearch, FaBuilding, FaChevronRight, FaExternalLinkAlt, FaSpinner, FaTrash, FaExclamationTriangle } from 'react-icons/fa';
+import { getShipmentStatusStyle } from "~/utils/styleUtils"; // Assurez-vous que cette fonction gère bien les nouveaux statuts
+import { useToast } from "~/context/ToastContext";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "~/components/ui/Select";
 
-    export const meta: MetaFunction = () => {
-      return [{ title: "Envois CTN | JDC Dashboard" }];
-    };
+export const meta: MetaFunction = () => {
+  return [{ title: "Envois CTN | JDC Dashboard" }];
+};
 
-    // Export loader and action
-    export { loader, action };
+export { loader, action };
 
-    // Outlet context likely provides UserSession now, adjust if needed based on root
-    type OutletContextType = {
-      user: UserSession | null; // Use UserSession
-    };
+type OutletContextType = {
+  user: UserSessionData | null;
+};
 
-    // Helper to parse serialized dates (similar to dashboard)
-    const parseSerializedDateOptional = (serializedDate: string | { seconds: number; nanoseconds: number; } | null | undefined): Date | undefined => {
-        if (!serializedDate) return undefined;
-        if (typeof serializedDate === 'string') {
-            try {
-                const date = new Date(serializedDate);
-                if (isNaN(date.getTime())) return undefined;
-                return date;
-            } catch { return undefined; }
-        }
-        if (typeof serializedDate === 'object' && 'seconds' in serializedDate && typeof serializedDate.seconds === 'number' && 'nanoseconds' in serializedDate && typeof serializedDate.nanoseconds === 'number') {
-             try { return new Timestamp(serializedDate.seconds, serializedDate.nanoseconds).toDate(); }
-             catch { return undefined; }
-        }
-        return undefined;
-    };
-
-
-    const groupShipmentsByClient = (shipments: Shipment[]): Map<string, Shipment[]> => {
-      const grouped = new Map<string, Shipment[]>();
-       if (!Array.isArray(shipments)) {
-         return grouped;
-       }
-      shipments.forEach(shipment => {
-        // Ensure dateCreation is handled correctly if needed for grouping/sorting logic later
-        const clientName = shipment.nomClient || 'Client Inconnu';
-        const existing = grouped.get(clientName);
-        if (existing) {
-          existing.push(shipment);
-        } else {
-          grouped.set(clientName, [shipment]);
-        }
-      });
-      return grouped;
-    };
-
-    // Type guard for fetcher data with error
-    function hasErrorProperty(data: any): data is { success: false; error: string } {
-        return data && data.success === false && typeof data.error === 'string';
+const parseSerializedDateOptional = (serializedDate: string | { seconds: number; nanoseconds: number; } | null | undefined): Date | undefined => {
+    if (!serializedDate) return undefined;
+    if (typeof serializedDate === 'string') {
+        try { const date = new Date(serializedDate); if (isNaN(date.getTime())) return undefined; return date; } catch { return undefined; }
     }
-
-    // Type guard for fetcher data with message
-    function hasMessageProperty(data: any): data is { success: true; message: string } {
-        return data && data.success === true && typeof data.message === 'string';
+    if (typeof serializedDate === 'object' && 'seconds' in serializedDate && typeof serializedDate.seconds === 'number' && 'nanoseconds' in serializedDate && typeof serializedDate.nanoseconds === 'number') {
+         try { return new Timestamp(serializedDate.seconds, serializedDate.nanoseconds).toDate(); } catch { return undefined; }
     }
+    return undefined;
+};
 
+const groupShipmentsByClient = (shipments: Shipment[]): Map<string, Shipment[]> => {
+  const grouped = new Map<string, Shipment[]>();
+   if (!Array.isArray(shipments)) return grouped;
+  shipments.forEach(shipment => {
+    const clientName = shipment.nomClient || shipment.client || 'Client Inconnu'; // Prioriser nomClient
+    const existing = grouped.get(clientName);
+    if (existing) { existing.push(shipment); } else { grouped.set(clientName, [shipment]); }
+  });
+  return grouped;
+};
 
-    export default function EnvoisCtn() {
-      const { user } = useOutletContext<OutletContextType>(); // User session from context
-      const { addToast } = useToast();
-      // Get data from loader
-      const { userProfile, allShipments: serializedShipments, error: loaderError } = useLoaderData<typeof loader>();
-      const fetcher = useFetcher<typeof action>(); // Fetcher for delete action
+function hasErrorProperty(data: any): data is { success: false; error: string } {
+    return data && data.success === false && typeof data.error === 'string';
+}
+function hasMessageProperty(data: any): data is { success: true; message: string } {
+    return data && data.success === true && typeof data.message === 'string';
+}
 
-      // State for client-side filtering and UI
-      const [deletingGroup, setDeletingGroup] = useState<string | null>(null); // Client name being deleted
-      const [selectedSector, setSelectedSector] = useState<string>('');
-      const [searchParams] = useSearchParams(); // Keep for reading URL params
-      const [searchTerm, setSearchTerm] = useState<string>(searchParams.get('client') || ''); // Initialize from URL
+const ALL_SECTORS_VALUE = "__ALL_SECTORS__"; // Constante pour la valeur "Tous les secteurs"
 
-      // Parse shipments dates from loader data
-      const allShipments: Shipment[] = useMemo(() => (serializedShipments ?? []).map(shipment => ({
-           ...shipment,
-           dateCreation: parseSerializedDateOptional(shipment.dateCreation),
-       })), [serializedShipments]);
+export default function EnvoisCtn() {
+  const { user } = useOutletContext<OutletContextType>();
+  const { addToast } = useToast();
+  const { userProfile, allShipments: serializedShipments, error: loaderError } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher<typeof action>();
 
-      // Effect to sync search term with URL params (client-side only)
-      useEffect(() => {
-        setSearchTerm(searchParams.get('client') || '');
-      }, [searchParams]);
+  const [deletingGroup, setDeletingGroup] = useState<string | null>(null);
+  const [selectedSector, setSelectedSector] = useState<string>(ALL_SECTORS_VALUE); // Initialiser avec la valeur pour "Tous"
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState<string>(searchParams.get('client') || '');
 
-       // Effect to handle fetcher results (for delete action)
-       useEffect(() => {
-         if (fetcher.state === 'idle' && fetcher.data) {
-           if (fetcher.data.success) {
-             // Use type guard for success message
-             const message = hasMessageProperty(fetcher.data)
-               ? fetcher.data.message
-               : 'Groupe supprimé avec succès.'; // Default success message
-             addToast({ type: 'success', message: message });
-           } else {
-             // Use type guard for error message
-             const errorMsg = hasErrorProperty(fetcher.data)
-               ? fetcher.data.error
-               : 'Erreur lors de la suppression.'; // Default error message
-             addToast({ type: 'error', message: errorMsg });
-           }
-           setDeletingGroup(null); // Reset deleting state regardless of outcome
-         }
-       }, [fetcher.state, fetcher.data, addToast]);
+  const allShipments: Shipment[] = useMemo(() => (serializedShipments ?? []).map(shipment => ({
+       ...shipment,
+       date: parseSerializedDateOptional(shipment.date as any), // Parser le champ 'date'
+       createdAt: parseSerializedDateOptional(shipment.createdAt as any), 
+       dateLivraison: parseSerializedDateOptional(shipment.dateLivraison as any),
+       updatedAt: parseSerializedDateOptional(shipment.updatedAt as any),
+   })), [serializedShipments]);
 
+  useEffect(() => { setSearchTerm(searchParams.get('client') || ''); }, [searchParams]);
 
-      const filteredAndGroupedShipments = useMemo(() => {
-        let filtered = allShipments; // Use parsed shipments
-
-        // Filter by Sector
-        if (selectedSector && selectedSector !== '') {
-           filtered = filtered.filter(s => s.secteur === selectedSector);
-        }
-
-        // Filter by Search Term (case-insensitive)
-        const lowerSearchTerm = searchTerm.trim().toLowerCase();
-        if (lowerSearchTerm) {
-          filtered = filtered.filter(s =>
-            (s.nomClient?.toLowerCase().includes(lowerSearchTerm)) ||
-            (s.codeClient?.toLowerCase().includes(lowerSearchTerm)) ||
-            (s.id?.toLowerCase().includes(lowerSearchTerm)) ||
-            (s.articleNom?.toLowerCase().includes(lowerSearchTerm))
-          );
-        }
-
-        return groupShipmentsByClient(filtered);
-      }, [allShipments, selectedSector, searchTerm]);
-
-      const clientGroups = useMemo(() => {
-          return Array.from(filteredAndGroupedShipments.entries())
-                      .sort((a, b) => a[0].localeCompare(b[0]));
-      }, [filteredAndGroupedShipments]);
-
-      const availableSectors = useMemo(() => {
-         // Calculate sectors from the originally loaded (serialized) data to avoid re-computation on filter
-         const uniqueSectors = new Set(serializedShipments?.map(s => s.secteur).filter(Boolean));
-         return Array.from(uniqueSectors).sort();
-      }, [serializedShipments]);
-
-      // --- Delete Group Handler (using fetcher) ---
-      const handleDeleteGroup = useCallback((clientName: string, shipmentsToDelete: Shipment[]) => {
-        if (!shipmentsToDelete || shipmentsToDelete.length === 0) return;
-
-        const shipmentCount = shipmentsToDelete.length;
-        const confirmation = window.confirm(`Êtes-vous sûr de vouloir supprimer les ${shipmentCount} envoi${shipmentCount > 1 ? 's' : ''} pour le client "${clientName}" ? Cette action est irréversible.`);
-
-        if (confirmation) {
-          setDeletingGroup(clientName); // Set UI state
-          const shipmentIds = shipmentsToDelete.map(s => s.id).join(','); // Comma-separated IDs
-
-          const formData = new FormData();
-          formData.append("intent", "delete_group");
-          formData.append("shipmentIds", shipmentIds);
-
-          fetcher.submit(formData, { method: "POST" });
-          // UI update will happen via loader revalidation triggered by the action
-        }
-      }, [fetcher]); // Depend on fetcher
-
-      const isAdmin = userProfile?.role === 'Admin'; // Use profile from loader
-      const isLoading = fetcher.state !== 'idle'; // Loading state based on fetcher
-
-      // Show message if user is not logged in (based on context)
-      if (!user) {
-         return (
-            <div className="text-center text-gray-400 py-10">
-                Veuillez vous connecter pour voir les envois.
-            </div>
-         )
-      }
-
-      // Show loader error if present
-       if (loaderError) {
-           return <div className="text-center text-red-400 bg-red-900 bg-opacity-50 p-4 rounded-lg"><FaExclamationTriangle className="mr-2" />{loaderError}</div>;
+   useEffect(() => {
+     if (fetcher.state === 'idle' && fetcher.data) {
+       if (fetcher.data.success) {
+         const message = hasMessageProperty(fetcher.data) ? fetcher.data.message : 'Groupe supprimé.';
+         addToast({ type: 'success', message: message });
+       } else {
+         const errorMsg = hasErrorProperty(fetcher.data) ? fetcher.data.error : 'Erreur suppression.';
+         addToast({ type: 'error', message: errorMsg });
        }
+       setDeletingGroup(null);
+     }
+   }, [fetcher.state, fetcher.data, addToast]);
 
-      return (
-        <div className="space-y-6 p-6 bg-gray-900 min-h-screen">
-          <h1 className="text-3xl font-semibold text-white mb-6 flex items-center">
-            <FaShippingFast className="mr-3 text-jdc-yellow" />
-            Suivi des Envois CTN
-            {isLoading && <FaSpinner className="ml-3 text-jdc-yellow animate-spin" title="Rafraîchissement..." />}
-          </h1>
-
-          {/* Filter and Search Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-800 rounded-lg shadow-xl border border-gray-700">
-            {/* Sector Filter - Disable based on fetcher state */}
-            <div className="col-span-1">
-              <label htmlFor="sector-filter" className="block text-sm font-medium text-gray-400 mb-1">
-                <FaFilter className="mr-1" /> Filtrer par Secteur
-              </label>
-              <select
-                id="sector-filter"
-                name="sector-filter"
-                value={selectedSector}
-                onChange={(e) => setSelectedSector(e.target.value)}
-                className="block w-full rounded-md bg-gray-900 border-gray-700 focus:border-jdc-blue focus:ring focus:ring-jdc-blue focus:ring-opacity-50 text-white py-2 pl-3 pr-10 text-sm"
-                disabled={isLoading || availableSectors.length === 0} // Disable during action
-              >
-                <option value="">Tous les secteurs</option>
-                {availableSectors.map(sector => (
-                  <option key={sector} value={sector}>{sector}</option>
-                ))}
-              </select>
-               {/* Messages adjusted based on loader data */}
-               {availableSectors.length === 0 && !isLoading && allShipments.length > 0 && (
-                 <p className="text-xs text-gray-500 mt-1">Aucun secteur trouvé dans les envois affichés.</p>
-               )}
-               {availableSectors.length === 0 && !isLoading && allShipments.length === 0 && !loaderError && (
-                 <p className="text-xs text-gray-500 mt-1">Aucun envoi accessible trouvé.</p>
-               )}
-            </div>
-
-            {/* Search Input - Disable based on fetcher state */}
-            <div className="col-span-1 md:col-span-2">
-               <Input
-                 label="Rechercher (Client, ID, Article...)"
-                 id="search-client"
-                 name="search-client"
-                 placeholder="Entrez un nom, code, ID, article..."
-                 value={searchTerm}
-                 onChange={(e) => setSearchTerm(e.target.value)}
-                 icon={<FaSearch />}
-                 wrapperClassName="mb-0"
-                 disabled={isLoading} // Disable during action
-                 className="bg-gray-900 text-white border-gray-700 focus:border-jdc-blue focus:ring-jdc-blue"
-                 labelClassName="text-gray-400"
-               />
-            </div>
-          </div>
-
-          {/* Loading State for Action */}
-          {isLoading && (
-            <div className="text-center text-gray-400 py-10">
-              <FaSpinner className="text-2xl mr-2 animate-spin" />
-              Traitement en cours...
-            </div>
-          )}
-
-          {/* No Results State */}
-          {!isLoading && !loaderError && clientGroups.length === 0 && (
-            <div className="text-center text-gray-400 py-10">
-              {allShipments.length > 0
-                ? "Aucun envoi trouvé correspondant à votre recherche ou filtre."
-                : "Aucun envoi accessible trouvé."}
-            </div>
-          )}
-
-
-          {/* Shipments List */}
-          {!isLoading && !loaderError && clientGroups.length > 0 && (
-            <div className="space-y-4">
-              {clientGroups.map(([clientName, clientShipments]) => (
-                <div key={clientName} className="bg-gray-800 rounded-lg shadow-xl overflow-hidden border border-gray-700">
-                  <details className="group">
-                    <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700 list-none transition-colors gap-4">
-                      <div className="flex items-center min-w-0 mr-2 flex-grow">
-                        <FaBuilding className="mr-3 text-jdc-blue text-lg flex-shrink-0" />
-                        <div className="min-w-0">
-                            <span className="font-semibold text-yellow-400 text-lg block truncate" title={clientName}>{clientName}</span>
-                            <span className="ml-0 md:ml-3 text-sm text-gray-400">
-                                ({clientShipments.length} envoi{clientShipments.length > 1 ? 's' : ''})
-                            </span>
-                             {clientShipments[0]?.codeClient && clientShipments[0].codeClient !== clientName && (
-                                <span className="block text-xs text-gray-500 truncate" title={`Code: ${clientShipments[0].codeClient}`}>Code: {clientShipments[0].codeClient}</span>
-                             )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center flex-shrink-0 space-x-3">
-                        {isAdmin && (
-                            <Button
-                                as="button"
-                                variant="danger"
-                                size="icon"
-                                title={`Supprimer tous les envois pour ${clientName}`}
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleDeleteGroup(clientName, clientShipments);
-                                }}
-                                isLoading={deletingGroup === clientName}
-                                disabled={isLoading}
-                                leftIcon={<FaTrash className="h-4 w-4" />}
-                            >
-                                {""}
-                            </Button>
-                        )}
-                        <FaChevronRight
-                          className="text-gray-400 transition-transform duration-200 group-open:rotate-90 text-xl flex-shrink-0"
-                        />
-                      </div>
-                    </summary>
-
-                    <div className="border-t border-gray-700 bg-gray-900 p-4 space-y-3">
-                      {clientShipments.map((shipment) => {
-                        const statusStyle = getShipmentStatusStyle(shipment.statutExpedition);
-                        const truncatedArticle = shipment.articleNom && shipment.articleNom.length > 50
-                          ? `${shipment.articleNom.substring(0, 47)}...`
-                          : shipment.articleNom;
-
-                        // Déterminer la couleur de la bordure
-                        let borderColor = '#333333'; // Default: jdc-gray-800
-                        if (statusStyle.bgColor === 'bg-green-700') {
-                          borderColor = '#15803d'; // green-700
-                        } else if (statusStyle.bgColor === 'bg-red-700') {
-                          borderColor = '#b91c1c'; // red-700
-                        }
-
-                        // Parse dateCreation for display if needed, or format directly if possible
-                        // const displayDate = shipment.dateCreation ? shipment.dateCreation.toLocaleDateString('fr-FR') : 'N/A';
-
-                        return (
-                          // Appliquer le style de carte ici
-                          <div
-                            key={shipment.id}
-                            className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex flex-col space-y-3 border-l-4"
-                            style={{ borderLeftColor: borderColor }} // Utiliser la couleur du statut pour la bordure
-                          >
-                            {/* Header: Nom Article, Statut, Bouton Suivi */}
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center min-w-0">
-                                {/* Peut-être une icône pour l'article ? FaBoxOpen ? */}
-                                <span className="text-white font-semibold text-base mr-2 truncate" title={shipment.articleNom}>
-                                  {truncatedArticle || 'Article non spécifié'}
-                                </span>
-                                <span className={`ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyle.bgColor} ${statusStyle.textColor}`}>
-                                  {shipment.statutExpedition || 'Inconnu'}
-                                </span>
-                              </div>
-                              <div className="flex-shrink-0">
-                                {shipment.trackingLink && (
-                                  <Button
-                                    as="link"
-                                    to={shipment.trackingLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    variant="secondary"
-                                    size="sm"
-                                    title="Suivre le colis"
-                                    leftIcon={<FaExternalLinkAlt />}
-                                    className="text-jdc-blue border-jdc-blue hover:bg-jdc-blue hover:text-white"
-                                  >
-                                    <span className="hidden md:inline">Suivi</span>
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Body: ID, Secteur, Date (si disponible) */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-gray-400">
-                              <div className="flex items-center" title={`ID: ${shipment.id}`}>
-                                {/* Icône ID ? FaBarcode ? */}
-                                <span>ID: {shipment.id.substring(0, 8)}...</span>
-                              </div>
-                              <div className="flex items-center" title={`Secteur: ${shipment.secteur || 'N/A'}`}>
-                                {/* Icône Secteur ? FaMapPin ? */}
-                                <span>Secteur: {shipment.secteur || 'N/A'}</span>
-                              </div>
-                              {/* Afficher la date si disponible et parsée */}
-                              {/* {displayDate && (
-                                <div className="flex items-center" title={`Date Création: ${displayDate}`}>
-                                  <FaCalendarAlt className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                                  <span>{displayDate}</span>
-                                </div>
-                              )} */}
-                            </div>
-
-                            {/* Footer: Peut-être d'autres infos si nécessaires */}
-                            {/* <div className="border-t border-gray-700 pt-2 mt-2 space-y-1 text-xs text-gray-400">
-                              ...
-                            </div> */}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </details>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+  const filteredAndGroupedShipments = useMemo(() => {
+    let filtered = allShipments;
+    if (selectedSector !== ALL_SECTORS_VALUE) { 
+       filtered = filtered.filter(s => s.secteur === selectedSector);
+    }
+    const lowerSearchTerm = searchTerm.trim().toLowerCase();
+    if (lowerSearchTerm) {
+      filtered = filtered.filter(s =>
+        (s.nomClient?.toLowerCase().includes(lowerSearchTerm)) || // Utiliser nomClient
+        (s.client?.toLowerCase().includes(lowerSearchTerm)) || 
+        (s.codeClient?.toLowerCase().includes(lowerSearchTerm)) ||
+        (s.id?.toLowerCase().includes(lowerSearchTerm)) ||
+        (s.articleNom?.toLowerCase().includes(lowerSearchTerm)) || // Utiliser articleNom
+        (s.produits?.[0]?.toLowerCase().includes(lowerSearchTerm)) 
       );
     }
+    return groupShipmentsByClient(filtered);
+  }, [allShipments, selectedSector, searchTerm]);
+
+  const clientGroups = useMemo(() => {
+      return Array.from(filteredAndGroupedShipments.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredAndGroupedShipments]);
+
+  const availableSectors = useMemo(() => {
+     const uniqueSectors = new Set(serializedShipments?.map(s => s.secteur).filter(Boolean));
+     return Array.from(uniqueSectors).sort();
+  }, [serializedShipments]);
+
+  const handleDeleteGroup = useCallback((clientName: string, shipmentsToDelete: Shipment[]) => {
+    if (!shipmentsToDelete || shipmentsToDelete.length === 0) return;
+    const shipmentCount = shipmentsToDelete.length;
+    const confirmation = window.confirm(`Supprimer les ${shipmentCount} envoi${shipmentCount > 1 ? 's' : ''} pour "${clientName}" ?`);
+    if (confirmation) {
+      setDeletingGroup(clientName);
+      const shipmentIds = shipmentsToDelete.map(s => s.id).filter(Boolean).join(','); // S'assurer que les IDs existent
+      if (!shipmentIds) {
+        addToast({type: 'error', message: 'Aucun ID d\'envoi valide à supprimer.'});
+        setDeletingGroup(null);
+        return;
+      }
+      const formData = new FormData();
+      formData.append("intent", "delete_group");
+      formData.append("shipmentIds", shipmentIds);
+      fetcher.submit(formData, { method: "POST" });
+    }
+  }, [fetcher, addToast]);
+
+  const isAdmin = userProfile?.role === 'Admin';
+  const isLoading = fetcher.state !== 'idle';
+
+  if (!user) {
+     return ( <div className="flex flex-col items-center justify-center h-[calc(100vh-150px)] text-text-secondary"><FaShippingFast className="text-4xl mb-4 text-brand-blue" /><p>Veuillez vous connecter pour voir les envois.</p></div> )
+  }
+
+   if (loaderError) {
+       return <div className="p-4 rounded-md bg-red-500/10 border border-red-500/30 text-red-300 text-center"><FaExclamationTriangle className="inline mr-2" />{loaderError}</div>;
+   }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold text-text-primary flex items-center">
+        <FaShippingFast className="mr-3 text-brand-blue h-6 w-6" />
+        Suivi des Envois CTN
+        {isLoading && clientGroups.length > 0 && <FaSpinner className="ml-3 text-brand-blue animate-spin" title="Rafraîchissement..." />}
+      </h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end p-4 bg-ui-surface/80 backdrop-blur-lg border border-ui-border/70 rounded-xl shadow-lg">
+        <div className="md:col-span-2">
+          <label htmlFor="ctn-search" className="block text-xs font-medium text-text-secondary mb-1">
+            <FaSearch className="inline mr-1.5 h-3.5 w-3.5" /> Rechercher
+          </label>
+          <Input
+            id="ctn-search"
+            placeholder="Client, ID, produit..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            disabled={isLoading}
+            className="w-full bg-ui-input border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue rounded-md placeholder:text-text-tertiary text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="ctn-sector-filter" className="block text-xs font-medium text-text-secondary mb-1">
+            <FaFilter className="inline mr-1.5 h-3.5 w-3.5" /> Secteur
+          </label>
+          <Select 
+            value={selectedSector} 
+            onValueChange={setSelectedSector} 
+            disabled={isLoading || availableSectors.length === 0}
+          >
+            <SelectTrigger id="ctn-sector-filter" className="w-full bg-ui-input border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue rounded-md text-sm">
+              <SelectValue placeholder="Tous les secteurs" />
+            </SelectTrigger>
+            <SelectContent className="bg-ui-surface border-ui-border text-text-primary">
+              <SelectItem value={ALL_SECTORS_VALUE} className="hover:bg-ui-hover focus:bg-ui-hover">Tous les secteurs</SelectItem>
+              {availableSectors.map(sector => (
+                <SelectItem key={sector} value={sector} className="hover:bg-ui-hover focus:bg-ui-hover">{sector}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+           {availableSectors.length === 0 && !isLoading && allShipments.length > 0 && (
+             <p className="text-xs text-text-tertiary mt-1">Aucun secteur dans les envois affichés.</p>
+           )}
+           {availableSectors.length === 0 && !isLoading && allShipments.length === 0 && !loaderError && (
+             <p className="text-xs text-text-tertiary mt-1">Aucun envoi trouvé.</p>
+           )}
+        </div>
+      </div>
+
+      {isLoading && clientGroups.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-10 text-text-secondary"><FaSpinner className="text-2xl animate-spin mb-2" />Chargement...</div>
+      )}
+
+      {!isLoading && !loaderError && clientGroups.length === 0 && (
+        <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
+          <FaShippingFast className="mx-auto text-4xl mb-3 opacity-40" />
+          <p className="font-medium">
+            {allShipments.length > 0 ? "Aucun envoi trouvé pour ces critères." : "Aucun envoi accessible."}
+          </p>
+        </div>
+      )}
+
+      {!isLoading && !loaderError && clientGroups.length > 0 && (
+        <div className="space-y-4">
+          {clientGroups.map(([clientName, clientShipments]) => (
+            <div key={clientName} className="bg-ui-surface rounded-lg shadow-md border border-ui-border/70 overflow-hidden">
+              <details className="group" open={clientGroups.length === 1 || searchTerm.length > 0}>
+                <summary className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-ui-surface-hover list-none transition-colors gap-3">
+                  <div className="flex items-center min-w-0 mr-2 flex-grow">
+                    <FaBuilding className="mr-2.5 text-brand-blue text-lg flex-shrink-0" />
+                    <div className="min-w-0">
+                        <span className="font-semibold text-text-primary text-base block truncate" title={clientName}>{clientName}</span>
+                        <span className="ml-0 md:ml-0.5 text-xs text-text-secondary">
+                            ({clientShipments.length} envoi{clientShipments.length > 1 ? 's' : ''})
+                        </span>
+                         {clientShipments[0]?.codeClient && clientShipments[0].codeClient !== clientName && (
+                            <span className="block text-xs text-text-tertiary truncate" title={`Code: ${clientShipments[0].codeClient}`}>Code: {clientShipments[0].codeClient}</span>
+                         )}
+                    </div>
+                  </div>
+                  <div className="flex items-center flex-shrink-0 space-x-2">
+                    {isAdmin && (
+                        <Button
+                            as="button"
+                            variant="danger"
+                            size="icon"
+                            title={`Supprimer envois pour ${clientName}`}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteGroup(clientName, clientShipments); }}
+                            isLoading={deletingGroup === clientName}
+                            disabled={isLoading}
+                            className="h-7 w-7 p-1"
+                        >
+                           <FaTrash className="h-3.5 w-3.5" />
+                        </Button>
+                    )}
+                    <FaChevronRight className="text-text-secondary transition-transform duration-200 group-open:rotate-90 text-lg flex-shrink-0" />
+                  </div>
+                </summary>
+                <div className="border-t border-ui-border bg-ui-background p-3 sm:p-4 space-y-3">
+                  {clientShipments.map((shipment) => {
+                    const statusStyle = getShipmentStatusStyle(shipment.statutExpedition || shipment.statut || 'Inconnu'); // Prioriser statutExpedition
+                    const articleDisplay = shipment.articleNom || shipment.produits?.[0] || 'Article non spécifié';
+                    const truncatedArticle = articleDisplay.length > 40 ? `${articleDisplay.substring(0, 37)}...` : articleDisplay;
+                    
+                    // Utiliser directement borderColor de statusStyle car il est maintenant inclus
+                    const itemBorderColor = statusStyle.borderColor.replace('border-', 'var(--color-') + ')'; // Convertit la classe en variable CSS
+
+                    return (
+                      <div key={shipment.id} className={`bg-ui-background-hover rounded-md shadow-sm p-3 border-l-4 ${statusStyle.borderColor.replace('border-', 'border-')}`} > {/* Appliquer la classe de bordure */}
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-text-primary font-medium text-sm truncate" title={articleDisplay}>
+                            {truncatedArticle}
+                          </span>
+                          <span className={`ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyle.bgColor} ${statusStyle.textColor} ${statusStyle.borderColor}`}>
+                            {shipment.statutExpedition || shipment.statut || 'Inconnu'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-0.5 text-xs text-text-secondary">
+                          <p title={`ID: ${shipment.id}`}>ID: <span className="text-text-tertiary">{shipment.id ? shipment.id.substring(0, 8) + '...' : 'N/A'}</span></p>
+                          <p>Secteur: <span className="text-text-primary">{shipment.secteur || 'N/A'}</span></p>
+                          {(shipment.date || shipment.createdAt) && <p>Date: <span className="text-text-primary">{new Date(shipment.date || shipment.createdAt!).toLocaleDateString()}</span></p>}
+                          {shipment.numeroCTN && <p>N° CTN: <span className="text-text-primary">{shipment.numeroCTN}</span></p>}
+                        </div>
+                        {shipment.trackingLink && (
+                          <div className="mt-2">
+                            <a 
+                              href={shipment.trackingLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="inline-flex items-center text-xs text-brand-blue-light hover:underline p-0 h-auto"
+                            >
+                              <FaExternalLinkAlt className="mr-1 h-3 w-3" /> Suivre le colis
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

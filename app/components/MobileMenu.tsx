@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, NavLink } from '@remix-run/react';
+import { Link, NavLink, Form } from '@remix-run/react'; // Ajout de Form
 import {
   FaTimes,
   FaUserCircle,
@@ -15,13 +15,13 @@ import {
  import { Button } from './ui/Button';
  // Use UserSession from server loader instead of AppUser from client-side auth
  // import type { AppUser } from '~/services/auth.service';
- import type { UserSession } from '~/services/session.server'; // Import UserSession
+ import type { UserSessionData } from '~/services/session.server'; // Import UserSessionData
  import type { UserProfile } from '~/types/firestore.types'; // Import UserProfile
 
  interface MobileMenuProps {
    isOpen: boolean;
    onClose: () => void;
-   user: UserSession | null; // Use UserSession type
+   user: UserSessionData | null; // Use UserSessionData type
    profile: UserProfile | null; // Use profile from context
    onLoginClick: () => void;
    // Remove onLogoutClick as it's handled by Header form
@@ -60,10 +60,10 @@ const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
 
  const JDC_LOGO_URL = "https://www.jdc.fr/images/logo_jdc_blanc.svg"; // Re-add logo URL if needed
 
- export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, user, profile, onLoginClick, loadingAuth }) => { // Removed onLogoutClick
-  const linkActiveClass = "text-jdc-yellow bg-jdc-gray-800/50 border-l-2 border-jdc-yellow";
-  const linkInactiveClass = "text-jdc-gray-300 hover:text-white hover:bg-jdc-gray-700/50 hover:border-l-2 hover:border-jdc-yellow/50";
-  const linkBaseClass = "flex items-center px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ease-in-out";
+ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, user, profile, onLoginClick, loadingAuth }) => {
+  const linkActiveClass = "text-brand-blue bg-ui-border font-semibold"; // Actif: texte bleu, fond légèrement contrastant
+  const linkInactiveClass = "text-text-secondary hover:text-text-primary hover:bg-ui-border";
+  const linkBaseClass = "flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors duration-150";
 
   // Determine if the Admin link should be shown
   const showAdminLink = !loadingAuth && profile?.role?.toLowerCase() === 'admin';
@@ -77,27 +77,27 @@ const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
       aria-hidden="true"
     >
       <div
-        className="fixed inset-y-0 left-0 w-72 bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out z-50 flex flex-col transform"
+        className="fixed inset-y-0 left-0 w-72 p-4 shadow-2xl border-r border-white/20 bg-white/10 backdrop-blur-md z-50 flex flex-col transform" // Utilisation des classes Tailwind pour glassmorphisme
         onClick={(e) => e.stopPropagation()}
       >
         {/* Menu Header */}
-        <div className="flex items-center justify-between px-2 py-1 border-b border-gray-700">
-           <Link to={user ? "/dashboard" : "/"} onClick={onClose}>
-             <img src={JDC_LOGO_URL} alt="JDC Logo" className="h-8 w-auto" />
+        <div className="flex items-center justify-between px-2 py-3 border-b border-white/10"> {/* Bordure cohérente */}
+           <Link to={user ? "/dashboard" : "/"} onClick={onClose} className="text-xl font-bold text-text-primary">
+             JDC Portal {/* Correspond au Header */}
            </Link>
           <button
             onClick={onClose}
-            className="text-jdc-gray-400 hover:text-white focus:outline-none"
+            className="text-text-secondary hover:text-text-primary focus:outline-none p-1 rounded-md hover:bg-ui-border"
             aria-label="Fermer le menu"
           >
-            <FaTimes size={12} className="text-xs" />
+            <FaTimes size={18} />
           </button>
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-2 py-4 space-y-1">
+        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
           {loadingAuth ? (
-             <div className="px-3 py-2 text-jdc-gray-400">Chargement...</div>
+             <div className="px-3 py-2 text-text-secondary">Chargement...</div>
           ) : user ? (
             <>
               {/* Regular Nav Items */}
@@ -115,8 +115,8 @@ const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
               ))}
 
               {/* Technique Section */}
-              <div className="pt-2 mt-2 border-t border-jdc-gray-700/50">
-                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Technique</span>
+              <div className="pt-3 mt-3 border-t border-white/10"> {/* Bordure cohérente */}
+                <span className="px-3 text-xs font-semibold uppercase text-text-tertiary tracking-wider">Technique</span>
                 {techniqueItems.map((item) => (
                   <NavLink
                     key={item.to}
@@ -132,8 +132,8 @@ const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
               </div>
 
               {/* Logistique Section */}
-              <div className="pt-2 mt-2 border-t border-jdc-gray-700/50">
-                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Logistique</span>
+              <div className="pt-3 mt-3 border-t border-white/10"> {/* Bordure cohérente */}
+                <span className="px-3 text-xs font-semibold uppercase text-text-tertiary tracking-wider">Logistique</span>
                 {logistiqueItems.map((item) => (
                   <NavLink
                     key={item.to}
@@ -149,10 +149,10 @@ const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
               </div>
 
               {/* Commercial Section */}
-              <div className="pt-2 mt-2 border-t border-jdc-gray-700/50">
-                <span className="px-3 text-xs font-semibold uppercase text-jdc-gray-400">Commercial</span>
+              <div className="pt-3 mt-3 border-t border-white/10"> {/* Bordure cohérente */}
+                <span className="px-3 text-xs font-semibold uppercase text-text-tertiary tracking-wider">Commercial</span>
                 {commercialItems.length === 0 ? (
-                   <div className="px-3 py-2 text-sm text-jdc-gray-400">
+                   <div className="px-3 py-2 text-sm text-text-secondary">
                      Aucun élément disponible
                    </div>
                 ) : (
@@ -174,46 +174,60 @@ const adminItem = { name: 'Admin', to: '/admin', icon: FaCog };
 
               {/* Conditionally render Admin link */}
               {showAdminLink && (
-                <NavLink
-                  to={adminItem.to}
-                  onClick={onClose}
-                  className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
-                  prefetch="intent"
-                >
-                  <adminItem.icon className="mr-3 h-5 w-5" />
-                  {adminItem.name}
-                </NavLink>
+                <div className="pt-3 mt-3 border-t border-white/10"> {/* Bordure cohérente */}
+                  <NavLink
+                    to={adminItem.to}
+                    onClick={onClose}
+                    className={({ isActive }) => `${linkBaseClass} ${isActive ? linkActiveClass : linkInactiveClass}`}
+                    prefetch="intent"
+                  >
+                    <adminItem.icon className="mr-3 h-5 w-5" />
+                    {adminItem.name}
+                  </NavLink>
+                </div>
               )}
             </>
           ) : (
-            <div className="px-3 py-2 text-jdc-gray-400">Veuillez vous connecter.</div>
+            <div className="px-3 py-2 text-text-secondary">Veuillez vous connecter.</div>
           )}
         </nav>
 
         {/* User Info / Actions Footer */}
-        <div className="border-t border-jdc-gray-800 p-4 bg-jdc-blue-dark/50">
+        <div className="mt-auto border-t border-white/10 p-4 bg-white/5"> {/* Footer avec fond légèrement différent et bordure cohérente */}
           {loadingAuth ? (
-            <div className="h-10 bg-jdc-gray-700 rounded animate-pulse"></div>
+            <div className="h-10 bg-ui-border rounded animate-pulse"></div>
           ) : user ? (
             <div className="space-y-3">
-              <div className="flex items-center space-x-3 text-sm text-jdc-gray-300 p-2 rounded-lg bg-jdc-gray-800/30">
-                <FaUserCircle className="h-6 w-6" />
-                <div className="flex flex-col">
+              <div className="flex items-center space-x-3 text-sm text-text-primary p-2 rounded-lg bg-ui-border">
+                <FaUserCircle className="h-6 w-6 text-brand-blue" />
+                <div className="flex flex-col overflow-hidden">
                   <span className="font-medium truncate" title={user.email ?? ''}>
                     {profile?.displayName || user.displayName || user.email?.split('@')[0]}
                   </span>
-                  <span className="text-xs text-jdc-gray-400 truncate">
+                  <span className="text-xs text-text-secondary truncate">
                     {user.email}
                   </span>
                 </div>
               </div>
+               {/* Bouton Déconnexion */}
+              <Form method="post" action="/logout" onSubmit={onClose}>
+                <Button
+                  type="submit"
+                  variant="ghost" // ou un variant stylé pour la déconnexion
+                  size="sm"
+                  className="w-full !justify-start text-text-secondary hover:text-text-primary hover:!bg-ui-border"
+                  leftIcon={<FaSignOutAlt />}
+                >
+                  Déconnexion
+                </Button>
+              </Form>
             </div>
           ) : (
             <Button 
-              variant="primary" 
+              variant="primary" // Ce variant devrait utiliser bg-brand-blue
               size="sm" 
               onClick={() => { onLoginClick(); onClose(); }} 
-              className="w-full transition-transform hover:scale-105" 
+              className="w-full transition-transform hover:scale-105 bg-brand-blue hover:bg-brand-blue-dark text-white"
               leftIcon={<FaSignInAlt />}
             >
               Connexion

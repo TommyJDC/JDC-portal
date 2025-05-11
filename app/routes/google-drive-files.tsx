@@ -88,52 +88,70 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 // Component to display the files
+import { FaGoogleDrive, FaArrowLeft, FaExclamationTriangle, FaFolderOpen } from 'react-icons/fa'; // Importer des icônes
+
 export default function GoogleDriveFiles() {
-  // Use the explicit LoaderData interface
   const { files, error } = useLoaderData<LoaderData>();
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-white">Fichiers Google Drive (Test API)</h1>
-
-      <Link to="/dashboard" className="text-jdc-blue hover:underline">
-        &larr; Retour au Tableau de Bord
-      </Link>
+    <div className="space-y-6"> {/* Augmenter l'espacement global */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-text-primary flex items-center">
+          <FaGoogleDrive className="mr-3 text-brand-blue h-6 w-6" />
+          Fichiers Google Drive
+        </h1>
+        <Link to="/dashboard" className="inline-flex items-center text-sm text-brand-blue hover:text-brand-blue-light hover:underline">
+          <FaArrowLeft className="mr-1.5 h-4 w-4" />
+          Retour au Tableau de Bord
+        </Link>
+      </div>
 
       {error && (
-        <div className="bg-red-900 bg-opacity-50 text-red-300 p-4 rounded-md">
-          <p className="font-semibold">Erreur lors de la récupération des fichiers :</p>
-          <p>{error}</p>
-          <p className="mt-2 text-sm">Cela peut être dû à un jeton expiré ou à des permissions insuffisantes. Essayez de vous reconnecter via Google.</p>
-           <Link to="/login" className="text-jdc-yellow hover:underline font-semibold mt-1 block">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-300 p-4 rounded-md shadow-md">
+          <div className="flex items-center mb-2">
+            <FaExclamationTriangle className="h-5 w-5 mr-2 text-red-400" />
+            <p className="font-semibold text-red-200">Erreur lors de la récupération des fichiers :</p>
+          </div>
+          <p className="text-sm">{error}</p>
+          <p className="mt-2 text-xs text-red-300/80">Cela peut être dû à un jeton expiré ou à des permissions insuffisantes. Essayez de vous reconnecter via Google.</p>
+           <Link to="/login?error=token_invalid_drive_ui" className="text-brand-yellow hover:underline font-semibold mt-2 text-sm inline-block">
              Se reconnecter
            </Link>
         </div>
       )}
 
       {!error && files && files.length > 0 && (
-        <ul className="bg-jdc-card rounded-lg shadow p-4 space-y-2">
-          {files.map((file) => (
-            <li key={file.id} className="border-b border-jdc-gray-700 pb-2 last:border-b-0">
-              <p className="font-medium text-white">{file.name}</p>
-              <p className="text-sm text-jdc-gray-400">{file.mimeType}</p>
-              {file.webViewLink && (
-                <a
-                  href={file.webViewLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-jdc-blue hover:underline"
-                >
-                  Ouvrir dans Drive
-                </a>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="bg-ui-surface rounded-lg shadow-md border border-ui-border">
+          <ul className="divide-y divide-ui-border/70">
+            {files.map((file) => (
+              <li key={file.id} className="p-3 sm:p-4 hover:bg-ui-surface-hover transition-colors">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-text-primary text-sm">{file.name}</p>
+                    <p className="text-xs text-text-secondary">{file.mimeType}</p>
+                  </div>
+                  {file.webViewLink && (
+                    <a
+                      href={file.webViewLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-brand-blue hover:text-brand-blue-light hover:underline ml-4 flex-shrink-0"
+                    >
+                      Ouvrir
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {!error && files && files.length === 0 && (
-        <p className="text-jdc-gray-400">Aucun fichier trouvé (ou accès non autorisé).</p>
+        <div className="text-center py-10 text-text-secondary bg-ui-surface rounded-lg shadow-md border border-ui-border">
+          <FaFolderOpen className="mx-auto text-4xl mb-3 opacity-40" />
+          <p>Aucun fichier trouvé (ou accès non autorisé).</p>
+        </div>
       )}
     </div>
   );

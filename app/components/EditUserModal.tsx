@@ -141,12 +141,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const currentSelectedSectors = formData.secteurs || [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 transition-opacity duration-300 ease-in-out">
-      <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-jdc-blue transition-all duration-300 ease-in-out w-full max-w-md transform scale-100">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-white">Modifier l'utilisateur</h2>
-          <button onClick={onClose} className="text-jdc-gray-400 hover:text-white" disabled={isSaving}>
-            &times;
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"> {/* z-index plus élevé, fond standard pour modales */}
+      <div className="bg-ui-surface/90 backdrop-blur-lg border border-ui-border/70 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 sm:p-6 border-b border-ui-border/50 sticky top-0 bg-ui-surface/80 backdrop-blur-lg z-10">
+          <h2 className="text-lg font-semibold text-text-primary">Modifier l'utilisateur</h2>
+          <button onClick={onClose} className="text-text-secondary hover:text-text-primary p-1 rounded-md hover:bg-white/10" disabled={isSaving}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -161,11 +163,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 p-4 sm:p-6 overflow-y-auto flex-1">
           {/* UID (Debug visualisation) */}
           <div>
-            <label className="block text-sm font-medium text-jdc-gray-300 mb-1">ID Utilisateur</label>
-            <p className="text-sm text-white bg-jdc-gray-800 px-3 py-2 rounded border border-gray-700">
+            <label className="block text-sm font-medium text-text-secondary mb-1">ID Utilisateur</label>
+            <p className="text-sm text-text-primary bg-ui-background/50 px-3 py-2 rounded-md border border-ui-border">
               {formData.uid || 'Manquant'}
             </p>
           </div>
@@ -173,8 +175,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           {/* Blockchain Address (Debug visualisation) */}
           {user.blockchainAddress && (
             <div>
-              <label className="block text-sm font-medium text-jdc-gray-300 mb-1">Adresse Blockchain</label>
-              <p className="text-sm text-white bg-jdc-gray-800 px-3 py-2 rounded border border-gray-700 truncate">
+              <label className="block text-sm font-medium text-text-secondary mb-1">Adresse Blockchain</label>
+              <p className="text-sm text-text-primary bg-ui-background/50 px-3 py-2 rounded-md border border-ui-border truncate">
                 {user.blockchainAddress}
               </p>
             </div>
@@ -182,8 +184,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
           {/* Email (Read-only) */}
           <div>
-            <label className="block text-sm font-medium text-jdc-gray-300 mb-1">Email</label>
-            <p className="text-sm text-white bg-jdc-gray-800 px-3 py-2 rounded">{formData.email}</p>
+            <label className="block text-sm font-medium text-text-secondary mb-1">Email</label>
+            <p className="text-sm text-text-primary bg-ui-background/50 px-3 py-2 rounded-md border border-ui-border">{formData.email}</p>
           </div>
 
           {/* Display Name */}
@@ -195,23 +197,24 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             onChange={handleChange}
             disabled={isSaving}
             placeholder="Nom affiché dans l'application"
+            className="bg-ui-background/70 border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue"
+            labelClassName="text-text-secondary"
           />
 
           {/* Role */}
-          <div> {/* Wrap Select with a div for label */}
-            <label htmlFor="role" className="block text-sm font-medium text-jdc-gray-300 mb-1">Rôle</label>
+          <div>
+            <label htmlFor="role" className="block text-sm font-medium text-text-secondary mb-1">Rôle</label>
             <Select
               value={formData.role || ''}
               onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}
               disabled={isSaving}
-              required
             >
-              <SelectTrigger id="role" name="role" className="w-full bg-gray-900 text-white rounded-md px-3 py-2 text-sm border border-gray-700 focus:ring-jdc-blue focus:border-jdc-blue">
+              <SelectTrigger id="role" className="w-full bg-ui-background/70 border-ui-border text-text-primary focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
                 <SelectValue placeholder="Sélectionner un rôle" />
               </SelectTrigger>
-              <SelectContent className="bg-gray-800 border border-gray-700">
+              <SelectContent className="bg-ui-surface border-ui-border text-text-primary">
                 {roleOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value} className="text-white hover:bg-gray-700">
+                  <SelectItem key={option.value} value={option.value} className="hover:bg-ui-background focus:bg-ui-background">
                     {option.label}
                   </SelectItem>
                 ))}
@@ -221,23 +224,19 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
           {/* Sector Buttons */}
           <div>
-            <label className="block text-sm font-medium text-jdc-gray-300 mb-2">Secteurs</label>
+            <label className="block text-sm font-medium text-text-secondary mb-2">Secteurs</label>
             <div className="flex flex-wrap gap-2">
               {availableSectors.map((sector) => {
                 const isSelected = currentSelectedSectors.includes(sector);
                 return (
                   <Button
                     key={sector}
-                    type="button" // Important: prevent form submission
-                    variant={isSelected ? 'primary' : 'secondary'} // Style based on selection
+                    type="button"
+                    variant={isSelected ? 'primary' : 'outline'}
                     size="sm"
                     onClick={() => handleSectorToggle(sector)}
                     disabled={isSaving}
-                    className={`transition-colors duration-150 ${
-                      isSelected
-                        ? 'bg-jdc-yellow text-black hover:bg-yellow-300'
-                        : 'bg-jdc-800 text-jdc-gray-300 hover:bg-jdc-gray-700 border border-gray-700' // Added border for consistency
-                    } px-3 py-1.5 rounded-md text-sm font-medium ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`${isSelected ? 'bg-brand-blue text-white' : 'border-ui-border text-text-secondary hover:bg-ui-border hover:text-text-primary'}`}
                   >
                     {sector}
                   </Button>
@@ -247,24 +246,23 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
 
           {error && (
-            <div className="bg-red-900/30 border border-red-700 rounded p-2">
-              <p className="text-sm text-red-400">{error}</p>
+            <div className="bg-red-500/10 border border-red-500/30 text-red-300 p-3 rounded-md text-sm">
+              <p>{error}</p>
             </div>
           )}
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
+          <div className="flex justify-end space-x-3 pt-4 sticky bottom-0 bg-ui-surface/80 backdrop-blur-lg p-4 -mx-6 -mb-6 rounded-b-lg border-t border-ui-border/50">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="border-ui-border text-text-secondary hover:bg-ui-border">
               Annuler
             </Button>
-            <button
+            <Button
               type="submit"
+              variant="primary"
               disabled={isSaving || Object.keys(validationErrors).length > 0}
-              className={`w-full px-4 py-2 text-sm font-medium text-black bg-jdc-yellow rounded-md hover:bg-yellow-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
-                isSaving || Object.keys(validationErrors).length > 0 ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className="bg-brand-blue hover:bg-brand-blue-dark text-white"
             >
-              {isSaving ? 'Sauvegarde en cours...' : 'Sauvegarder les modifications'}
-            </button>
+              {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+            </Button>
           </div>
         </form>
       </div>

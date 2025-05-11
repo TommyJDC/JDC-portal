@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  @apply bg-jdc-black text-jdc-yellow;
+  @apply text-text-primary min-h-screen; /* bg-ui-background retiré, le fond sera géré par app/root.tsx */
   font-size: 0.875rem; /* Réduire la taille de la police de base */
 }
 

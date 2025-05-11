@@ -135,16 +135,23 @@ export interface Article {
 }
 
 export interface Shipment {
-  id?: string;
+  id?: string; // Identifiant de l'envoi (peut-être le numéro de BT ou un ID Firestore)
   codeClient?: string;
-  numeroCTN?: string;
-  client?: string;
+  nomClient?: string; // Nom du client
+  client?: string; // Gardé pour rétrocompatibilité si certaines données l'utilisent encore
   secteur?: string;
-  dateLivraison?: Date | string;
-  statut?: string;
-  produits?: string[];
-  createdAt?: Date;
+  articleNom?: string; // Nom de l'article principal
+  produits?: string[]; // Peut-être une liste si plusieurs produits, ou utiliser articleNom
+  numeroCTN?: string; // Numéro de suivi CTN (TNT)
+  bt?: string; // Bon de Transport, pourrait être le même que numeroCTN ou id
+  statutExpedition?: string; // Statut de l'expédition (ex: "OUI", "NON")
+  statut?: string; // Gardé pour rétrocompatibilité
+  trackingLink?: string; // Lien de suivi direct
+  date?: Date | string; // Date de création ou d'événement principal de l'envoi
+  dateLivraison?: Date | string; // Date de livraison prévue/réelle
+  createdAt?: Date; // Date de création de l'enregistrement Firestore
   updatedAt?: Date;
+  secret?: string; // Si utilisé
 }
 
 export interface StatsSnapshot {
@@ -181,7 +188,7 @@ export interface InstallationFilters {
 }
 
 // Configuration pour le traitement Gmail
-interface SectorGmailConfig {
+export interface SectorGmailConfig { // Ajout de export
   enabled: boolean;
   labels: string[];       // Labels Gmail à surveiller pour ce secteur
   responsables: string[]; // UID des utilisateurs responsables du traitement pour ce secteur

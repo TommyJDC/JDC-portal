@@ -103,24 +103,24 @@ export default function Admin() {
 
   // Panels d'administration (sans blockchain)
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#1a2250] to-[#1e2746] p-6 font-bold font-jetbrains">
-      <h1 className="text-3xl font-extrabold text-jdc-yellow drop-shadow-neon mb-4">Administration</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <Card>
+    <div className="space-y-6"> {/* Fond géré par root.tsx, p-6 est déjà sur main dans root.tsx */}
+      <h1 className="text-2xl font-semibold text-text-primary">Administration</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> {/* mb-8 retiré, l'espacement est géré par space-y-6 */}
+        <Card className="bg-ui-surface"> {/* Appliquer le fond de carte ici */}
           <CardHeader>
-            <div className="flex items-center text-white">
-              <FaUsers className="mr-3 h-5 w-5 text-jdc-blue" />
+            <div className="flex items-center text-text-primary">
+              <FaUsers className="mr-3 h-5 w-5 text-brand-blue" />
               <span className="font-semibold text-lg">Utilisateurs</span>
             </div>
           </CardHeader>
-          <CardBody>
+          <CardBody> {/* Le padding est géré par CardBody ou Card si noPadding=false */}
             <UserManagementPanel users={users} onEditUser={handleEditUser} />
           </CardBody>
         </Card>
-        <Card>
+        <Card className="bg-ui-surface">
           <CardHeader>
-            <div className="flex items-center text-white">
-              <FaChartBar className="mr-3 h-5 w-5 text-jdc-blue" />
+            <div className="flex items-center text-text-primary">
+              <FaChartBar className="mr-3 h-5 w-5 text-brand-blue" />
               <span className="font-semibold text-lg">Statistiques</span>
             </div>
           </CardHeader>
@@ -128,10 +128,10 @@ export default function Admin() {
             <StatsPanel />
           </CardBody>
         </Card>
-        <Card>
+        <Card className="bg-ui-surface">
           <CardHeader>
-            <div className="flex items-center text-white">
-              <FaBell className="mr-3 h-5 w-5 text-jdc-blue" />
+            <div className="flex items-center text-text-primary">
+              <FaBell className="mr-3 h-5 w-5 text-brand-blue" />
               <span className="font-semibold text-lg">Notifications</span>
             </div>
           </CardHeader>
@@ -139,10 +139,10 @@ export default function Admin() {
             <NotificationPanel />
           </CardBody>
         </Card>
-        <Card>
+        <Card className="bg-ui-surface">
           <CardHeader>
-            <div className="flex items-center text-white">
-              <FaBug className="mr-3 h-5 w-5 text-jdc-blue" />
+            <div className="flex items-center text-text-primary">
+              <FaBug className="mr-3 h-5 w-5 text-brand-blue" />
               <span className="font-semibold text-lg">Logs</span>
             </div>
           </CardHeader>
@@ -151,7 +151,7 @@ export default function Admin() {
           </CardBody>
         </Card>
       </div>
-      {selectedUser && isEditModalOpen && ( // S'assurer que isEditModalOpen est aussi vrai
+      {selectedUser && isEditModalOpen && (
         <EditUserModal 
           user={selectedUser} 
           isOpen={isEditModalOpen}

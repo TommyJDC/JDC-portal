@@ -5,7 +5,7 @@ import { loader } from "./articles.loader";
 import { action } from "./articles.action";
 import type { Article as FirestoreArticle } from "~/types/firestore.types"; // Modifié pour utiliser FirestoreArticle
 import type { UserProfile } from "~/types/firestore.types";
-import type { UserSession } from "~/services/session.server";
+import type { UserSessionData } from "~/services/session.server"; // Correction du type
 import { useOutletContext } from "@remix-run/react";
 import { FaPlus, FaSpinner, FaTimes, FaTrashAlt, FaSearch, FaBoxOpen } from 'react-icons/fa';
 import { Input } from "~/components/ui/Input";
@@ -17,7 +17,7 @@ export { loader, action };
 
 // Interface pour le contexte de l'outlet (inchangée)
 interface OutletContextType {
-  user: UserSession | null; // Changed AppUser to UserSession
+  user: UserSessionData | null; // Correction du type
   profile: UserProfile | null;
   loadingAuth: boolean;
 }
@@ -168,18 +168,18 @@ export default function ArticlesSearch() {
   const isLoadingData = fetcher.state === 'loading';
 
   return (
-    <div className="space-y-6 p-6 bg-gray-900 min-h-screen">
-      <h1 className="text-3xl font-semibold text-white mb-6 flex items-center">
-         <FaSearch className="mr-3 text-jdc-yellow" />
+    <div className="space-y-6"> {/* p-6 est sur le layout parent, bg-gray-900 retiré */}
+      <h1 className="text-2xl font-semibold text-text-primary mb-6 flex items-center">
+         <FaSearch className="mr-3 text-brand-blue h-6 w-6" />
          Recherche d'Articles
-         {isLoadingData && <FaSpinner className="ml-3 text-jdc-yellow animate-spin" title="Chargement..." />}
+         {isLoadingData && <FaSpinner className="ml-3 text-brand-blue animate-spin" title="Chargement..." />}
       </h1>
 
       {/* Formulaire de recherche */}
-      <Form method="get" className="mb-8 p-6 bg-gradient-to-br from-[#10182a]/90 via-[#1a2250]/90 to-[#0a1120]/95 rounded-3xl shadow-2xl border border-jdc-yellow/10 animate-fade-in-up backdrop-blur-xl">
-        <div className="w-full flex flex-col md:flex-row md:items-end md:space-x-6 gap-4 mb-2">
-          <div className="flex-1 flex flex-col justify-end">
-            <label htmlFor="code" className="block text-sm font-extrabold text-jdc-yellow mb-1 md:mb-2 tracking-wide drop-shadow-glow uppercase">
+      <Form method="get" className="p-4 sm:p-6 bg-ui-surface/80 backdrop-blur-lg border border-ui-border/70 rounded-xl shadow-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-end">
+          <div>
+            <label htmlFor="code" className="block text-xs font-medium text-text-secondary mb-1">
               Code Article
             </label>
             <Input
@@ -188,15 +188,14 @@ export default function ArticlesSearch() {
               id="code"
               value={codeSearch}
               onChange={(e) => setCodeSearch(e.target.value)}
-              placeholder="Ex : 12345 ou code exact"
+              placeholder="Ex : 12345"
               disabled={isLoadingData}
-              className="bg-[#10182a]/80 text-white border-jdc-yellow/30 focus:border-jdc-yellow focus:ring-jdc-yellow rounded-xl font-bold placeholder:italic placeholder:text-jdc-yellow/40 shadow-inner"
-              labelClassName="text-jdc-yellow"
+              className="bg-ui-input border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue rounded-md placeholder:text-text-tertiary text-sm"
               autoComplete="off"
             />
           </div>
-          <div className="flex-1 flex flex-col justify-end">
-            <label htmlFor="nom" className="block text-sm font-extrabold text-jdc-yellow mb-1 md:mb-2 tracking-wide drop-shadow-glow uppercase">
+          <div>
+            <label htmlFor="nom" className="block text-xs font-medium text-text-secondary mb-1">
               Nom Article
             </label>
             <Input
@@ -207,21 +206,21 @@ export default function ArticlesSearch() {
               onChange={(e) => setNomSearch(e.target.value)}
               placeholder="Nom partiel ou complet"
               disabled={isLoadingData}
-              className="bg-[#10182a]/80 text-white border-jdc-yellow/30 focus:border-jdc-yellow focus:ring-jdc-yellow rounded-xl font-bold placeholder:italic placeholder:text-jdc-yellow/40 shadow-inner"
-              labelClassName="text-jdc-yellow"
+              className="bg-ui-input border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue rounded-md placeholder:text-text-tertiary text-sm"
               autoComplete="off"
             />
           </div>
-          <div className="flex items-end h-full md:h-[56px] w-full md:w-auto">
+          <div className="md:col-span-2 flex justify-end"> {/* Bouton sur toute la largeur sur mobile, à droite sur desktop */}
             <Button
               type="submit"
-              className="w-full md:w-auto bg-jdc-blue text-white hover:bg-jdc-blue-dark font-extrabold py-2 px-8 rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#10182a] focus:ring-jdc-yellow transition duration-150 ease-in-out flex items-center justify-center gap-2 shadow-lg h-[44px] md:h-[56px] tracking-wide drop-shadow-glow text-base"
+              variant="primary"
+              className="w-full md:w-auto bg-brand-blue hover:bg-brand-blue-dark text-white flex items-center justify-center gap-2 text-sm py-2.5"
               disabled={isLoadingData}
             >
               {isLoadingData ? (
-                <FaSpinner className="animate-spin" />
+                <FaSpinner className="animate-spin h-4 w-4" />
               ) : (
-                <FaSearch />
+                <FaSearch className="h-4 w-4" />
               )}
               <span>{isLoadingData ? 'Recherche...' : 'Rechercher'}</span>
             </Button>
@@ -230,100 +229,89 @@ export default function ArticlesSearch() {
       </Form>
 
       {/* Section des résultats */}
-      <div className="bg-gray-800 p-2 sm:p-4 md:p-6 border border-gray-700 rounded-xl shadow-xl">
-        <h2 className="text-xl font-semibold mb-4 text-white">Résultats</h2>
+      <div className="bg-ui-surface rounded-lg shadow-md p-4 sm:p-6">
+        <h2 className="text-lg font-semibold mb-4 text-text-primary">Résultats de la recherche</h2>
 
         {loaderError && <p className="text-red-400 text-sm mb-3">{loaderError}</p>}
 
-        {/* Afficher l'erreur de l'action seulement si elle existe et a la propriété error */}
         {fetcher.data && !fetcher.data.success && hasErrorProperty(fetcher.data) && (
           <p className="text-red-400 text-sm mb-3">{fetcher.data.error}</p>
         )}
 
-        {isLoadingData && <p className="text-gray-400 italic">Chargement...</p>}
+        {isLoadingData && <div className="flex justify-center items-center py-10"><FaSpinner className="animate-spin text-brand-blue h-8 w-8" /></div>}
 
         {!isLoadingData && !loaderError && (
           <>
             {paginatedArticles && paginatedArticles.length > 0 ? (
-              <div className="flex flex-col divide-y divide-jdc-yellow/10">
-                {paginatedArticles.map((article: FirestoreArticle, idx: number) => { // Modifié pour FirestoreArticle
+              <div className="space-y-3">
+                {paginatedArticles.map((article: FirestoreArticle) => { 
                   const isUploadingCurrent = uploadingImageId === article.code && fetcher.state !== 'idle';
                   const isDeletingCurrent = (imageUrl: string) => deletingImageUrl === imageUrl && fetcher.state !== 'idle';
-                  // Utiliser article.id si disponible et unique, sinon article.code comme fallback.
-                  // Firestore documents ont un ID unique. Si 'id' est mappé depuis l'ID du document Firestore, c'est le meilleur choix.
-                  // Le type FirestoreArticle a id?: string.
                   const uniqueKey = article.id || article.code; 
                   return (
                     <div
-                      key={uniqueKey} // Utiliser une clé unique
-                      className="group flex items-center w-full bg-gradient-to-r from-[#10182a]/80 via-[#1a2250]/80 to-[#0a1120]/90 rounded-2xl shadow-xl border-l-4 border-jdc-yellow/40 px-4 py-3 my-1 font-jetbrains backdrop-blur-xl hover:shadow-neon hover:scale-[1.01] transition-all duration-200 cursor-pointer focus-within:shadow-neon"
-                      style={{ animationDelay: `${0.1 + idx * 0.03}s` }}
+                      key={uniqueKey}
+                      className="group flex flex-col sm:flex-row items-start sm:items-center w-full bg-ui-background hover:bg-ui-background-hover rounded-lg shadow-sm border-l-4 border-brand-blue p-3 sm:p-4 transition-all duration-200 focus-within:ring-2 focus-within:ring-brand-blue"
                       tabIndex={0}
                     >
-                      <FaBoxOpen className="text-jdc-yellow text-xl flex-shrink-0 mr-4 drop-shadow-glow" />
-                      <div className="flex-1 min-w-0 flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-jdc-blue font-extrabold text-base truncate drop-shadow-glow">{article.code}</span>
-                          <span className="text-white font-semibold truncate drop-shadow-glow">{article.designation}</span>
-                        </div>
+                      <FaBoxOpen className="text-brand-blue text-xl flex-shrink-0 mr-3 mt-1 sm:mt-0" />
+                      <div className="flex-1 min-w-0 mb-2 sm:mb-0">
+                        <span className="text-brand-blue font-semibold text-sm block truncate">{article.code}</span>
+                        <span className="text-text-primary text-base font-medium block truncate">{article.designation}</span>
                       </div>
-                      {article.images && article.images.length > 0 && (
-                        <div className="flex flex-row gap-2 ml-4">
-                          {article.images.slice(0, 3).map((imageUrl: string, index: number) => (
-                            // La clé pour cette sous-liste interne peut être l'index ou l'URL si elle est unique dans ce contexte.
-                            <div key={`${uniqueKey}-img-${index}`} className="relative group"> 
-                              <img
-                                src={imageUrl}
-                                alt={article.designation + ' - image ' + (index + 1)}
-                                className="w-10 h-10 object-cover rounded-lg border-2 border-jdc-yellow/20 hover:border-jdc-blue transition-transform duration-200 transform hover:scale-105 shadow group-hover:shadow-lg backdrop-blur-md"
-                                onClick={e => { e.stopPropagation(); openImageModal(imageUrl); }}
-                              />
-                              <button
-                                type="button"
-                                className="absolute -top-2 -right-2 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"
-                                onClick={e => { e.stopPropagation(); handleDeleteImage(article.code, imageUrl); }}
-                                disabled={isDeletingCurrent(imageUrl)}
-                                aria-label="Supprimer l'image"
-                              >
-                                {isDeletingCurrent(imageUrl) ? (
-                                  <FaSpinner className="animate-spin h-3 w-3" />
-                                ) : (
-                                  <FaTrashAlt className="h-3 w-3" />
-                                )}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <div className="flex items-center ml-4">
-                        <button
+                      
+                      {/* Images */}
+                      <div className="flex flex-row flex-wrap gap-2 items-center my-2 sm:my-0 sm:ml-4">
+                        {article.images && article.images.slice(0, 3).map((imageUrl: string, index: number) => (
+                          <div key={`${uniqueKey}-img-${index}`} className="relative group/image"> 
+                            <img
+                              src={imageUrl}
+                              alt={`${article.designation} - image ${index + 1}`}
+                              className="w-10 h-10 object-cover rounded-md border border-ui-border hover:opacity-80 cursor-pointer transition-opacity"
+                              onClick={e => { e.stopPropagation(); openImageModal(imageUrl); }}
+                            />
+                            <Button
+                              type="button"
+                              variant="danger"
+                              size="icon"
+                              className="absolute -top-1.5 -right-1.5 h-5 w-5 p-0.5 opacity-0 group-hover/image:opacity-100 transition-opacity"
+                              onClick={e => { e.stopPropagation(); handleDeleteImage(article.code, imageUrl); }}
+                              disabled={isDeletingCurrent(imageUrl)}
+                              aria-label="Supprimer l'image"
+                            >
+                              {isDeletingCurrent(imageUrl) ? <FaSpinner className="animate-spin h-2.5 w-2.5" /> : <FaTrashAlt className="h-2.5 w-2.5" />}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Bouton Ajouter Photo */}
+                      <div className="flex items-center ml-auto sm:ml-4 mt-2 sm:mt-0">
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           onClick={e => { e.stopPropagation(); handleAddPhotoClick(article.code); }}
                           disabled={isUploadingCurrent}
-                          className="inline-flex items-center px-3 py-1.5 text-xs font-bold rounded-xl text-white bg-jdc-blue hover:bg-jdc-blue-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-jdc-blue disabled:opacity-50 disabled:cursor-not-allowed shadow border border-jdc-yellow/20 hover:shadow-neon transition-all"
-                          aria-label="Ajouter une photo à l'article"
+                          className="border-ui-border text-text-secondary hover:bg-ui-border hover:text-text-primary flex items-center gap-1.5 text-xs py-1 px-2.5"
+                          aria-label="Ajouter une photo"
                         >
                           {isUploadingCurrent ? (
-                            <>
-                              <FaSpinner className="animate-spin mr-2 h-4 w-4" />
-                              <span>Upload en cours...</span>
-                            </>
+                            <> <FaSpinner className="animate-spin h-3.5 w-3.5" /> Upload... </>
                           ) : (
-                            <>
-                              <FaPlus className="mr-2 h-4 w-4" />
-                              <span>Ajouter une photo</span>
-                            </>
+                            <> <FaPlus className="h-3.5 w-3.5" /> Photo </>
                           )}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-gray-400">
-                {codeSearch || nomSearch ? "Aucun article trouvé pour les critères spécifiés." : "Veuillez spécifier au moins un critère de recherche."}
-              </p>
+              <div className="text-center py-10 text-text-secondary">
+                <FaBoxOpen className="mx-auto text-4xl mb-3 opacity-40" />
+                <p>{codeSearch || nomSearch ? "Aucun article trouvé." : "Veuillez lancer une recherche."}</p>
+              </div>
             )}
           </>
         )}
@@ -343,18 +331,19 @@ export default function ArticlesSearch() {
             <img
               src={selectedImageUrl}
               alt="Image agrandie"
-              className="max-w-full max-h-[90vh] object-contain"
+              className="max-w-full max-h-[90vh] object-contain rounded-md" // Ajout de rounded-md
             />
             <button
               onClick={closeImageModal}
-              className="absolute top-2 right-2 bg-black bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90 transition"
+              className="absolute top-3 right-3 bg-ui-background/70 text-text-primary p-1.5 rounded-full hover:bg-ui-border transition-colors"
               aria-label="Fermer"
             >
-              <FaTimes className="h-5 w-5" />
+              <FaTimes className="h-4 w-4" />
             </button>
           </div>
         </div>
       )}
+      {/* TODO: Ajouter la pagination ici si nécessaire, en utilisant totalPages et currentPage */}
     </div>
   );
 }

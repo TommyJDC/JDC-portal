@@ -265,28 +265,33 @@ export default function UserProfileDirectPage() {
   const departmentOptions = AVAILABLE_DEPARTMENTS.map(dept => ({ value: dept, label: dept.charAt(0).toUpperCase() + dept.slice(1) }));
 
   return (
-    <div className="min-h-screen bg-jdc-gray-900 flex flex-col items-center justify-center p-4">
-      <div className="bg-green-700 text-white px-4 py-3 rounded-lg mb-4 max-w-md w-full text-center">
-        <p className="font-bold">Mode d'authentification directe</p>
-        <p className="text-sm">Ce profil utilise la méthode d'authentification robuste</p>
-      </div>
+    <div className="min-h-full flex flex-col items-center justify-start py-8 px-4"> {/* Fond géré par root, ajustement du padding et de la justification */}
+      {/* Les messages d'info/erreur seront stylisés avec le nouveau thème */}
+      <div className="bg-ui-surface shadow-lg rounded-lg p-6 sm:p-8 max-w-lg w-full"> {/* Carte principale pour le formulaire */}
+        <h1 className="text-2xl font-semibold text-text-primary text-center mb-6">
+          Mon Profil 
+          {/* Le "(Direct)" peut être conditionnel ou stylisé différemment si besoin */}
+          {/* <span className="text-brand-blue-light text-lg">(Direct)</span> */}
+        </h1>
+        
+        {/* Message d'info sur le mode d'authentification (si pertinent de le garder) */}
+        {/* <div className="bg-brand-blue/10 border border-brand-blue/30 text-brand-blue-light px-4 py-3 rounded-md mb-6 text-sm text-center">
+          <p>Ce profil utilise la méthode d'authentification directe.</p>
+        </div> */}
 
-      {fallbackMode && (
-        <div className="bg-yellow-700 text-white px-4 py-3 rounded-lg mb-4 max-w-md w-full text-center">
-          <p className="font-bold">Mode de secours actif</p>
-          <p className="text-sm">L'accès à la blockchain a échoué. Certaines fonctionnalités sont limitées.</p>
-          {error && <p className="text-xs mt-2 text-yellow-200">{error}</p>}
-        </div>
-      )}
+        {fallbackMode && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 px-4 py-3 rounded-md mb-6 text-sm">
+            <p className="font-semibold">Mode de secours actif</p>
+            <p>L'accès à la blockchain a échoué. Certaines fonctionnalités sont limitées.</p>
+            {error && <p className="text-xs mt-1">{error}</p>}
+          </div>
+        )}
 
-      <div className="bg-jdc-card rounded-lg shadow-lg p-8 max-w-md w-full">
-        <h1 className="text-2xl font-bold text-white text-center mb-6">Mon Profil <span className="text-yellow-400">(Direct)</span></h1>
-
-        <Form method="post" className="space-y-4">
+        <Form method="post" className="space-y-5">
           {/* Email (Read-only) */}
           <div>
-            <label className="block text-sm font-medium text-jdc-gray-300 mb-1">Email</label>
-            <p className="text-sm text-white bg-jdc-gray-800 px-3 py-2 rounded">{formData.email}</p>
+            <label className="block text-sm font-medium text-text-secondary mb-1">Email</label>
+            <p className="text-sm text-text-primary bg-ui-background/50 px-3 py-2 rounded-md border border-ui-border">{formData.email}</p>
           </div>
 
           {/* Display Name */}
@@ -298,6 +303,8 @@ export default function UserProfileDirectPage() {
             onChange={handleChange}
             disabled={isSubmitting}
             placeholder="Nom affiché dans l'application"
+            className="bg-ui-background/70 border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue"
+            labelClassName="text-text-secondary"
           />
 
           {/* Nom */}
@@ -309,6 +316,8 @@ export default function UserProfileDirectPage() {
             onChange={handleChange}
             disabled={isSubmitting}
             placeholder="Votre nom complet"
+            className="bg-ui-background/70 border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue"
+            labelClassName="text-text-secondary"
           />
 
           {/* Phone */}
@@ -320,6 +329,8 @@ export default function UserProfileDirectPage() {
             onChange={handleChange}
             disabled={isSubmitting}
             placeholder="Votre numéro de téléphone"
+            className="bg-ui-background/70 border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue"
+            labelClassName="text-text-secondary"
           />
 
           {/* Address */}
@@ -331,6 +342,8 @@ export default function UserProfileDirectPage() {
             onChange={handleChange}
             disabled={isSubmitting}
             placeholder="Votre adresse"
+            className="bg-ui-background/70 border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue"
+            labelClassName="text-text-secondary"
           />
 
           {/* Job Title */}
@@ -342,11 +355,13 @@ export default function UserProfileDirectPage() {
             onChange={handleChange}
             disabled={isSubmitting}
             placeholder="Votre titre de poste"
+            className="bg-ui-background/70 border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue"
+            labelClassName="text-text-secondary"
           />
 
           {/* Department */}
-          <div className="space-y-1">
-            <label htmlFor="department" className="block text-sm font-medium text-jdc-gray-300">
+          <div>
+            <label htmlFor="department" className="block text-sm font-medium text-text-secondary mb-1">
               Département
             </label>
             <select
@@ -355,7 +370,7 @@ export default function UserProfileDirectPage() {
               value={formData.department || ''}
               onChange={handleChange}
               disabled={isSubmitting}
-              className="bg-jdc-gray-800 text-white px-3 py-2 rounded"
+              className="w-full block rounded-md bg-ui-background/70 border-ui-border text-text-primary focus:border-brand-blue focus:ring-1 focus:ring-brand-blue py-2 px-3 shadow-sm"
             >
               <option value="">Sélectionnez un département</option>
               {departmentOptions.map((option) => (
@@ -367,35 +382,35 @@ export default function UserProfileDirectPage() {
           </div>
 
           {/* Sectors */}
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-jdc-gray-300">
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
               Secteurs
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {AVAILABLE_SECTORS.map((sector) => (
                 <div
                   key={sector}
                   className={`
-                    cursor-pointer px-3 py-2 rounded-md text-sm
+                    cursor-pointer px-3 py-2 rounded-md text-sm font-medium border
                     ${
                       formData.secteurs?.includes(sector)
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-jdc-gray-800 text-jdc-gray-300 hover:bg-jdc-gray-700'
+                        ? 'bg-brand-blue text-white border-brand-blue-dark'
+                        : 'bg-ui-background/70 text-text-secondary border-ui-border hover:bg-ui-border'
                     }
                   `}
                   onClick={() => handleSectorToggle(sector)}
                 >
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      name="sectors"
-                      value={sector}
-                      checked={formData.secteurs?.includes(sector) || false}
-                      onChange={() => {}}
-                      className="hidden"
-                    />
-                    <span>{sector}</span>
-                  </div>
+                  {/* Checkbox cachée pour la sémantique du formulaire */}
+                  <input
+                    type="checkbox"
+                    name="sectors"
+                    value={sector}
+                    checked={formData.secteurs?.includes(sector) || false}
+                    onChange={() => {}} // Géré par onClick sur le div parent
+                    className="hidden" 
+                    aria-hidden="true"
+                  />
+                  <span>{sector}</span>
                 </div>
               ))}
             </div>
@@ -404,42 +419,32 @@ export default function UserProfileDirectPage() {
           {/* Submit Button */}
           <Button
             type="submit"
-            className="w-full"
+            variant="primary"
+            className="w-full bg-brand-blue hover:bg-brand-blue-dark"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Enregistrement en cours..." : "Enregistrer les modifications"}
+            {isSubmitting ? "Enregistrement..." : "Enregistrer les modifications"}
           </Button>
 
           {/* Bouton Retour */}
-          <div className="text-center mt-4">
-            <Link to="/dashboard" className="text-jdc-gray-300 hover:text-white">
+          <div className="text-center">
+            <Link to="/dashboard" className="text-sm text-text-secondary hover:text-brand-blue hover:underline">
               Retour au tableau de bord
             </Link>
           </div>
         </Form>
 
-        {/* Liens vers d'autres pages */}
-        <div className="mt-6 border-t border-jdc-gray-700 pt-4">
-          <div className="text-sm text-jdc-gray-400 mb-2">Liens rapides:</div>
-          <div className="flex flex-wrap gap-2">
+        {/* Section Paramètres */}
+        <div className="mt-8 border-t border-ui-border/50 pt-6">
+          <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-3">Paramètres</h3>
+          <div className="flex flex-col space-y-2">
             <Link 
-              to="/user-profile" 
-              className="text-xs text-blue-400 hover:underline"
+              to="/gmail-config" 
+              className="text-sm text-brand-blue hover:text-brand-blue-light hover:underline"
             >
-              Version standard du profil
+              Configuration Gmail et Traitement Automatique
             </Link>
-            <Link 
-              to="/diagnostic-auth" 
-              className="text-xs text-green-400 hover:underline"
-            >
-              Diagnostic d'authentification
-            </Link>
-            <Link 
-              to="/reset-session" 
-              className="text-xs text-red-400 hover:underline"
-            >
-              Réinitialiser session
-            </Link>
+            {/* Vous pouvez ajouter d'autres liens de paramètres ici si nécessaire */}
           </div>
         </div>
       </div>

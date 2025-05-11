@@ -5,7 +5,7 @@ import { loader } from "./tickets-sap.loader";
 import { action } from "./tickets-sap.action";
 import type { TicketsSapLoaderData } from "./tickets-sap.loader";
 import type { SapTicket, UserProfile } from "~/types/firestore.types";
-import type { UserSession } from "~/services/session.server";
+import type { UserSessionData } from "~/services/session.server"; // Correction du type
 import { Input } from "~/components/ui/Input";
 import { Button } from "~/components/ui/Button";
 import TicketSAPDetails from "~/components/TicketSAPDetails";
@@ -45,7 +45,7 @@ const parseSapTicketDates = (ticket: JsonSapTicket): SapTicket => ({
 export { loader, action };
 
 type OutletContextType = {
-  user: UserSession | null;
+  user: UserSessionData | null; // Correction du type
 };
 
 const groupTicketsByRaisonSociale = (tickets: SapTicket[]): Map<string, SapTicket[]> => {
@@ -226,50 +226,52 @@ export default function TicketsSap() {
   const isLoading = revalidator.state === 'loading';
 
   return (
-    <div className="space-y-4 p-4 min-h-screen bg-jdc-black animate-fade-in-up">
-      <h1 className="text-2xl font-extrabold text-jdc-yellow mb-4 flex items-center drop-shadow-lg animate-fade-in-up">
-        <FaTicketAlt className="mr-3 text-jdc-yellow text-3xl" />
-        Gestion des Tickets SAP
-        {isLoading && <FaSpinner className="ml-3 text-jdc-yellow animate-spin" title="Rafraîchissement..." />}
-      </h1>
+    <div className="space-y-6"> {/* p-4 retiré, sera géré par le layout parent. bg-jdc-black et animate retirés */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold text-text-primary flex items-center">
+          <FaTicketAlt className="mr-3 text-brand-blue h-7 w-7" />
+          Gestion des Tickets SAP
+        </h1>
+        {isLoading && <FaSpinner className="ml-3 text-brand-blue animate-spin" title="Rafraîchissement..." />}
+      </div>
 
       {/* Bandeau de statistiques */}
-      <div className="flex flex-wrap gap-3 mb-4 animate-fade-in-up">
-        <div className="flex-1 min-w-[140px] bg-jdc-yellow rounded-lg shadow-md p-3 flex flex-col items-center justify-center border border-jdc-yellow">
-          <span className="text-xl font-bold text-jdc-black drop-shadow">{ticketStats.total}</span>
-          <span className="text-xs font-semibold text-jdc-black uppercase tracking-wider">Total</span>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
+          <span className="text-2xl font-bold text-text-primary">{ticketStats.total}</span>
+          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Total</span>
         </div>
-        <div className="flex-1 min-w-[140px] bg-jdc-card rounded-lg shadow-md p-3 flex flex-col items-center justify-center border border-jdc-yellow">
-          <span className="text-xl font-bold text-jdc-yellow drop-shadow">{ticketStats.ouverts}</span>
-          <span className="text-xs font-semibold text-jdc-yellow uppercase tracking-wider">Ouverts</span>
+        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
+          <span className="text-2xl font-bold text-text-primary">{ticketStats.ouverts}</span>
+          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Ouverts</span>
         </div>
-        <div className="flex-1 min-w-[140px] bg-jdc-card rounded-lg shadow-md p-3 flex flex-col items-center justify-center border border-jdc-yellow">
-          <span className="text-xl font-bold text-jdc-yellow drop-shadow">{ticketStats.enCours}</span>
-          <span className="text-xs font-semibold text-jdc-yellow uppercase tracking-wider">En cours</span>
+        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
+          <span className="text-2xl font-bold text-text-primary">{ticketStats.enCours}</span>
+          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">En cours</span>
         </div>
-        <div className="flex-1 min-w-[140px] bg-jdc-card rounded-lg shadow-md p-3 flex flex-col items-center justify-center border border-jdc-yellow">
-          <span className="text-xl font-bold text-jdc-yellow drop-shadow">{ticketStats.clos}</span>
-          <span className="text-xs font-semibold text-jdc-yellow uppercase tracking-wider">Clos</span>
+        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
+          <span className="text-2xl font-bold text-text-primary">{ticketStats.clos}</span>
+          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Clos</span>
         </div>
-        <div className="flex-1 min-w-[140px] bg-jdc-card rounded-lg shadow-md p-3 flex flex-col items-center justify-center border border-jdc-yellow">
-          <span className="text-xl font-bold text-jdc-yellow drop-shadow">{ticketStats.autres}</span>
-          <span className="text-xs font-semibold text-jdc-yellow uppercase tracking-wider">Autres</span>
+        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
+          <span className="text-2xl font-bold text-text-primary">{ticketStats.autres}</span>
+          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Autres</span>
         </div>
       </div>
 
       {/* Filtres sticky */}
-      <div className="sticky top-16 z-30 bg-jdc-card bg-opacity-90 rounded-xl shadow-lg border border-jdc-yellow/50 mb-4 animate-fade-in-up backdrop-blur-sm">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3">
-          <div className="col-span-1">
-            <label htmlFor="sector-filter" className="block text-xs font-bold text-jdc-yellow mb-1 flex items-center gap-1">
-              <FaFilter /> Secteur
+      <div className="sticky top-16 z-20 bg-white/5 backdrop-blur-md rounded-lg shadow-lg border border-white/10 p-3 mb-6"> {/* Styles glassmorphiques du nouveau thème, z-20 pour être sous le header (z-30) */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label htmlFor="sector-filter" className="block text-xs font-medium text-text-secondary mb-1">
+              Secteur
             </label>
             <select
               id="sector-filter"
               name="sector-filter"
               value={selectedSector}
               onChange={(e) => setSelectedSector(e.target.value)}
-              className="block w-full rounded-md bg-jdc-black border-jdc-yellow/50 focus:border-jdc-yellow focus:ring focus:ring-jdc-yellow/40 text-jdc-yellow py-1 px-2 text-xs shadow"
+              className="block w-full rounded-md bg-ui-background/70 border-ui-border focus:border-brand-blue focus:ring focus:ring-brand-blue/40 text-text-primary py-1.5 px-2 text-xs shadow-sm"
               disabled={isLoading || availableSectors.length === 0}
             >
               <option value="">Tous</option>
@@ -278,11 +280,11 @@ export default function TicketsSap() {
               ))}
             </select>
             {availableSectors.length === 0 && !isLoading && !loaderError && (
-              <p className="text-xs text-jdc-gray-400 mt-1">Aucun secteur assigné.</p>
+              <p className="text-xs text-text-tertiary mt-1">Aucun secteur assigné.</p>
             )}
           </div>
-          <div className="col-span-1">
-            <label htmlFor="status-filter" className="block text-xs font-bold text-jdc-yellow mb-1 flex items-center gap-1">
+          <div>
+            <label htmlFor="status-filter" className="block text-xs font-medium text-text-secondary mb-1">
               Statut
             </label>
             <select
@@ -290,7 +292,7 @@ export default function TicketsSap() {
               name="status-filter"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="block w-full rounded-md bg-jdc-black border-jdc-yellow/50 focus:border-jdc-yellow focus:ring focus:ring-jdc-yellow/40 text-jdc-yellow py-1 px-2 text-xs shadow"
+              className="block w-full rounded-md bg-ui-background/70 border-ui-border focus:border-brand-blue focus:ring focus:ring-brand-blue/40 text-text-primary py-1.5 px-2 text-xs shadow-sm"
               disabled={isLoading}
             >
               <option value="">Tous</option>
@@ -302,7 +304,7 @@ export default function TicketsSap() {
               <option value="rma">RMA</option>
             </select>
           </div>
-          <div className="col-span-2 md:col-span-2">
+          <div className="col-span-1 md:col-span-2"> {/* Ajustement pour que la recherche prenne plus de place */}
             <Input
               label="Rechercher..."
               id="search-client"
@@ -310,18 +312,18 @@ export default function TicketsSap() {
               placeholder="Nom, ID, mot-clé..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              icon={<FaSearch />}
+              icon={<FaSearch className="text-text-tertiary"/>}
               wrapperClassName="mb-0"
               disabled={isLoading}
-              className="bg-jdc-black text-jdc-yellow border-jdc-yellow/50 focus:border-jdc-yellow focus:ring-jdc-yellow py-1 px-2 text-xs"
-              labelClassName="text-jdc-yellow text-xs"
+              className="bg-ui-background/70 text-text-primary border-ui-border focus:border-brand-blue focus:ring-brand-blue py-1.5 px-2 text-xs"
+              labelClassName="text-text-secondary text-xs"
             />
           </div>
         </div>
       </div>
 
       {!isLoading && !loaderError && filteredTickets.length === 0 && (
-        <div className="text-center text-jdc-gray-200 py-10 animate-fade-in-up">
+        <div className="text-center text-text-secondary py-10">
           {allTickets.length > 0
             ? "Aucun ticket trouvé correspondant à votre recherche ou filtre."
             : "Aucun ticket SAP trouvé pour les secteurs assignés."}
@@ -329,157 +331,143 @@ export default function TicketsSap() {
       )}
 
       {!isLoading && !loaderError && filteredTickets.length > 0 && (
-        <div className="w-full flex flex-col divide-y divide-jdc-yellow/20 bg-jdc-card rounded-xl shadow-lg overflow-hidden animate-fade-in-up">
-          {paginatedTickets.map((ticket, idx) => {
-            const statusStyle = getTicketStatusStyle(ticket.statut || 'N/A');
-            const displayDate = formatDate(ticket.date);
-            const phoneNumbers = getStringValue(ticket.telephone, '').split(',').map((n: string) => n.trim()).filter((n: string) => n) || [];
-            return (
-              <div
-                key={ticket.id}
-                className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 px-3 py-2 hover:bg-jdc-yellow/10 transition-colors group relative cursor-pointer"
-                style={{ animationDelay: `${0.1 + idx * 0.03}s` }}
-                onClick={() => handleTicketClick(ticket)}
-              >
-                {/* Colonne gauche : infos principales */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-base font-bold text-jdc-yellow truncate" title={getStringValue(ticket.raisonSociale, 'N/A')}>
-                      {getStringValue(ticket.raisonSociale, 'N/A')}
-                    </span>
-                    {ticket.codeClient && (
-                      <span className="text-xs text-jdc-yellow">({getStringValue(ticket.codeClient)})</span>
-                    )}
-                    {/* Ajout d'un espace avant le badge statut */}
-                    <span className="ml-2" />
-                    <span className={`inline-block px-1.5 py-0.5 rounded-full text-xs font-semibold shadow ${statusStyle.bgColor} ${statusStyle.textColor} border border-jdc-yellow/30 drop-shadow`}>
-                      {typeof ticket.statut === 'object' && ticket.statut !== null && 'stringValue' in ticket.statut
-                        ? ticket.statut.stringValue
-                        : ticket.statut || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-jdc-gray-300">
-                    <span>{getStringValue(ticket.client, '')}</span>
-                    {ticket.deducedSalesperson && (
-                      <span className="ml-1">Comm: <span className="font-semibold text-jdc-yellow">{getStringValue(ticket.deducedSalesperson)}</span></span>
-                    )}
-                    <span className="ml-1">Sect: <span className="font-semibold text-jdc-yellow">{ticket.secteur || 'N/A'}</span></span>
-                    <span className="ml-1 flex items-center"><FaCalendarAlt className="mr-1 text-jdc-yellow w-3" />{displayDate}</span>
-                  </div>
-                  {ticket.adresse && (
-                    <div className="text-xs text-jdc-gray-400 mt-0.5 flex items-center">
-                      <FaMapMarkerAlt className="mr-1.5 text-jdc-yellow w-3 flex-shrink-0" />
-                      <span className="truncate" title={getStringValue(ticket.adresse, '')}>{getStringValue(ticket.adresse)}</span>
-                    </div>
-                  )}
-                </div>
-                {/* Colonne droite : actions */}
-                <div className="flex flex-row items-center gap-2 mt-2 md:mt-0 md:ml-4" onClick={e => e.stopPropagation()}>
-                  {/* Bouton Appeler */}
-                  {phoneNumbers.length > 0 && (
-                    <div className="relative">
-                      <Button
-                        variant="outline"
-                        size="sm" 
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleWebexCall(ticket.id, phoneNumbers);
-                        }}
-                        className="text-jdc-yellow border-jdc-yellow hover:bg-jdc-yellow hover:text-jdc-black"
-                        title={phoneNumbers.length === 1 ? `Appeler ${phoneNumbers[0]}` : "Appeler..."}
-                      >
-                        <FaPhone className="w-3 h-3"/>
-                      </Button>
-                      {showNumberOptions[ticket.id] && phoneNumbers.length > 1 && (
-                        <div className="absolute right-0 mt-1 w-40 bg-jdc-card backdrop-blur-sm rounded-md shadow-lg z-10 border border-jdc-yellow/50 animate-fade-in-up">
-                          <ul className="py-0.5">
-                            {phoneNumbers.map((number: string, index: number) => (
-                              <li key={index}>
-                                <a
-                                  href={`webexphone://call?uri=tel:${number}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    handleNumberSelection(number);
-                                    setShowNumberOptions(prev => ({ ...prev, [ticket.id]: false }));
-                                  }}
-                                  className="block px-2 py-1 text-xs text-jdc-yellow hover:bg-jdc-yellow hover:text-jdc-black rounded-md transition-all"
-                                >
-                                  {number}
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
+        <div className="bg-ui-surface shadow-lg rounded-lg overflow-hidden">
+          <div className="divide-y divide-ui-border"> {/* Séparateurs entre les tickets */}
+            {paginatedTickets.map((ticket, idx) => {
+              const statusStyle = getTicketStatusStyle(ticket.statut || 'N/A'); // Sera adapté plus tard
+              const displayDate = formatDate(ticket.date);
+              const phoneNumbers = getStringValue(ticket.telephone, '').split(',').map((n: string) => n.trim()).filter((n: string) => n) || [];
+              return (
+                <div
+                  key={ticket.id}
+                  className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-4 py-3 hover:bg-ui-background transition-colors group cursor-pointer"
+                  onClick={() => handleTicketClick(ticket)}
+                >
+                  {/* Colonne gauche : infos principales */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-md font-semibold text-text-primary truncate" title={getStringValue(ticket.raisonSociale, 'N/A')}>
+                        {getStringValue(ticket.raisonSociale, 'N/A')}
+                      </span>
+                      {ticket.codeClient && (
+                        <span className="text-xs text-text-secondary">({getStringValue(ticket.codeClient)})</span>
                       )}
+                      <span className={`ml-auto md:ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyle.bgColor} ${statusStyle.textColor} border border-transparent`}> {/* borderColor retiré pour l'instant */}
+                        {typeof ticket.statut === 'object' && ticket.statut !== null && 'stringValue' in ticket.statut
+                          ? ticket.statut.stringValue
+                          : ticket.statut || 'N/A'}
+                      </span>
                     </div>
-                  )}
-                  {/* Bouton Clore/Rouvrir */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const isClosed = getStringValue(ticket.statut, '').toLowerCase().includes('clos') || getStringValue(ticket.statut, '').toLowerCase().includes('fermé');
-                      if (!isClosed) {
-                        handleRequestClose(ticket);
-                      } else {
-                        // Réouverture directe
-                        const formData = new FormData();
-                        formData.append('intent', 'update_status');
-                        formData.append('ticketId', ticket.id);
-                        formData.append('sectorId', ticket.secteur || '');
-                        formData.append('newStatus', 'open');
-                        await fetch('/tickets-sap', { method: 'POST', body: formData });
-                        handleTicketUpdated();
-                        addToast({ type: 'success', message: 'Ticket rouvert avec succès.' });
-                      }
-                    }}
-                    className={
-                      getStringValue(ticket.statut, '').toLowerCase().includes('clos') || getStringValue(ticket.statut, '').toLowerCase().includes('fermé')
-                        ? 'text-jdc-yellow border-jdc-yellow hover:bg-jdc-yellow hover:text-jdc-black' // Vert -> Jaune
-                        : 'text-jdc-gray-400 border-jdc-gray-400 hover:bg-jdc-gray-400 hover:text-jdc-black'
-                    }
-                    title={
-                      getStringValue(ticket.statut, '').toLowerCase().includes('clos') || getStringValue(ticket.statut, '').toLowerCase().includes('fermé')
-                        ? 'Rouvrir le ticket'
-                        : 'Clore le ticket'
-                    }
-                  >
-                    {getStringValue(ticket.statut, '').toLowerCase().includes('clos') || getStringValue(ticket.statut, '').toLowerCase().includes('fermé') ? (
-                      <span title="Rouvrir"><FaExclamationTriangle className="w-3 h-3"/></span>
-                    ) : (
-                      <span title="Clore"><FaExclamationTriangle className="w-3 h-3"/></span>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+                      <span>{getStringValue(ticket.client, '')}</span>
+                      {ticket.deducedSalesperson && (
+                        <span>Comm: <span className="font-medium text-text-primary">{getStringValue(ticket.deducedSalesperson)}</span></span>
+                      )}
+                      <span>Sect: <span className="font-medium text-text-primary">{ticket.secteur || 'N/A'}</span></span>
+                      <span className="flex items-center"><FaCalendarAlt className="mr-1.5 text-text-tertiary" />{displayDate}</span>
+                    </div>
+                    {ticket.adresse && (
+                      <div className="text-xs text-text-secondary mt-1 flex items-center">
+                        <FaMapMarkerAlt className="mr-1.5 text-text-tertiary flex-shrink-0" />
+                        <span className="truncate" title={getStringValue(ticket.adresse, '')}>{getStringValue(ticket.adresse)}</span>
+                      </div>
                     )}
-                  </Button>
+                  </div>
+                  {/* Colonne droite : actions */}
+                  <div className="flex flex-row items-center gap-2 mt-2 md:mt-0 md:ml-4" onClick={e => e.stopPropagation()}>
+                    {phoneNumbers.length > 0 && (
+                      <div className="relative">
+                        <Button
+                          variant="outline"
+                          size="sm"  // Changé de xs à sm
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleWebexCall(ticket.id, phoneNumbers); }}
+                          className="text-brand-blue border-brand-blue hover:bg-brand-blue hover:text-white p-1.5" // Padding ajusté pour taille xs-like
+                          title={phoneNumbers.length === 1 ? `Appeler ${phoneNumbers[0]}` : "Appeler..."}
+                        >
+                          <FaPhone className="h-3 w-3"/> {/* Taille icone ajustée */}
+                        </Button>
+                        {showNumberOptions[ticket.id] && phoneNumbers.length > 1 && (
+                          <div className="absolute right-0 mt-1 w-40 bg-ui-surface backdrop-blur-sm rounded-md shadow-lg z-10 border border-ui-border">
+                            <ul className="py-1">
+                              {phoneNumbers.map((number: string, index: number) => (
+                                <li key={index}>
+                                  <a
+                                    href={`webexphone://call?uri=tel:${number}`}
+                                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleNumberSelection(number); setShowNumberOptions(prev => ({ ...prev, [ticket.id]: false })); }}
+                                    className="block px-3 py-1.5 text-xs text-text-primary hover:bg-ui-background rounded-md"
+                                  >
+                                    {number}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm" // Changé de xs à sm
+                      type="button"
+                      onClick={async (e) => { 
+                        e.stopPropagation();
+                        const isClosed = getStringValue(ticket.statut, '').toLowerCase().includes('clos') || getStringValue(ticket.statut, '').toLowerCase().includes('fermé');
+                        if (!isClosed) {
+                          handleRequestClose(ticket);
+                        } else {
+                          const formData = new FormData();
+                          formData.append('intent', 'update_status');
+                          formData.append('ticketId', ticket.id);
+                          formData.append('sectorId', ticket.secteur || '');
+                          formData.append('newStatus', 'open');
+                          await fetch('/tickets-sap', { method: 'POST', body: formData });
+                          handleTicketUpdated();
+                          addToast({ type: 'success', message: 'Ticket rouvert avec succès.' });
+                        }
+                      }}
+                      className={`p-1.5 ${ // Padding ajusté pour taille xs-like
+                        getStringValue(ticket.statut, '').toLowerCase().includes('clos') || getStringValue(ticket.statut, '').toLowerCase().includes('fermé')
+                          ? 'text-green-500 border-green-500 hover:bg-green-500 hover:text-white'
+                          : 'text-red-500 border-red-500 hover:bg-red-500 hover:text-white'
+                      }`}
+                      title={
+                        getStringValue(ticket.statut, '').toLowerCase().includes('clos') || getStringValue(ticket.statut, '').toLowerCase().includes('fermé')
+                          ? 'Rouvrir le ticket'
+                          : 'Clore le ticket'
+                      }
+                    >
+                       {getStringValue(ticket.statut, '').toLowerCase().includes('clos') || getStringValue(ticket.statut, '').toLowerCase().includes('fermé') 
+                         ? <FaExclamationTriangle className="h-3 w-3"/> 
+                         : <FaExclamationTriangle className="h-3 w-3"/>}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
       {/* Pagination */}
       {!isLoading && !loaderError && totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6 animate-fade-in-up">
+        <div className="flex justify-center items-center gap-2 mt-6">
           <Button
-            variant="outline" // Changed from secondary
-            size="sm" // Changed from sm
+            variant="outline"
+            size="sm"
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="text-jdc-yellow border-jdc-yellow hover:bg-jdc-yellow hover:text-jdc-black"
+            className="text-brand-blue border-brand-blue hover:bg-brand-blue hover:text-white"
           >
             Précédent
           </Button>
-          <span className="text-jdc-yellow font-semibold mx-1 text-xs">Page {currentPage} / {totalPages}</span>
+          <span className="text-text-secondary font-medium mx-2 text-sm">Page {currentPage} / {totalPages}</span>
           <Button
-            variant="outline" // Changed from secondary
-            size="sm" // Changed from sm
+            variant="outline"
+            size="sm"
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="text-jdc-yellow border-jdc-yellow hover:bg-jdc-yellow hover:text-jdc-black"
+            className="text-brand-blue border-brand-blue hover:bg-brand-blue hover:text-white"
           >
             Suivant
           </Button>
@@ -497,30 +485,30 @@ export default function TicketsSap() {
 
       {/* Popup modale de saisie de note pour clôture */}
       {isCloseNoteModalOpen && ticketToClose && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-jdc-black/70 backdrop-blur-md">
-          <div className="bg-jdc-card border-2 border-jdc-yellow rounded-xl shadow-xl p-6 w-full max-w-md mx-auto animate-fade-in-up">
-            <h2 className="text-xl font-bold text-jdc-yellow mb-3">Clôturer le ticket</h2>
-            <p className="text-jdc-yellow mb-2 text-sm">Merci de renseigner une note du technicien pour clôturer ce ticket.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"> {/* Fond général de la modale */}
+          <div className="bg-ui-surface backdrop-blur-md border border-ui-border rounded-lg shadow-xl p-6 w-full max-w-md mx-auto"> {/* Style glassmorphique pour la carte modale */}
+            <h2 className="text-xl font-semibold text-text-primary mb-4">Clôturer le ticket</h2>
+            <p className="text-text-secondary mb-3 text-sm">Merci de renseigner une note du technicien pour clôturer ce ticket.</p>
             <textarea
-              className="w-full min-h-[100px] rounded-md bg-jdc-black text-jdc-yellow border border-jdc-yellow/50 p-2 text-sm focus:border-jdc-yellow focus:ring-jdc-yellow outline-none mb-3"
+              className="w-full min-h-[100px] rounded-md bg-ui-background/70 text-text-primary border border-ui-border p-2 text-sm focus:border-brand-blue focus:ring-1 focus:ring-brand-blue outline-none mb-4"
               value={technicianNoteInput}
               onChange={e => setTechnicianNoteInput(e.target.value)}
               placeholder="Ajouter une note technique..."
               autoFocus
             />
-            <div className="flex justify-end gap-3 mt-2">
+            <div className="flex justify-end gap-3">
               <Button
                 variant="outline"
                 size="sm"
-                className="border-jdc-yellow text-jdc-yellow hover:bg-jdc-yellow hover:text-jdc-black font-semibold px-4"
+                className="border-ui-border text-text-secondary hover:bg-ui-border hover:text-text-primary"
                 onClick={() => setIsCloseNoteModalOpen(false)}
               >
                 Annuler
               </Button>
               <Button
-                variant="primary" // Assuming primary is yellow background
+                variant="primary" 
                 size="sm"
-                className="bg-jdc-yellow text-jdc-black hover:bg-opacity-80 font-semibold px-4"
+                className="bg-brand-blue text-white hover:bg-brand-blue-dark" // Utilisation de brand-blue pour le bouton primaire
                 onClick={async () => {
                   if (!technicianNoteInput.trim()) return;
                   await handleCloseTicket(ticketToClose, technicianNoteInput.trim());

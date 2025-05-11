@@ -38,30 +38,34 @@ interface StatCardProps {
   icon: React.ReactNode;
   change?: string;
   isPositive?: boolean;
-  color?: string;
+  color?: string; // Ex: 'brand-blue', 'green', 'purple', 'yellow', 'red'
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon, change, isPositive, color = "blue" }) => {
-  const colorClasses: Record<string, string> = {
-    blue: "bg-blue-500/10 border-blue-500/30 text-blue-500",
-    green: "bg-green-500/10 border-green-500/30 text-green-500",
-    purple: "bg-purple-500/10 border-purple-500/30 text-purple-500",
-    yellow: "bg-yellow-500/10 border-yellow-500/30 text-yellow-500",
-    red: "bg-red-500/10 border-red-500/30 text-red-500"
+const StatCard: React.FC<StatCardProps> = ({ title, value, icon, change, isPositive, color = "brand-blue" }) => {
+  // Map de couleurs sémantiques vers des classes Tailwind
+  // Assurez-vous que ces couleurs (ex: text-brand-blue, bg-brand-blue/10) sont définies dans votre tailwind.config.ts
+  const colorConfig: Record<string, { bg: string; border: string; textIcon: string }> = {
+    'brand-blue': { bg: 'bg-brand-blue/10', border: 'border-brand-blue/30', textIcon: 'text-brand-blue' },
+    green: { bg: 'bg-green-500/10', border: 'border-green-500/30', textIcon: 'text-green-500' },
+    purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', textIcon: 'text-purple-500' },
+    yellow: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', textIcon: 'text-yellow-500' },
+    red: { bg: 'bg-red-500/10', border: 'border-red-500/30', textIcon: 'text-red-500' },
+    default: { bg: 'bg-ui-border/20', border: 'border-ui-border/30', textIcon: 'text-text-secondary' },
   };
+  const currentColors = colorConfig[color] || colorConfig.default;
 
   return (
-    <div className={`p-4 rounded-lg border ${colorClasses[color]} backdrop-blur-sm`}>
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-sm font-medium text-jdc-gray-300">{title}</h3>
-        <div className={`p-2 rounded-full ${colorClasses[color]}`}>
-          {icon}
+    <div className={`p-4 rounded-lg border ${currentColors.bg} ${currentColors.border} backdrop-blur-sm`}>
+      <div className="flex justify-between items-start mb-1"> {/* items-start pour aligner l'icône avec le titre */}
+        <h3 className="text-sm font-medium text-text-secondary">{title}</h3>
+        <div className={`p-1.5 rounded-full ${currentColors.bg}`}> {/* Icone plus petite et fond assorti */}
+          <span className={`${currentColors.textIcon} h-5 w-5 block`}>{icon}</span>
         </div>
       </div>
-      <div className="flex items-end gap-2">
-        <p className="text-2xl font-bold text-white">{value}</p>
+      <div className="flex items-baseline gap-2"> {/* baseline pour aligner texte et flèche */}
+        <p className="text-2xl font-semibold text-text-primary">{value}</p>
         {change && (
-          <span className={`text-xs font-medium mb-1 ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+          <span className={`text-xs font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
             {isPositive ? '↑' : '↓'} {change}
           </span>
         )}
@@ -84,28 +88,31 @@ const BarChart: React.FC<{
 }) => {
   const values = Object.values(data);
   const maxValue = Math.max(...values, 1); // Éviter la division par zéro
-  
+  const chartColors = ['bg-brand-blue', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-red-500', 'bg-sky-500'];
+
   return (
-    <div className="p-4 rounded-lg bg-jdc-gray-800/70 border border-jdc-gray-700">
-      <h3 className="text-lg font-medium text-white mb-4">{title}</h3>
+    <div className="p-4 rounded-lg bg-ui-background/50 border border-ui-border">
+      <h3 className="text-md font-semibold text-text-primary mb-3">{title}</h3>
       <div 
-        className="w-full rounded-lg overflow-hidden relative flex items-end justify-around p-4"
+        className="w-full rounded-md overflow-hidden relative flex items-end justify-around p-2" // p-2 pour un peu d'espace
         style={{ height: `${height}px` }}
       >
         {values.map((value, i) => (
           <div 
             key={i}
-            className="w-[8%] bg-jdc-blue/80 rounded-t-sm shadow-lg"
-            style={{ height: `${Math.max((value / maxValue) * 100, 5)}%` }}
-            title={`${labels?.[i] || ''}: ${value}`}
+            className={`w-[10%] ${chartColors[i % chartColors.length]} rounded-t-sm shadow-sm hover:opacity-80 transition-opacity`}
+            style={{ height: `${Math.max((value / maxValue) * 100, 5)}%` }} // min 5% height
+            title={`${labels?.[i] || `Data ${i+1}`}: ${value}`}
           ></div>
         ))}
       </div>
-      <div className="flex justify-between mt-4 text-xs text-jdc-gray-400">
-        {labels && labels.map((label, i) => (
-          <span key={i}>{label}</span>
-        ))}
-      </div>
+      {labels && labels.length > 0 && (
+        <div className="flex justify-between mt-2 text-xs text-text-secondary px-1">
+          {labels.map((label, i) => (
+            <span key={i} className="truncate w-1/${labels.length} text-center">{label}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -120,39 +127,39 @@ const PieChart: React.FC<{
   data,
   height = 250
 }) => {
-  // Calculer les pourcentages pour chaque secteur
   const total = Object.values(data).reduce((sum, value) => sum + value, 0) || 1;
   const entries = Object.entries(data);
-  
-  // Couleurs pour les secteurs
-  const colors = ["#8b5cf6", "#3b82f6", "#22c55e", "#eab308"];
-  
+  const chartColors = ['#3B82F6', '#10B981', '#A855F7', '#F59E0B', '#EF4444', '#0EA5E9']; // brand-blue, green, purple, yellow, red, sky
+
   return (
-    <div className="p-4 rounded-lg bg-jdc-gray-800/70 border border-jdc-gray-700">
-      <h3 className="text-lg font-medium text-white mb-4">{title}</h3>
+    <div className="p-4 rounded-lg bg-ui-background/50 border border-ui-border">
+      <h3 className="text-md font-semibold text-text-primary mb-3">{title}</h3>
       <div 
-        className="w-full rounded-lg overflow-hidden relative flex justify-center items-center"
-        style={{ height: `${height}px` }}
+        className="w-full flex justify-center items-center"
+        style={{ height: `${height - 80}px` }} // Ajuster la hauteur pour la légende
       >
-        <div className="w-[150px] h-[150px] mx-auto rounded-full overflow-hidden relative">
-          <div className="absolute inset-0" style={{ 
-            background: entries.length > 0 
-              ? `conic-gradient(${entries.map((entry, i) => {
-                  const [key, value] = entry;
+        <div className="w-[120px] h-[120px] sm:w-[140px] sm:h-[140px] rounded-full relative"> {/* Taille du pie chart */}
+          {entries.length > 0 ? (
+            <div className="absolute inset-0 rounded-full" style={{ 
+              background: `conic-gradient(${entries.map((entry, i) => {
+                  const [, value] = entry;
                   const percent = (value / total) * 100;
-                  const color = colors[i % colors.length];
+                  const color = chartColors[i % chartColors.length];
                   return `${color} 0% ${percent}%${i < entries.length - 1 ? ',' : ''}`;
                 }).join(' ')})` 
-              : '#3b82f6'
-          }}></div>
-          <div className="absolute inset-[30%] rounded-full bg-jdc-gray-800"></div>
+            }}></div>
+          ) : (
+            <div className="absolute inset-0 rounded-full bg-ui-border"></div> // Fond si pas de données
+          )}
+          <div className="absolute inset-[33%] rounded-full bg-ui-background/80 backdrop-blur-sm"></div> {/* Trou central */}
         </div>
       </div>
-      <div className="flex flex-col space-y-1 w-full mt-4">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 w-full mt-4 text-xs">
         {entries.map(([key, value], i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[i % colors.length] }}></span>
-            <span className="text-xs text-jdc-gray-400">{key} ({Math.round((value / total) * 100)}%)</span>
+          <div key={i} className="flex items-center gap-1.5 truncate">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: chartColors[i % chartColors.length] }}></span>
+            <span className="text-text-secondary truncate" title={key}>{key}:</span>
+            <span className="text-text-primary font-medium">{Math.round((value / total) * 100)}%</span>
           </div>
         ))}
       </div>
@@ -225,22 +232,22 @@ export function StatsPanel() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap justify-between items-center gap-4">
-        <h2 className="text-xl font-bold">Statistiques Blockchain</h2>
+        <h2 className="text-lg font-semibold text-text-primary">Statistiques Blockchain</h2>
         
-        <div className="flex items-center gap-4">
-          <div className="flex rounded-lg overflow-hidden border border-jdc-gray-700">
+        <div className="flex items-center gap-3">
+          <div className="flex rounded-md overflow-hidden border border-ui-border">
             {(["day", "week", "month", "year"] as const).map((range) => (
               <button
                 key={range}
-                className={`px-3 py-1 text-sm ${
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   timeRange === range 
-                    ? "bg-jdc-blue text-white" 
-                    : "bg-jdc-gray-800 text-jdc-gray-300 hover:bg-jdc-gray-700"
-                }`}
+                    ? "bg-brand-blue text-white" 
+                    : "bg-ui-background hover:bg-ui-border text-text-secondary"
+                } ${range !== "year" ? "border-r border-ui-border" : ""}`}
                 onClick={() => setTimeRange(range)}
               >
                 {range === "day" && "Jour"}
-                {range === "week" && "Semaine"}
+                {range === "week" && "Sem."}
                 {range === "month" && "Mois"}
                 {range === "year" && "Année"}
               </button>
@@ -248,8 +255,8 @@ export function StatsPanel() {
           </div>
           
           <div className="flex gap-2">
-            <Button onClick={refreshStats} disabled={loading}>
-              {loading ? <FaSync className="animate-spin mr-2" /> : null}
+            <Button onClick={refreshStats} disabled={loading} variant="outline" size="sm" className="border-ui-border text-text-secondary hover:bg-ui-border hover:text-text-primary">
+              {loading && <FaSync className="animate-spin mr-2 h-3.5 w-3.5" />}
               {loading ? "Chargement..." : "Rafraîchir"}
             </Button>
             
@@ -257,9 +264,10 @@ export function StatsPanel() {
               onClick={resetStats} 
               disabled={resetInProgress || loading}
               variant="danger"
+              size="sm"
             >
-              {resetInProgress ? <FaSync className="animate-spin mr-2" /> : null}
-              {resetInProgress ? "Réinitialisation..." : "Réinitialiser"}
+              {resetInProgress && <FaSync className="animate-spin mr-2 h-3.5 w-3.5" />}
+              {resetInProgress ? "Réinit..." : "Réinitialiser"}
             </Button>
           </div>
         </div>
@@ -349,27 +357,27 @@ export function StatsPanel() {
             
             {statsData?.installations && (
               <div className="lg:col-span-2">
-                <div className="p-4 rounded-lg bg-jdc-gray-800/70 border border-jdc-gray-700">
-                  <h3 className="text-lg font-medium text-white mb-4">Installations par statut</h3>
+                <div className="p-4 rounded-lg bg-ui-background/50 border border-ui-border">
+                  <h3 className="text-md font-semibold text-text-primary mb-3">Installations par statut</h3>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-jdc-gray-700">
-                          <th className="py-2 text-left text-jdc-gray-400">Secteur</th>
-                          <th className="py-2 text-right text-jdc-gray-400">Total</th>
-                          <th className="py-2 text-right text-jdc-gray-400">En attente</th>
-                          <th className="py-2 text-right text-jdc-gray-400">Planifiées</th>
-                          <th className="py-2 text-right text-jdc-gray-400">Terminées</th>
+                    <table className="w-full text-xs">
+                      <thead className="text-text-secondary">
+                        <tr className="border-b border-ui-border">
+                          <th className="py-2 px-3 text-left font-medium">Secteur</th>
+                          <th className="py-2 px-3 text-right font-medium">Total</th>
+                          <th className="py-2 px-3 text-right font-medium">En attente</th>
+                          <th className="py-2 px-3 text-right font-medium">Planifiées</th>
+                          <th className="py-2 px-3 text-right font-medium">Terminées</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-ui-border/50">
                         {Object.entries(statsData?.installations || {}).map(([sector, data]) => (
-                          <tr key={sector} className="border-b border-jdc-gray-800">
-                            <td className="py-2 text-white">{sector}</td>
-                            <td className="py-2 text-right text-jdc-gray-300">{data.total}</td>
-                            <td className="py-2 text-right text-yellow-400">{data.enAttente}</td>
-                            <td className="py-2 text-right text-blue-400">{data.planifiees}</td>
-                            <td className="py-2 text-right text-green-400">{data.terminees}</td>
+                          <tr key={sector} className="hover:bg-ui-background/30">
+                            <td className="py-2 px-3 text-text-primary font-medium">{sector}</td>
+                            <td className="py-2 px-3 text-right text-text-secondary">{data.total}</td>
+                            <td className="py-2 px-3 text-right text-yellow-400">{data.enAttente}</td>
+                            <td className="py-2 px-3 text-right text-blue-400">{data.planifiees}</td>
+                            <td className="py-2 px-3 text-right text-green-400">{data.terminees}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -382,18 +390,19 @@ export function StatsPanel() {
         </>
       )}
       
-      <div className="mt-4 p-4 rounded-lg bg-jdc-blue/10 border border-jdc-blue/30">
-        <h3 className="text-lg font-semibold mb-2">À propos des statistiques</h3>
-        <p className="text-sm text-jdc-gray-300">
+      <div className="mt-4 p-4 rounded-lg bg-ui-background/50 border border-ui-border">
+        <h3 className="text-md font-semibold text-text-primary mb-2">À propos des statistiques</h3>
+        <p className="text-sm text-text-secondary">
           Les données présentées sont générées à partir des événements et transactions sur la blockchain privée Besu. 
           Ces statistiques aident à surveiller la santé et l'utilisation de la plateforme blockchain JDC.
-          Pour un rapport détaillé, utilisez le bouton "Exporter" ci-dessous.
         </p>
-        <div className="mt-4 flex gap-2">
-          <Button variant="outline">Exporter les données</Button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" className="border-ui-border text-text-secondary hover:bg-ui-border hover:text-text-primary">Exporter les données</Button>
           <Button 
-            variant="secondary" 
+            variant="outline" 
+            size="sm"
             onClick={() => window.open('/admin/test-blockchain', '_blank')}
+            className="border-ui-border text-text-secondary hover:bg-ui-border hover:text-text-primary"
           >
             Tester la connexion blockchain
           </Button>
@@ -401,4 +410,4 @@ export function StatsPanel() {
       </div>
     </div>
   );
-} 
+}

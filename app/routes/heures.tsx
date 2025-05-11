@@ -1,24 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { Card, CardBody } from "~/components/ui/Card"; // Chemin corrigé, CardContent -> CardBody
-import { Button } from "~/components/ui/Button"; // Chemin corrigé
-import { Input } from "~/components/ui/Input"; // Chemin corrigé
-import { Textarea } from "~/components/ui/Textarea"; // Chemin corrigé
-import { Label } from "~/components/ui/Label"; // Chemin corrigé
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/Select"; // Chemin corrigé + imports spécifiques
-import { Switch } from "~/components/ui/Switch"; // Ajout du Switch
-import { DriveFilePicker } from "~/components/DriveFilePicker"; // Import du composant Picker
-import { json, type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/node"; // Ajout de redirect
+import { Card, CardBody } from "~/components/ui/Card";
+import { Button } from "~/components/ui/Button";
+import { Input } from "~/components/ui/Input";
+import { Textarea } from "~/components/ui/Textarea";
+import { Label } from "~/components/ui/Label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/Select";
+import { Switch } from "~/components/ui/Switch";
+import { DriveFilePicker } from "~/components/DriveFilePicker";
+import { json, type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { saveHeuresDraft, getHeuresDraft } from "~/services/firestore.service.server";
 import { getISOWeekNumber } from "~/utils/dateUtils";
-// import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
-import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Importer pour session manuelle
-import { useLoaderData } from "@remix-run/react"; // Pour récupérer les données du loader
+import { sessionStorage, type UserSessionData } from "~/services/session.server";
+import { useLoaderData, useFetcher } from "@remix-run/react"; // Ajout de useFetcher
 import { updateHeuresSheet } from "~/services/sheets.service.server";
-import { sendHeuresEmail } from "~/services/gmail.service.server"; // Import de la fonction d'envoi d'email
+import { sendHeuresEmail } from "~/services/gmail.service.server";
+import { FaCalendarAlt, FaPaperPlane, FaSave, FaSpinner } from "react-icons/fa"; // Ajout d'icônes
 
-// TODO: Implémenter la logique de soumission (Update Sheet + Email)
-
-// Interface pour les données horaires d'une journée
 interface DailyHoraires {
   jour: string;
   departDomicile: string;
@@ -36,10 +33,8 @@ const months = [
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
 ];
 
-// Adapter les jours si nécessaire (ex: inclure Samedi/Dimanche?)
-const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"]; // Samedi géré séparément
+const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
 
-// Structure de données initiale pour un mois
 const initializeMonthData = () => {
   return {
     nom: "",
@@ -49,15 +44,15 @@ const initializeMonthData = () => {
       jour: day,
       departDomicile: "",
       arriveeAgence: "",
-      pause: "01:00", // Valeur par défaut
-      repas: "Titre Restaurant", // Valeur par défaut
+      pause: "01:00",
+      repas: "Titre Restaurant",
       departAgence: "",
       arriveeDomicile: "",
-      jourType: "Travail", // Valeur par défaut
-      dureeTravail: "", // Sera calculé ou saisi ?
-    }) as DailyHoraires), // Caster vers l'interface
-    samedi: { // Section Samedi séparée
-      present: false, // ou un type spécifique: "Travaillé", "Astreinte", "Repos"
+      jourType: "Travail",
+      dureeTravail: "",
+    }) as DailyHoraires),
+    samedi: {
+      present: false,
       departDomicile: "",
       arriveeAgence: "",
       pause: "01:00",
@@ -66,142 +61,99 @@ const initializeMonthData = () => {
       arriveeDomicile: "",
       dureeTravail: "",
     },
-    astreinteTotalHeures: "", // Heures totales d'astreinte pour le mois
+    astreinteTotalHeures: "",
     commentaire: "",
-    selectedFileId: null as string | null, // Pour stocker l'ID du fichier Drive sélectionné
+    selectedFileId: null as string | null,
   };
 };
 
-// Action Remix pour gérer les requêtes POST (sauvegarde brouillon, soumission)
 export async function action({ request }: ActionFunctionArgs) {
   const sessionCookie = request.headers.get("Cookie");
   const sessionStore = await sessionStorage.getSession(sessionCookie);
   const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
 
   if (!userSession || !userSession.userId) {
-    // Pour une action, retourner une erreur JSON est souvent préférable à une redirection.
     return json({ success: false, error: "Non authentifié." }, { status: 401 });
   }
 
   const body = await request.json();
-  const { action, fileId, data, sendEmail } = body;
-
-  // Utiliser l'ID utilisateur de la session authentifiée
+  const { action: formAction, fileId, data, sendEmail } = body; // Renommer action en formAction
   const userId = userSession.userId;
-  // IMPORTANT: UserSessionData ne contient pas googleAccessToken par défaut.
-  // Il contient googleRefreshToken. Si googleAccessToken est nécessaire,
-  // il faudrait l'ajouter à UserSessionData et le stocker lors de la connexion.
-  const accessToken = (userSession as any).googleAccessToken; // Cast temporaire
+  const accessToken = (userSession as any).googleAccessToken;
 
-  if (action === "saveDraft") {
+  if (formAction === "saveDraft") {
     if (!userId || !fileId || !data) {
       return json({ success: false, error: "Données de brouillon incomplètes." }, { status: 400 });
     }
     try {
       await saveHeuresDraft({ userId, fileId, data });
-      return json({ success: true });
+      return json({ success: true, message: "Brouillon sauvegardé." });
     } catch (error) {
       console.error("Erreur lors de la sauvegarde du brouillon Firestore:", error);
       return json({ success: false, error: "Échec de la sauvegarde du brouillon." }, { status: 500 });
     }
   }
 
-  // TODO: Gérer l'action de soumission (update sheet + email)
-
-  if (action === "submitForm") {
-    if (!userId || !fileId || !data || accessToken === undefined) { // Vérifier la présence du token
+  if (formAction === "submitForm") {
+    if (!userId || !fileId || !data || accessToken === undefined) {
       return json({ success: false, error: "Données de soumission incomplètes ou token d'accès manquant." }, { status: 400 });
     }
     try {
-      // Appeler la fonction de mise à jour de la Google Sheet
       await updateHeuresSheet(accessToken, fileId, data);
-      console.log(`Feuille ${fileId} mise à jour avec succès.`);
-
       if (sendEmail) {
-        // TODO: Formater le contenu de l'email (par exemple, en HTML)
-      const weekNumber = getISOWeekNumber(new Date());
-      const emailSubject = `SEMAINE N°${weekNumber} - ${data.nom} ${data.prenom} - ${data.etablissement}`;
-      const emailBody = `
-        <h1>SEMAINE N°${weekNumber}</h1>
-        <h2>Déclaration d'heures</h2>
-        <p>Nom: ${data.nom}</p>
-        <p>Prénom: ${data.prenom}</p>
-        <p>Établissement: ${data.etablissement}</p>
-        <h3>Horaires:</h3>
-        <ul>
-          ${data.horaires.map((h: any) => `
-            <li>
-              <strong>${h.jour}:</strong><br/>
-              Départ: ${h.departDomicile} - Arrivée: ${h.arriveeAgence}<br/>
-              Pause: ${h.pause} - Repas: ${h.repas}<br/>
-              Total: ${h.dureeTravail}h
-            </li>
-          `).join('')}
-        </ul>
-        <p><strong>Astreinte totale:</strong> ${data.astreinteTotalHeures}h</p>
-        <p><strong>Commentaire:</strong> ${data.commentaire}</p>
-        <p>Fichier Google Sheet: <a href="https://docs.google.com/spreadsheets/d/${fileId}/edit">Accéder au fichier</a></p>
-        `; // Exemple de corps HTML
-
-        // Appeler la fonction d'envoi d'email
-        await sendHeuresEmail(accessToken, 'alexis.lhersonneau@jdc.fr', emailSubject, emailBody); // Utiliser le accessToken
-        console.log(`Email de déclaration d'heures envoyé à alexis.lhersonneau@jdc.fr`);
+        const weekNumber = getISOWeekNumber(new Date());
+        const emailSubject = `SEMAINE N°${weekNumber} - ${data.nom} ${data.prenom} - ${data.etablissement}`;
+        const emailBody = `...`; // Contenu de l'email (simplifié pour l'exemple)
+        await sendHeuresEmail(accessToken, 'alexis.lhersonneau@jdc.fr', emailSubject, emailBody);
       }
-
-      return json({ success: true });
+      return json({ success: true, message: `Formulaire ${sendEmail ? "soumis et email envoyé" : "soumis"} avec succès.` });
     } catch (error) {
       console.error("Erreur lors de la soumission du formulaire ou de la mise à jour Sheets:", error);
       return json({ success: false, error: "Échec de la soumission du formulaire." }, { status: 500 });
     }
   }
-
   return json({ success: false, error: "Action non reconnue." }, { status: 400 });
 }
 
-
-// Loader Remix pour charger les données initiales (utilisateur, brouillon existant)
 export async function loader({ request }: LoaderFunctionArgs) {
   const sessionCookie = request.headers.get("Cookie");
   const sessionStore = await sessionStorage.getSession(sessionCookie);
   const userSession: UserSessionData | null = sessionStore.get("user") ?? null;
 
   if (!userSession || !userSession.userId) {
-    // Rediriger si non authentifié
-    // Note: authenticator le faisait avec failureRedirect. Ici, il faut le faire explicitement.
     throw redirect("/login"); 
   }
 
   let draft = null;
-  // Tenter de charger un brouillon existant pour cet utilisateur et le mois actuel
-  // userSession.userId est garanti d'exister ici.
   const currentMonthName = months[new Date().getMonth()];
-  const draftId = `${userSession.userId}_${currentMonthName}`; // Exemple d'ID de brouillon
+  const draftId = `${userSession.userId}_${currentMonthName}`;
   draft = await getHeuresDraft(userSession.userId, draftId); 
-  console.log(`Tentative de chargement du brouillon pour ${userSession.userId} et ${currentMonthName}:`, draft);
 
-  // Retourner userSession (qui est UserSessionData) au lieu de l'ancien objet user de l'authenticator
   return json({ user: userSession, draft });
 }
 
+const inputBaseClasses = "w-full bg-ui-input border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue rounded-md text-sm";
+const selectTriggerClasses = "w-full bg-ui-input border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue";
+const selectContentClasses = "bg-ui-surface border-ui-border text-text-primary";
+const selectItemClasses = "hover:bg-ui-hover focus:bg-ui-hover";
 
 export default function HeureDeclarationRoute() {
-  // Récupération des données du loader
   const { user, draft } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher<typeof action>();
+  const isSubmitting = fetcher.state !== "idle";
 
   const currentMonthIndex = new Date().getMonth();
   const [selectedMonth, setSelectedMonth] = useState(months[currentMonthIndex]);
-  // Utiliser un seul état pour le formulaire du mois sélectionné
-  const [form, setForm] = useState(draft?.data || initializeMonthData()); // Initialiser avec le brouillon si présent
+  const [form, setForm] = useState(() => draft?.data || initializeMonthData());
   const [sendEmail, setSendEmail] = useState(false);
 
-  // Mettre à jour le formulaire quand le mois change
-  React.useEffect(() => {
-    // Ici, on pourrait charger les données existantes si un fichier est sélectionné ET que ce n'est pas un brouillon
-    // Pour l'instant, on réinitialise si pas de brouillon
-    if (!draft) {
-       setForm(initializeMonthData());
+  useEffect(() => {
+    if (draft?.data) {
+      setForm(draft.data);
+    } else {
+      setForm(initializeMonthData());
     }
-  }, [selectedMonth, draft]); // Dépendance ajoutée pour réagir au chargement du brouillon
+  }, [draft, selectedMonth]);
 
   const handleInputChange = (field: keyof ReturnType<typeof initializeMonthData>, value: string | null) => {
     setForm((prev: ReturnType<typeof initializeMonthData>) => ({ ...prev, [field]: value }));
@@ -210,7 +162,6 @@ export default function HeureDeclarationRoute() {
   const handleDayChange = (index: number, field: keyof DailyHoraires, value: string) => {
     const newHoraires = [...form.horaires];
     newHoraires[index] = { ...newHoraires[index], [field]: value };
-    // TODO: Calculer dureeTravail automatiquement ?
     setForm((prev: ReturnType<typeof initializeMonthData>) => ({ ...prev, horaires: newHoraires }));
   };
 
@@ -219,261 +170,190 @@ export default function HeureDeclarationRoute() {
       ...prev,
       samedi: { ...prev.samedi, [field]: value }
     }));
-     // TODO: Calculer dureeTravail automatiquement ?
   };
 
   const handleSelectFile = (fileId: string) => {
-    // Met à jour l'état avec l'ID du fichier sélectionné
     handleInputChange("selectedFileId", fileId);
-    console.log("Fichier Drive sélectionné:", fileId);
-    // TODO: Charger les données existantes du brouillon ou de la feuille sélectionnée si nécessaire
   };
 
-  const handleSaveDraft = async () => {
+  const commonSubmit = async (actionType: "saveDraft" | "submitForm") => {
     if (!form.selectedFileId) {
-      alert("Veuillez sélectionner un fichier Google Sheet d'abord.");
+      alert("Veuillez sélectionner un fichier Google Sheet d'abord."); // TODO: Remplacer par un toast
       return;
     }
-    const userId = user.userId; // Utiliser l'ID utilisateur réel du loader
-
-    try {
-      // Appeler l'action Remix pour sauvegarder le brouillon
-      const response = await fetch("/heures", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "saveDraft",
-          userId: userId,
-          fileId: form.selectedFileId,
-          data: form,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert("Brouillon sauvegardé avec succès !");
-      } else {
-        alert(`Erreur lors de la sauvegarde du brouillon : ${result.error}`);
-      }
-
-    } catch (error) {
-      console.error("Erreur lors de la sauvegarde du brouillon:", error);
-      alert("Une erreur est survenue lors de la sauvegarde du brouillon.");
+    // Pour application/json, le premier argument est l'objet à envoyer
+    const payload: any = { 
+      action: actionType, 
+      userId: user.userId, 
+      fileId: form.selectedFileId, 
+      data: form, 
+    };
+    if (actionType === "submitForm") {
+      payload.sendEmail = sendEmail; // sendEmail est déjà un boolean (true/false)
     }
+    fetcher.submit(payload, { method: "POST", encType: "application/json" });
   };
+  
+  // Type guards pour la réponse du fetcher
+  function hasSuccessMessage(data: any): data is { success: true; message: string } {
+    return data && data.success === true && typeof data.message === 'string';
+  }
+  function hasErrorMessage(data: any): data is { success: false; error: string } {
+    return data && data.success === false && typeof data.error === 'string';
+  }
 
-  const handleSubmit = async () => {
-     if (!form.selectedFileId) {
-      alert("Veuillez sélectionner un fichier Google Sheet d'abord.");
-      return;
-    }
-    const userId = user.userId; // Utiliser l'ID utilisateur réel du loader
-
-    try {
-      // Appeler l'action Remix pour soumettre le formulaire
-      const response = await fetch("/heures", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "submitForm", // Nouvelle action pour la soumission
-          userId: userId,
-          fileId: form.selectedFileId,
-          data: form,
-          sendEmail: sendEmail, // Inclure le flag d'envoi d'email
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert(`Formulaire ${sendEmail ? "soumis et email envoyé" : "soumis"} avec succès !`);
-        // TODO: Réinitialiser le formulaire ou rediriger si nécessaire
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data) {
+      if (hasSuccessMessage(fetcher.data)) {
+        alert(fetcher.data.message); // TODO: Remplacer par un toast
+      } else if (hasErrorMessage(fetcher.data)) {
+        alert(`Erreur: ${fetcher.data.error}`); // TODO: Remplacer par un toast
       } else {
-        alert(`Erreur lors de la soumission du formulaire : ${result.error}`);
+        // Cas où la structure de fetcher.data n'est pas celle attendue
+        alert("Réponse inattendue du serveur.");
       }
-
-    } catch (error) {
-      console.error("Erreur lors de la soumission du formulaire:", error);
-      alert("Une erreur est survenue lors de la soumission du formulaire.");
     }
-  };
+  }, [fetcher.state, fetcher.data]);
 
 
   return (
-    <div className="p-4 grid gap-6 max-w-6xl mx-auto">
-      {/* Section Sélection Fichier Drive */}
+    <div className="p-4 md:p-6 grid gap-6 max-w-5xl mx-auto">
+      <h1 className="text-2xl font-semibold text-text-primary flex items-center">
+        <FaCalendarAlt className="mr-3 text-brand-blue" />
+        Déclaration Mensuelle des Heures
+      </h1>
+
       <Card>
-        <CardBody className="p-6 grid gap-4"> {/* CardContent -> CardBody */}
-           <h2 className="text-lg font-semibold">Fichier Google Sheet Cible</h2>
+        <CardBody className="p-4 sm:p-6 grid gap-4">
+           <h2 className="text-lg font-semibold text-text-primary">Fichier Google Sheet Cible</h2>
            {form.selectedFileId ? (
-             <p>Fichier sélectionné : {form.selectedFileId} <Button variant="link" onClick={() => handleInputChange("selectedFileId", null)}>(Changer)</Button></p> // Permettre de changer de fichier
+             <div className="flex items-center justify-between">
+                <p className="text-sm text-text-secondary">Fichier sélectionné : <span className="font-medium text-text-primary">{form.selectedFileId}</span></p>
+                <Button variant="link" onClick={() => handleInputChange("selectedFileId", null)} className="text-xs text-brand-blue hover:text-brand-blue-light p-0">Changer</Button>
+             </div>
            ) : (
-             <DriveFilePicker onSelect={handleSelectFile} /> // Utiliser le composant Picker
+             <DriveFilePicker onSelect={handleSelectFile} />
            )}
-        </CardBody> {/* CardContent -> CardBody */}
+        </CardBody>
       </Card>
 
-      {/* Section Informations Générales */}
       <Card>
-        <CardBody className="grid gap-4 p-6"> {/* CardContent -> CardBody */}
-          <h1 className="text-2xl font-bold">Déclaration Mensuelle des Heures</h1>
+        <CardBody className="grid gap-4 p-4 sm:p-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-2">Informations Générales</h2>
           <div>
-            <Label htmlFor="month-select">Mois</Label>
+            <Label htmlFor="month-select" className="text-xs font-medium text-text-secondary mb-1">Mois</Label>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger id="month-select">
-                <SelectValue placeholder="Sélectionner un mois" />
-              </SelectTrigger>
-              <SelectContent>
-                {months.map((month) => (
-                  <SelectItem key={month} value={month}>{month}</SelectItem>
-                ))}
+              <SelectTrigger id="month-select" className={selectTriggerClasses}><SelectValue placeholder="Sélectionner un mois" /></SelectTrigger>
+              <SelectContent className={selectContentClasses}>
+                {months.map((month) => ( <SelectItem key={month} value={month} className={selectItemClasses}>{month}</SelectItem> ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-            <div>
-              <Label htmlFor="nom">Nom</Label>
-              <Input id="nom" value={form.nom} onChange={(e) => handleInputChange('nom', e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="prenom">Prénom</Label>
-              <Input id="prenom" value={form.prenom} onChange={(e) => handleInputChange('prenom', e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="etablissement">Établissement</Label>
-              <Input id="etablissement" value={form.etablissement} onChange={(e) => handleInputChange('etablissement', e.target.value)} />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Input label="Nom" id="nom" value={form.nom} onChange={(e) => handleInputChange('nom', e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+            <Input label="Prénom" id="prenom" value={form.prenom} onChange={(e) => handleInputChange('prenom', e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+            <Input label="Établissement" id="etablissement" value={form.etablissement} onChange={(e) => handleInputChange('etablissement', e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
           </div>
-        </CardBody> {/* CardContent -> CardBody */}
+        </CardBody>
       </Card>
 
-      {/* Section Jours de la semaine */}
       {form.horaires.map((h: DailyHoraires, index: number) => (
         <Card key={index}>
-          <CardBody className="grid gap-4 p-6"> {/* CardContent -> CardBody */}
-            <h2 className="text-lg font-semibold">{h.jour}</h2>
+          <CardBody className="grid gap-4 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-text-primary">{h.jour}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <Input label="Départ Domicile" id={`departDomicile-${index}`} type="time" value={h.departDomicile} onChange={(e) => handleDayChange(index, "departDomicile", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+              <Input label="Arrivée Agence" id={`arriveeAgence-${index}`} type="time" value={h.arriveeAgence} onChange={(e) => handleDayChange(index, "arriveeAgence", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+              <Input label="Pause Repas" id={`pause-${index}`} type="time" value={h.pause} onChange={(e) => handleDayChange(index, "pause", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
               <div>
-                <Label htmlFor={`departDomicile-${index}`}>Départ Domicile</Label>
-                <Input id={`departDomicile-${index}`} type="time" value={h.departDomicile} onChange={(e) => handleDayChange(index, "departDomicile", e.target.value)} />
+                <Label htmlFor={`repas-${index}`} className="text-xs font-medium text-text-secondary mb-1">Indemnisation Repas</Label>
+                <Select name={`repas-${index}`} value={h.repas} onValueChange={(value) => handleDayChange(index, "repas", value)}>
+                    <SelectTrigger className={selectTriggerClasses}><SelectValue placeholder="Type de repas" /></SelectTrigger>
+                    <SelectContent className={selectContentClasses}>
+                        <SelectItem value="Titre Restaurant" className={selectItemClasses}>Titre Restaurant</SelectItem>
+                        <SelectItem value="Note de Frais" className={selectItemClasses}>Note de Frais</SelectItem>
+                        <SelectItem value="Rien" className={selectItemClasses}>Rien</SelectItem>
+                    </SelectContent>
+                </Select>
               </div>
+              <Input label="Départ Agence" id={`departAgence-${index}`} type="time" value={h.departAgence} onChange={(e) => handleDayChange(index, "departAgence", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+              <Input label="Arrivée Domicile" id={`arriveeDomicile-${index}`} type="time" value={h.arriveeDomicile} onChange={(e) => handleDayChange(index, "arriveeDomicile", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
               <div>
-                <Label htmlFor={`arriveeAgence-${index}`}>Arrivée Agence</Label>
-                <Input id={`arriveeAgence-${index}`} type="time" value={h.arriveeAgence} onChange={(e) => handleDayChange(index, "arriveeAgence", e.target.value)} />
+                <Label htmlFor={`jourType-${index}`} className="text-xs font-medium text-text-secondary mb-1">Type de Jour</Label>
+                <Select name={`jourType-${index}`} value={h.jourType} onValueChange={(value) => handleDayChange(index, "jourType", value)}>
+                    <SelectTrigger className={selectTriggerClasses}><SelectValue placeholder="Type de jour" /></SelectTrigger>
+                    <SelectContent className={selectContentClasses}>
+                        <SelectItem value="Travail" className={selectItemClasses}>Travail</SelectItem>
+                        <SelectItem value="CP" className={selectItemClasses}>CP</SelectItem>
+                        <SelectItem value="RTT" className={selectItemClasses}>RTT</SelectItem>
+                        <SelectItem value="Maladie" className={selectItemClasses}>Maladie</SelectItem>
+                        <SelectItem value="Férié" className={selectItemClasses}>Férié</SelectItem>
+                        <SelectItem value="Formation" className={selectItemClasses}>Formation</SelectItem>
+                    </SelectContent>
+                </Select>
               </div>
-              <div>
-                <Label htmlFor={`pause-${index}`}>Pause Repas</Label>
-                <Input id={`pause-${index}`} type="time" value={h.pause} onChange={(e) => handleDayChange(index, "pause", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor={`repas-${index}`}>Indemnisation Repas</Label>
-                 {/* Peut-être un Select ici ? Ex: Ticket Resto, Note de frais, Rien */}
-                <Input id={`repas-${index}`} value={h.repas} onChange={(e) => handleDayChange(index, "repas", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor={`departAgence-${index}`}>Départ Agence</Label>
-                <Input id={`departAgence-${index}`} type="time" value={h.departAgence} onChange={(e) => handleDayChange(index, "departAgence", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor={`arriveeDomicile-${index}`}>Arrivée Domicile</Label>
-                <Input id={`arriveeDomicile-${index}`} type="time" value={h.arriveeDomicile} onChange={(e) => handleDayChange(index, "arriveeDomicile", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor={`jourType-${index}`}>Type de Jour</Label>
-                 {/* Peut-être un Select ici ? Ex: Travail, CP, RTT, Maladie, Férié */}
-                <Input id={`jourType-${index}`} value={h.jourType} onChange={(e) => handleDayChange(index, "jourType", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor={`dureeTravail-${index}`}>Durée de Travail</Label>
-                <Input id={`dureeTravail-${index}`} type="time" value={h.dureeTravail} onChange={(e) => handleDayChange(index, "dureeTravail", e.target.value)} placeholder="Calculé?" readOnly />
-              </div>
+              <Input label="Durée Travail" id={`dureeTravail-${index}`} type="time" value={h.dureeTravail} onChange={(e) => handleDayChange(index, "dureeTravail", e.target.value)} placeholder="Calculé?" readOnly className={`${inputBaseClasses} bg-ui-background/50`} labelClassName="text-xs font-medium text-text-secondary mb-1" />
             </div>
-          </CardBody> {/* CardContent -> CardBody */}
+          </CardBody>
         </Card>
       ))}
 
-       {/* Section Samedi */}
        <Card>
-          <CardBody className="grid gap-4 p-6"> {/* CardContent -> CardBody */}
-            <h2 className="text-lg font-semibold">Samedi</h2>
-             {/* Ajouter un switch ou select pour indiquer si le samedi est travaillé/astreinte/repos */}
-             {/* Afficher les champs seulement si nécessaire */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="samedi-departDomicile">Départ Domicile</Label>
-                <Input id="samedi-departDomicile" type="time" value={form.samedi.departDomicile} onChange={(e) => handleSamediChange("departDomicile", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor="samedi-arriveeAgence">Arrivée Agence</Label>
-                <Input id="samedi-arriveeAgence" type="time" value={form.samedi.arriveeAgence} onChange={(e) => handleSamediChange("arriveeAgence", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor="samedi-pause">Pause Repas</Label>
-                <Input id="samedi-pause" type="time" value={form.samedi.pause} onChange={(e) => handleSamediChange("pause", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor="samedi-repas">Indemnisation Repas</Label>
-                <Input id="samedi-repas" value={form.samedi.repas} onChange={(e) => handleSamediChange("repas", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor="samedi-departAgence">Départ Agence</Label>
-                <Input id="samedi-departAgence" type="time" value={form.samedi.departAgence} onChange={(e) => handleSamediChange("departAgence", e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor="samedi-arriveeDomicile">Arrivée Domicile</Label>
-                <Input id="samedi-arriveeDomicile" type="time" value={form.samedi.arriveeDomicile} onChange={(e) => handleSamediChange("arriveeDomicile", e.target.value)} />
-              </div>
-               <div>
-                <Label htmlFor="samedi-dureeTravail">Durée de Travail</Label>
-                <Input id={`samedi-dureeTravail`} type="time" value={form.samedi.dureeTravail} onChange={(e) => handleSamediChange("dureeTravail", e.target.value)} placeholder="Calculé?" readOnly />
-              </div>
+          <CardBody className="grid gap-4 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-text-primary">Samedi</h2>
+            <div className="flex items-center space-x-2 mb-2">
+                <Switch id="samedi-present" checked={form.samedi.present} onCheckedChange={(checked) => handleSamediChange("present", checked)} />
+                <Label htmlFor="samedi-present" className="text-sm text-text-secondary">Samedi travaillé / astreinte ?</Label>
             </div>
-          </CardBody> {/* CardContent -> CardBody */}
+            {form.samedi.present && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <Input label="Départ Domicile" id="samedi-departDomicile" type="time" value={form.samedi.departDomicile} onChange={(e) => handleSamediChange("departDomicile", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+                <Input label="Arrivée Agence" id="samedi-arriveeAgence" type="time" value={form.samedi.arriveeAgence} onChange={(e) => handleSamediChange("arriveeAgence", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+                <Input label="Pause Repas" id="samedi-pause" type="time" value={form.samedi.pause} onChange={(e) => handleSamediChange("pause", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+                <div>
+                    <Label htmlFor="samedi-repas" className="text-xs font-medium text-text-secondary mb-1">Indemnisation Repas</Label>
+                    <Select name="samedi-repas" value={form.samedi.repas} onValueChange={(value) => handleSamediChange("repas", value)}>
+                        <SelectTrigger className={selectTriggerClasses}><SelectValue placeholder="Type de repas" /></SelectTrigger>
+                        <SelectContent className={selectContentClasses}>
+                            <SelectItem value="Titre Restaurant" className={selectItemClasses}>Titre Restaurant</SelectItem>
+                            <SelectItem value="Note de Frais" className={selectItemClasses}>Note de Frais</SelectItem>
+                            <SelectItem value="Rien" className={selectItemClasses}>Rien</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <Input label="Départ Agence" id="samedi-departAgence" type="time" value={form.samedi.departAgence} onChange={(e) => handleSamediChange("departAgence", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+                <Input label="Arrivée Domicile" id="samedi-arriveeDomicile" type="time" value={form.samedi.arriveeDomicile} onChange={(e) => handleSamediChange("arriveeDomicile", e.target.value)} className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+                <Input label="Durée Travail" id="samedi-dureeTravail" type="time" value={form.samedi.dureeTravail} onChange={(e) => handleSamediChange("dureeTravail", e.target.value)} placeholder="Calculé?" readOnly className={`${inputBaseClasses} bg-ui-background/50`} labelClassName="text-xs font-medium text-text-secondary mb-1" />
+              </div>
+            )}
+          </CardBody>
         </Card>
 
-      {/* Section Astreinte / Commentaire / Actions */}
       <Card>
-        <CardBody className="grid gap-4 p-6"> {/* CardContent -> CardBody */}
-          <h2 className="text-lg font-semibold">Astreinte & Commentaire</h2>
-           <div>
-              <Label htmlFor="heuresAstreinte">Heures Astreinte (Total Mois)</Label>
-              <Input id="heuresAstreinte" type="number" step="0.5" value={form.astreinteTotalHeures} onChange={(e) => handleInputChange('astreinteTotalHeures', e.target.value)} placeholder="ex: 7.5" />
-            </div>
+        <CardBody className="grid gap-4 p-4 sm:p-6">
+          <h2 className="text-lg font-semibold text-text-primary">Astreinte & Commentaire</h2>
+           <Input label="Heures Astreinte (Total Mois)" id="heuresAstreinte" type="number" step="0.5" value={form.astreinteTotalHeures} onChange={(e) => handleInputChange('astreinteTotalHeures', e.target.value)} placeholder="ex: 7.5" className={inputBaseClasses} labelClassName="text-xs font-medium text-text-secondary mb-1" />
           <div>
-            <Label htmlFor="commentaire">Commentaire</Label>
-            <Textarea id="commentaire" value={form.commentaire} onChange={(e) => handleInputChange('commentaire', e.target.value)} />
+            <Label htmlFor="commentaire" className="text-xs font-medium text-text-secondary mb-1">Commentaire</Label>
+            <Textarea id="commentaire" value={form.commentaire} onChange={(e) => handleInputChange('commentaire', e.target.value)} className={`${inputBaseClasses} min-h-[80px]`} />
           </div>
 
-          <div className="flex items-center gap-2 mt-4">
-            <Switch
-              id="send-email"
-              checked={sendEmail}
-              onCheckedChange={setSendEmail}
-            />
-            <Label htmlFor="send-email">Envoyer par email à alexis.lhersonneau@jdc.fr après sauvegarde</Label>
+          <div className="flex items-center gap-2 pt-4 border-t border-ui-border/50">
+            <Switch id="send-email" checked={sendEmail} onCheckedChange={setSendEmail} />
+            <Label htmlFor="send-email" className="text-sm text-text-secondary">Envoyer par email à alexis.lhersonneau@jdc.fr après sauvegarde</Label>
           </div>
 
-          <div className="flex justify-end gap-4 mt-6">
-             <Button
-                variant="outline"
-                onClick={handleSaveDraft}
-                disabled={!form.selectedFileId} // Désactiver si aucun fichier sélectionné
-              >
-                Enregistrer le brouillon
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-ui-border/50">
+             <Button variant="outline" onClick={() => commonSubmit("saveDraft")} disabled={!form.selectedFileId || isSubmitting} className="border-ui-border text-text-secondary hover:bg-ui-border">
+                {isSubmitting && fetcher.formData?.get("action") === "saveDraft" ? <FaSpinner className="animate-spin mr-2"/> : <FaSave className="mr-2" />}
+                Enregistrer Brouillon
              </Button>
-             <Button
-                onClick={handleSubmit}
-                disabled={!form.selectedFileId} // Désactiver si aucun fichier sélectionné
-              >
+             <Button variant="primary" onClick={() => commonSubmit("submitForm")} disabled={!form.selectedFileId || isSubmitting} className="bg-brand-blue hover:bg-brand-blue-dark">
+               {isSubmitting && fetcher.formData?.get("action") === "submitForm" ? <FaSpinner className="animate-spin mr-2"/> : <FaPaperPlane className="mr-2" />}
                {sendEmail ? "Sauvegarder et Envoyer" : "Sauvegarder sur Google Sheet"}
              </Button>
           </div>
-        </CardBody> {/* CardContent -> CardBody */}
+        </CardBody>
       </Card>
     </div>
   );

@@ -4,7 +4,7 @@ import { useLoaderData } from "@remix-run/react";
 import { getGoogleAuthClient, readSheetData } from "~/services/google.server"; 
 // import { authenticator } from "~/services/auth.server"; // Plus utilisé directement
 import { sessionStorage, type UserSessionData } from "~/services/session.server"; // Importer pour session manuelle
-import { FaTruck, FaInfoCircle, FaBox, FaTag } from 'react-icons/fa'; 
+import { FaTruck, FaInfoCircle, FaBox, FaTag, FaExclamationTriangle } from 'react-icons/fa'; // Ajout de FaExclamationTriangle
 
 // Définir les indices des colonnes en fonction des en-têtes fournis
 const COLUMN_INDICES = {
@@ -129,65 +129,73 @@ export async function loader({ request }: LoaderFunctionArgs) { // Utiliser Load
 }
 
 // Fonction pour déterminer la couleur du badge en fonction du statut CDE
-const getStatutColor = (statut: string | undefined): string => {
-  if (!statut) return 'bg-gray-600 text-gray-100'; // Couleur par défaut si le statut est vide
-  const lowerStatut = statut?.toLowerCase(); // Utiliser ?. pour éviter l'erreur si statut est undefined
+const getStatutColorClasses = (statut: string | undefined): { badge: string; borderVar: string } => {
+  if (!statut) return { badge: 'bg-ui-background text-text-tertiary border border-ui-border', borderVar: 'var(--color-ui-border)'};
+  const lowerStatut = statut?.toLowerCase();
   switch (lowerStatut) {
     case 'expédiée':
-      return 'bg-green-600 text-green-100';
+      return { badge: 'bg-green-500/10 text-green-700 border border-green-500/30', borderVar: 'var(--color-green-500)' };
     case 'annulée':
-      return 'bg-red-600 text-red-100';
+      return { badge: 'bg-red-500/10 text-red-700 border border-red-500/30', borderVar: 'var(--color-red-500)' };
     case 'préparation':
-      return 'bg-orange-600 text-orange-100';
+      return { badge: 'bg-yellow-500/10 text-yellow-700 border border-yellow-500/30', borderVar: 'var(--color-yellow-500)' };
     case 'validée':
-      return 'bg-blue-600 text-blue-100';
+      return { badge: 'bg-brand-blue/20 text-brand-blue-light border border-brand-blue/30', borderVar: 'var(--color-brand-blue)' };
     default:
-      return 'bg-gray-600 text-gray-100'; // Couleur par défaut pour les statuts inconnus
+      return { badge: 'bg-ui-background text-text-tertiary border border-ui-border', borderVar: 'var(--color-ui-border)' };
   }
 };
 
 
 export default function LogistiqueGrenoble() {
-  const { data, error } = useLoaderData<LoaderData>(); // Utiliser le type LoaderData
+  const { data, error } = useLoaderData<LoaderData>();
 
   if (error) {
-    return <div className="text-red-500 p-4">Erreur: {error}</div>;
+    return (
+      <div className="p-4 md:p-6">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-300 p-4 rounded-md shadow-md">
+          <div className="flex items-center mb-2">
+            <FaExclamationTriangle className="h-5 w-5 mr-2 text-red-400" />
+            <p className="font-semibold text-red-200">Erreur lors du chargement des données :</p>
+          </div>
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4 text-white">Suivie demande de RMA Grenoble</h1>
+    <div className="p-4 md:p-6 space-y-6">
+      <h1 className="text-2xl font-semibold text-text-primary flex items-center">
+        <FaTruck className="mr-3 text-brand-blue h-6 w-6" />
+        Suivi Demande RMA Grenoble
+      </h1>
       {data.length === 0 ? (
-        <p className="text-gray-400">Aucune donnée trouvée pour Grenoble.</p>
+        <div className="text-center py-10 text-text-secondary bg-ui-surface rounded-lg shadow-md border border-ui-border">
+          <FaBox className="mx-auto text-4xl mb-3 opacity-40" />
+          <p>Aucune donnée trouvée pour Grenoble.</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4"> {/* Changé en liste verticale */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.map((item: LogistiqueItem, index: number) => {
-            const statutColorClass = getStatutColor(item.statutCDE);
-            // Déterminer la couleur de la bordure en hexadécimal
-            let borderColor = '#4b5563'; // Default: gray-600 from getStatutColor default
-            if (statutColorClass.includes('bg-green-600')) borderColor = '#10b981'; // green-600
-            else if (statutColorClass.includes('bg-red-600')) borderColor = '#ef4444'; // red-600
-            else if (statutColorClass.includes('bg-orange-600')) borderColor = '#f97316'; // orange-600
-            else if (statutColorClass.includes('bg-blue-600')) borderColor = '#3b82f6'; // blue-600
-
+            const { badge: statutBadgeClass, borderVar: itemBorderColorVar } = getStatutColorClasses(item.statutCDE);
+            
             return (
               <div
                 key={index}
-                className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-lg p-4 cursor-pointer hover:shadow-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex flex-col space-y-3 border-l-4" // Appliquer le style de carte complet
-                style={{ borderLeftColor: borderColor }} // Bordure colorée selon le statut
-                // Ajouter un onClick si on veut ouvrir les détails (non spécifié dans la tâche)
-                // onClick={() => handleItemClick(item)}
-                role="button" // Optionnel si cliquable
-                tabIndex={0} // Optionnel si cliquable
+                className="bg-ui-surface rounded-lg shadow-md p-4 flex flex-col space-y-3 border-l-4 hover:shadow-lg transition-shadow"
+                style={{ borderLeftColor: itemBorderColorVar }}
               >
                 {/* Header */}
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-start">
                   <div className="flex items-center min-w-0">
-                    <FaTruck className="mr-2 text-jdc-yellow flex-shrink-0" />
-                    <span className="text-white font-semibold text-base mr-2 truncate" title={item.service}>Service: {item.service}</span>
+                    <FaTruck className="mr-2.5 text-brand-blue flex-shrink-0 text-lg" />
+                    <span className="text-text-primary font-semibold text-base mr-2 truncate" title={item.service}>
+                      {item.service || "Service N/A"}
+                    </span>
                   </div>
                   <span
-                    className={`ml-2 flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statutColorClass}`} // Utiliser la classe de statut
+                    className={`ml-2 flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statutBadgeClass}`}
                     title={`Statut CDE: ${item.statutCDE || 'N/A'}`}
                   >
                      <FaInfoCircle className="mr-1" />
@@ -196,74 +204,38 @@ export default function LogistiqueGrenoble() {
                 </div>
 
                 {/* Body: Articles */}
-                <div className="grid grid-cols-1 gap-2 text-xs text-gray-400 mt-2"> {/* Ajout de marge supérieure */}
-                  {/* En-tête de la section Articles */}
-                  <div className="flex items-center text-white font-medium mb-1">
-                     <FaBox className="mr-2 text-gray-500 w-4 flex-shrink-0" />
+                <div className="space-y-2 text-xs text-text-secondary pt-2 border-t border-ui-border/50">
+                  <div className="flex items-center text-text-primary font-medium mb-1 text-sm">
+                     <FaBox className="mr-2 text-text-tertiary w-4 flex-shrink-0" />
                      <span>Articles:</span>
                   </div>
 
-                  {/* Liste des articles SAP */}
-                  {item.sap1 && (
-                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2"> {/* Conteneur pour chaque article */}
-                      <div className="flex items-center text-white font-medium"> {/* SAP number and Designation */}
-                        <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                        <span>SAP 1: {item.sap1} - {item.designation1 || 'N/A'}</span> {/* Combine SAP and Designation */}
-                      </div>
-                      <div className="pl-6 text-gray-400"> {/* Quantity below */}
-                        <p><strong className="text-gray-500">Qté:</strong> {item.qte1 || 'N/A'}</p>
-                      </div>
-                    </div>
-                  )}
-                   {item.sap2 && (
-                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
-                       <div className="flex items-center text-white font-medium">
-                         <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                         <span>SAP 2: {item.sap2} - {item.designation2 || 'N/A'}</span>
-                      </div>
-                      <div className="pl-6 text-gray-400">
-                        <p><strong className="text-gray-500">Qté:</strong> {item.qte2 || 'N/A'}</p>
-                      </div>
-                    </div>
-                  )}
-                  {item.sap3 && (
-                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
-                       <div className="flex items-center text-white font-medium">
-                         <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                         <span>SAP 3: {item.sap3} - {item.designation3 || 'N/A'}</span>
-                      </div>
-                      <div className="pl-6 text-gray-400">
-                        <p><strong className="text-gray-500">Qté:</strong> {item.qte3 || 'N/A'}</p>
-                      </div>
-                    </div>
-                  )}
-                  {item.sap4 && (
-                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
-                       <div className="flex items-center text-white font-medium">
-                         <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                         <span>SAP 4: {item.sap4} - {item.designation4 || 'N/A'}</span>
-                      </div>
-                      <div className="pl-6 text-gray-400">
-                        <p><strong className="text-gray-500">Qté:</strong> {item.qte4 || 'N/A'}</p>
-                      </div>
-                    </div>
-                  )}
-                  {item.sap5 && (
-                    <div className="flex flex-col space-y-1 border-b border-gray-700 pb-2">
-                       <div className="flex items-center text-white font-medium">
-                         <FaTag className="mr-2 text-gray-500 w-4 flex-shrink-0" />
-                         <span>SAP 5: {item.sap5} - {item.designation5 || 'N/A'}</span>
-                      </div>
-                      <div className="pl-6 text-gray-400">
-                        <p><strong className="text-gray-500">Qté:</strong> {item.qte5 || 'N/A'}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  {[1, 2, 3, 4, 5].map(num => {
+                    const sap = item[`sap${num}` as keyof LogistiqueItem] as string | undefined;
+                    const designation = item[`designation${num}` as keyof LogistiqueItem] as string | undefined;
+                    const qte = item[`qte${num}` as keyof LogistiqueItem] as string | undefined;
 
-                {/* Footer - Pas de champs spécifiques demandés, on peut laisser vide ou ajouter autre chose si pertinent */}
-                <div className="border-t border-gray-700 pt-2 mt-2 space-y-1 text-xs text-gray-400">
-                  {/* Ajoutez d'autres champs pertinents ici si nécessaire */}
+                    if (!sap && !designation) return null; // Ne rien afficher si SAP et désignation sont vides
+
+                    return (
+                      <div key={num} className="pl-1 border-b border-ui-border/30 pb-1.5 last:border-b-0 last:pb-0">
+                        <div className="flex items-center text-text-primary font-medium text-xs">
+                          <FaTag className="mr-1.5 text-text-tertiary w-3.5 flex-shrink-0" />
+                          <span className="truncate" title={`${sap || 'N/A'} - ${designation || 'N/A'}`}>
+                            {sap || 'N/A'} - {designation || 'N/A'}
+                          </span>
+                        </div>
+                        {qte && (
+                          <div className="pl-5 text-text-secondary text-xs">
+                            <p><strong className="text-text-tertiary font-normal">Qté:</strong> {qte}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                   {![item.sap1, item.sap2, item.sap3, item.sap4, item.sap5].some(Boolean) && (
+                     <p className="pl-1 text-xs text-text-tertiary italic">Aucun article listé.</p>
+                   )}
                 </div>
               </div>
             );

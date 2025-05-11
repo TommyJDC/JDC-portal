@@ -6,12 +6,12 @@ import { getInstallationsBySector } from "~/services/firestore.service.server";
 import InstallationListItem from "~/components/InstallationListItem";
 import InstallationDetails from "~/components/InstallationDetails";
 import type { Installation } from "~/types/firestore.types";
-import type { UserSession } from "~/services/session.server";
+import type { UserSessionData } from "~/services/session.server"; // Correction du type
 import { useState } from 'react';
 import { toast } from "react-hot-toast";
 
 type OutletContextType = {
-  user: UserSession | null;
+  user: UserSessionData | null; // Correction du type
 };
 
 interface ActionData {
@@ -126,28 +126,42 @@ export default function TabacInstallations() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#1a2250] to-[#1e2746] p-6 font-bold font-jetbrains">
-      <h1 className="text-3xl font-extrabold text-jdc-yellow drop-shadow-neon mb-4">Installations Tabac</h1>
-      <Link to="/dashboard" className="text-jdc-blue font-bold hover:text-jdc-yellow transition-colors hover:underline drop-shadow-neon">
-        &larr; Retour au Tableau de Bord
-      </Link>
-      <div className="mb-4 mt-4">
+    <div className="space-y-6"> {/* Fond géré par root.tsx */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold text-text-primary">Installations Tabac</h1>
+        <Link to="/dashboard" className="text-sm text-brand-blue hover:text-brand-blue-light hover:underline">
+          &larr; Retour au Tableau de Bord
+        </Link>
+      </div>
+      <div className="relative">
         <input
           type="text"
-          placeholder="Rechercher par nom, code client, ville, contact, téléphone, commercial, technicien ou commentaire..."
-          className="w-full px-4 py-3 bg-[#10182a] text-jdc-yellow font-bold border-2 border-jdc-yellow/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-jdc-yellow/60 text-lg font-jetbrains placeholder-jdc-yellow/40"
+          placeholder="Rechercher une installation..."
+          className="w-full rounded-md bg-ui-background border-ui-border text-text-primary focus:border-brand-blue focus:ring-1 focus:ring-brand-blue py-2 pl-10 pr-3 text-sm shadow-sm placeholder-text-tertiary"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 transform -translate-y-1/2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+        </svg>
       </div>
       {error && (
-        <div className="bg-red-900/80 text-jdc-yellow p-4 rounded-xl font-bold shadow-xl">
-          <p className="font-bold">Erreur :</p>
-          <p>{error}</p>
+        <div className="p-4 rounded-md bg-red-500/10 border border-red-500/30 text-red-300">
+          <p className="font-semibold text-sm">Erreur de chargement :</p>
+          <p className="text-xs">{error}</p>
         </div>
       )}
-      {!error && filteredInstallations.length > 0 && (
-        <div className="space-y-4 mt-4">
+      {fetcher.state === "loading" && !installations.length && (
+         <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
+          <svg className="animate-spin h-6 w-6 text-brand-blue mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Chargement des installations...
+        </div>
+      )}
+      {!error && fetcher.state !== "loading" && filteredInstallations.length > 0 && (
+        <div className="space-y-3">
           {filteredInstallations.map((installation) => (
             <InstallationListItem 
               key={installation.id}
@@ -158,10 +172,13 @@ export default function TabacInstallations() {
           ))}
         </div>
       )}
-      {!error && filteredInstallations.length === 0 && (
-        <div className="bg-[#10182a] p-6 rounded-xl shadow-xl border-2 border-jdc-yellow/20 mt-4 text-center">
-          <p className="text-jdc-yellow-200 font-bold">Aucune installation Tabac à afficher.</p>
-          {searchTerm && <p className="text-jdc-yellow-200 mt-2">Essayez avec d'autres termes de recherche.</p>}
+      {!error && fetcher.state !== "loading" && filteredInstallations.length === 0 && (
+        <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
+           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 mx-auto mb-3 text-text-tertiary">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+          </svg>
+          <p className="font-medium">Aucune installation Tabac à afficher.</p>
+          {searchTerm && <p className="text-xs mt-1">Essayez avec d'autres termes de recherche.</p>}
         </div>
       )}
       {isModalOpen && selectedInstallation && (
