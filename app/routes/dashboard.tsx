@@ -15,7 +15,7 @@ import { TicketsChart } from '~/components/TicketsChart';
 import { UpcomingInstallationsTimeline } from '~/components/UpcomingInstallationsTimeline';
 import { MiniAgendaToday } from '~/components/MiniAgendaToday';
 import {
-  FaUtensils, FaShieldAlt, FaHamburger, FaSmoking, FaCalendarAlt, FaTruck, FaClipboardCheck, FaStore
+  FaUtensils, FaShieldAlt, FaHamburger, FaSmoking, FaCalendarAlt, FaTruck, FaClipboardCheck, FaStore, FaClipboardList
 } from 'react-icons/fa';
 import type { BlockchainSapTicket, BlockchainShipment } from "~/types/blockchain.types";
 import type { Installation as FirestoreInstallation } from "~/types/firestore.types";
@@ -109,57 +109,127 @@ export default function Dashboard() {
     <div className="space-y-6">
 
       {/* Section Statistiques Tickets SAP */}
-      <section className="bg-ui-surface shadow-lg rounded-lg p-4 sm:p-6">
-        <h2 className="text-xl font-semibold text-text-primary mb-4">Tickets SAP</h2>
+      <section className="glass-card bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-2xl p-8 shadow-2xl border border-white/10 backdrop-blur-xl">
+        <h2 className="text-2xl font-extrabold text-white flex items-center drop-shadow-lg mb-6">
+          <FaClipboardList className="mr-3 text-jdc-yellow text-2xl" />
+          Tickets SAP
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard title="CHR" value={sapTicketCountsBySector?.['CHR'] ?? 0} icon={FaUtensils} isLoading={false} />
-          <StatsCard title="HACCP" value={sapTicketCountsBySector?.['HACCP'] ?? 0} icon={FaShieldAlt} isLoading={false} />
-          <StatsCard title="Kezia" value={sapTicketCountsBySector?.['Kezia'] ?? 0} icon={FaHamburger} isLoading={false} />
-          <StatsCard title="Tabac" value={sapTicketCountsBySector?.['Tabac'] ?? 0} icon={FaSmoking} isLoading={false} />
+          <div className="glass-card bg-gradient-to-br from-green-400/20 to-green-700/30 rounded-xl p-6 border border-green-400/20 hover:border-green-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-green-400/20">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 rounded-full bg-green-400/30 border-2 border-white/20 shadow-lg">
+                <FaShieldAlt className="text-white text-xl drop-shadow" />
+              </div>
+              <h3 className="font-bold text-lg text-white">HACCP</h3>
+            </div>
+            <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['HACCP'] ?? 0}</div>
+          </div>
+          
+          <div className="glass-card bg-gradient-to-br from-blue-400/20 to-blue-700/30 rounded-xl p-6 border border-blue-400/20 hover:border-blue-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-blue-400/20">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 rounded-full bg-blue-400/30 border-2 border-white/20 shadow-lg">
+                <FaUtensils className="text-white text-xl drop-shadow" />
+              </div>
+              <h3 className="font-bold text-lg text-white">CHR</h3>
+            </div>
+            <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['CHR'] ?? 0}</div>
+          </div>
+          
+          <div className="glass-card bg-gradient-to-br from-red-400/20 to-red-700/30 rounded-xl p-6 border border-red-400/20 hover:border-red-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-red-400/20">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 rounded-full bg-red-400/30 border-2 border-white/20 shadow-lg">
+                <FaSmoking className="text-white text-xl drop-shadow" />
+              </div>
+              <h3 className="font-bold text-lg text-white">Tabac</h3>
+            </div>
+            <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['Tabac'] ?? 0}</div>
+          </div>
+          
+          <div className="glass-card bg-gradient-to-br from-purple-400/20 to-purple-700/30 rounded-xl p-6 border border-purple-400/20 hover:border-purple-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-purple-400/20">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 rounded-full bg-purple-400/30 border-2 border-white/20 shadow-lg">
+                <FaHamburger className="text-white text-xl drop-shadow" />
+              </div>
+              <h3 className="font-bold text-lg text-white">Kezia</h3>
+            </div>
+            <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['Kezia'] ?? 0}</div>
+          </div>
         </div>
       </section>
 
       {/* Section Statistiques Installations */}
-      <section className="bg-ui-surface shadow-lg rounded-lg p-4 sm:p-6">
-        <h2 className="text-xl font-semibold text-text-primary mb-4">Installations</h2>
+      <section className="glass-card bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-2xl p-8 shadow-2xl border border-white/10 backdrop-blur-xl">
+        <h2 className="text-2xl font-extrabold text-white flex items-center drop-shadow-lg mb-6">
+          <FaStore className="mr-3 text-jdc-yellow text-2xl" />
+          Installations
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {installCards.map(cardData => (
-            <Card key={cardData.label} className="bg-ui-background shadow-md rounded-lg"> {/* Fond légèrement différent pour les cartes internes */}
-              <div className="p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <cardData.icon className="text-2xl text-brand-blue" />
-                  <span className="font-semibold text-md text-text-primary">{cardData.label}</span>
+          {[
+            { label: 'HACCP', icon: FaClipboardCheck, stats: sectorStats.haccp },
+            { label: 'CHR', icon: FaUtensils, stats: sectorStats.chr },
+            { label: 'Tabac', icon: FaSmoking, stats: sectorStats.tabac },
+            { label: 'Kezia', icon: FaStore, stats: sectorStats.kezia }
+          ].map(cardData => {
+            const gradient = cardData.label === 'HACCP' ? 'from-green-400/20 to-green-700/30' :
+                           cardData.label === 'CHR' ? 'from-blue-400/20 to-blue-700/30' :
+                           cardData.label === 'Tabac' ? 'from-red-400/20 to-red-700/30' :
+                           'from-purple-400/20 to-purple-700/30';
+            const border = cardData.label === 'HACCP' ? 'border-green-400/20 hover:border-green-400/40' :
+                         cardData.label === 'CHR' ? 'border-blue-400/20 hover:border-blue-400/40' :
+                         cardData.label === 'Tabac' ? 'border-red-400/20 hover:border-red-400/40' :
+                         'border-purple-400/20 hover:border-purple-400/40';
+            const shadow = cardData.label === 'HACCP' ? 'shadow-green-400/20' :
+                         cardData.label === 'CHR' ? 'shadow-blue-400/20' :
+                         cardData.label === 'Tabac' ? 'shadow-red-400/20' :
+                         'shadow-purple-400/20';
+            const badge = cardData.label === 'HACCP' ? 'bg-green-400/30' :
+                        cardData.label === 'CHR' ? 'bg-blue-400/30' :
+                        cardData.label === 'Tabac' ? 'bg-red-400/30' :
+                        'bg-purple-400/30';
+
+            return (
+              <div key={cardData.label} 
+                className={`glass-card bg-gradient-to-br ${gradient} rounded-xl p-6 border ${border} transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${shadow}`}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`p-3 rounded-full ${badge} border-2 border-white/20 shadow-lg`}>
+                    <cardData.icon className="text-white text-xl drop-shadow" />
+                  </div>
+                  <h3 className="font-bold text-lg text-white">{cardData.label}</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
-                  <div>
-                    <div className="font-bold text-lg text-text-primary">{cardData.stats.total}</div>
-                    <div className="text-text-secondary">Total</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Total</p>
+                    <p className="text-2xl font-bold text-white">{cardData.stats.total}</p>
                   </div>
-                  <div>
-                    <div className="font-bold text-lg text-text-primary">{cardData.stats.enAttente}</div>
-                    <div className="text-text-secondary">En attente</div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">En attente</p>
+                    <p className="text-2xl font-bold text-yellow-300">{cardData.stats.enAttente}</p>
                   </div>
-                  <div>
-                    <div className="font-bold text-lg text-text-primary">{cardData.stats.planifiees}</div>
-                    <div className="text-text-secondary">Planifiées</div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Planifiées</p>
+                    <p className="text-2xl font-bold text-blue-300">{cardData.stats.planifiees}</p>
                   </div>
-                  <div>
-                    <div className="font-bold text-lg text-text-primary">{cardData.stats.terminees}</div>
-                    <div className="text-text-secondary">Terminées</div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Terminées</p>
+                    <p className="text-2xl font-bold text-green-300">{cardData.stats.terminees}</p>
                   </div>
                 </div>
               </div>
-            </Card>
-          ))}
+            );
+          })}
         </div>
       </section>
       
       {/* Section Prochaines Installations */}
-      <section className="bg-ui-surface shadow-lg rounded-lg p-4 sm:p-6">
-        <h2 className="text-xl font-semibold text-text-primary mb-4">Prochaines Installations</h2>
-        <Card className="bg-ui-background shadow-md rounded-lg p-4"> {/* Fond légèrement différent */}
+      <section className="glass-card bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-2xl p-8 shadow-2xl border border-white/10 backdrop-blur-xl">
+        <h2 className="text-2xl font-extrabold text-white flex items-center drop-shadow-lg mb-6">
+          <FaCalendarAlt className="mr-3 text-jdc-yellow text-2xl" />
+          Prochaines Installations
+        </h2>
+        <div className="glass-card bg-gradient-to-br from-gray-800/40 to-gray-900/60 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
           <UpcomingInstallationsTimeline installations={timelineInstallations} />
-        </Card>
+        </div>
       </section>
 
       {/* D'autres sections pourraient être ajoutées ici, par exemple : */}

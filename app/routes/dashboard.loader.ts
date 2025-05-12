@@ -5,7 +5,7 @@ import { sessionStorage, type UserSessionData } from "~/services/session.server"
 import { getGoogleAuthClient, getCalendarEvents } from "~/services/google.server";
 import { getCache, setCache } from "~/services/cache.server";
 import { getWeekDateRangeForAgenda } from "~/utils/dateUtils";
-import { triggerScheduledTasks } from "~/services/scheduledTasks.server"; // Importez la fonction
+import { triggerScheduledTasks } from "~/services/scheduledTasks.server"; // Réintégré
 import {
   getUserProfileSdk,
   getRecentTicketsForSectors,
@@ -65,7 +65,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   if (!userSession?.userId) return json(data); // Utiliser userSession
 
-  // Déclencher les tâches planifiées simulées
+  // Déclencher les tâches planifiées (maintenant uniquement sap-notification)
   await triggerScheduledTasks();
 
   try {

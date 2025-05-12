@@ -39,33 +39,41 @@ const sectorConfig = {
     label: 'HACCP',
     icon: FaClipboardCheck,
     to: '/installations/haccp',
-    gradient: 'from-green-400/60 to-green-700/80',
-    shadow: 'shadow-green-400/40',
-    badge: 'bg-green-400',
+    gradient: 'from-green-400/20 to-green-700/30',
+    shadow: 'shadow-green-400/20',
+    badge: 'bg-green-400/30',
+    border: 'border-green-400/20',
+    hover: 'hover:border-green-400/40',
   },
   chr: {
     label: 'CHR',
     icon: FaUtensils,
     to: '/installations/chr-firestore',
-    gradient: 'from-blue-400/60 to-blue-700/80',
-    shadow: 'shadow-blue-400/40',
-    badge: 'bg-blue-400',
+    gradient: 'from-blue-400/20 to-blue-700/30',
+    shadow: 'shadow-blue-400/20',
+    badge: 'bg-blue-400/30',
+    border: 'border-blue-400/20',
+    hover: 'hover:border-blue-400/40',
   },
   tabac: {
     label: 'Tabac',
     icon: FaSmoking,
     to: '/installations/tabac-firestore',
-    gradient: 'from-red-400/60 to-red-700/80',
-    shadow: 'shadow-red-400/40',
-    badge: 'bg-red-400',
+    gradient: 'from-red-400/20 to-red-700/30',
+    shadow: 'shadow-red-400/20',
+    badge: 'bg-red-400/30',
+    border: 'border-red-400/20',
+    hover: 'hover:border-red-400/40',
   },
   kezia: {
     label: 'Kezia',
     icon: FaStore,
     to: '/installations/kezia-firestore',
-    gradient: 'from-purple-400/60 to-purple-700/80',
-    shadow: 'shadow-purple-400/40',
-    badge: 'bg-purple-400',
+    gradient: 'from-purple-400/20 to-purple-700/30',
+    shadow: 'shadow-purple-400/20',
+    badge: 'bg-purple-400/30',
+    border: 'border-purple-400/20',
+    hover: 'hover:border-purple-400/40',
   },
 };
 
@@ -76,7 +84,9 @@ const InstallationCard = ({
   to, 
   gradient,
   shadow,
-  badge
+  badge,
+  border,
+  hover
 }: { 
   title: string;
   stats: InstallationStats;
@@ -85,14 +95,16 @@ const InstallationCard = ({
   gradient: string;
   shadow: string;
   badge: string;
+  border: string;
+  hover: string;
 }) => (
   <Link
     to={to}
-    className={`relative glass-card group bg-gradient-to-br ${gradient} rounded-2xl p-6 min-h-[220px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl ${shadow}`}
+    className={`relative glass-card group bg-gradient-to-br ${gradient} rounded-2xl p-6 min-h-[220px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl ${shadow} border ${border} ${hover}`}
     style={{backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}
   >
     <div className="flex items-center gap-3 mb-2">
-      <div className={`p-4 rounded-full bg-white/20 border-2 border-white/30 shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform duration-200 ${badge}`}>
+      <div className={`p-4 rounded-full bg-white/10 border-2 border-white/20 shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform duration-200 ${badge}`}>
         <IconComponent className="text-white text-2xl drop-shadow" />
       </div>
       <h3 className="font-extrabold text-2xl text-white tracking-wide drop-shadow-lg">{title}</h3>
@@ -223,6 +235,8 @@ export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = (prop
             gradient={conf.gradient}
             shadow={conf.shadow}
             badge={conf.badge}
+            border={conf.border}
+            hover={conf.hover}
           />
         ))}
       </div>

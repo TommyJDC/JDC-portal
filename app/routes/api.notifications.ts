@@ -11,6 +11,8 @@ import {
   getUnreadNotificationsCount
 } from '~/services/notifications.service.server'; 
 import type { Notification as FirestoreNotification } from '~/types/firestore.types'; // Type Notification de Firestore
+import { initializeFirebaseAdmin, getDb } from '~/firebase.admin.config.server';
+import type { DocumentSnapshot } from 'firebase-admin/firestore';
 
 // Interface pour une notification (peut être simplifiée ou alignée avec FirestoreNotification)
 export interface NotificationDisplay {
@@ -140,63 +142,130 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  const url = new URL(request.url);
-  const segments = url.pathname.split('/');
-  const notificationId = segments[segments.length - 2];
-  const actionType = segments[segments.length - 1];
-  const devBypass = url.searchParams.get("dev_bypass") === "true";
+export const action = async ({ request }: ActionFunctionArgs) => {
+  try {
+    console.log('[api.notifications] Début du traitement de la requête');
+    const formData = await request.formData();
+    const action = formData.get('action') as string;
+    const notificationId = formData.get('notificationId') as string;
 
-  // Authentification de l'utilisateur
-  const session = await sessionStorage.getSession(request.headers.get("Cookie"));
-  const userSession: UserSessionData | null = session.get("user") ?? null;
+    // Récupérer l'ID de l'utilisateur depuis la session
+    const session = await sessionStorage.getSession(request.headers.get("Cookie"));
+    const userSession = session.get("user");
+    const userId = userSession?.userId;
 
-  if (!userSession && !devBypass) {
-    return json({ error: 'Non authentifié (session manuelle)' }, { status: 401 });
-  }
-  
-  // Si devBypass est true, userSession peut être null.
-  // currentUserId sera null si userSession est null.
-  const currentUserId = userSession?.userId; 
+    if (!userId) {
+      console.error('[api.notifications] Utilisateur non authentifié');
+      return json({ 
+        success: false, 
+        message: 'Vous devez être connecté pour effectuer cette action' 
+      }, { status: 401 });
+    }
 
-  if (request.method === 'POST') {
-    try {
-      if (actionType === 'read' && notificationId) {
-        const success = await markNotificationAsRead(notificationId);
-        return json({ success });
-      } 
-      else if (actionType === 'delete' && notificationId) {
-        console.log(`[api.notifications] Tentative de suppression Firestore de la notification: ${notificationId}`);
-        const result = await deleteNotification(notificationId); // Utilise la fonction du service Firestore
-        if (result) { // Le service retourne true en cas de succès
+    console.log('[api.notifications] Données reçues:', { action, notificationId });
+
+    if (!action) {
+      console.error('[api.notifications] Action non spécifiée');
+      return json({ success: false, message: 'Action non spécifiée' }, { status: 400 });
+    }
+
+    switch (action) {
+      case 'delete': {
+        if (!notificationId) {
+          console.error('[api.notifications] ID de notification manquant pour la suppression');
+          return json({ success: false, message: 'ID de notification requis' }, { status: 400 });
+        }
+
+        console.log(`[api.notifications] Tentative de suppression de la notification ${notificationId}`);
+        const result = await deleteNotification(notificationId);
+        
+        if (!result.success) {
+          console.error(`[api.notifications] Échec de la suppression de ${notificationId}:`, result.message);
+          return json(result, { status: 400 });
+        }
+
+        console.log(`[api.notifications] Notification ${notificationId} supprimée avec succès`);
+        return json(result);
+      }
+
+      case 'clearAll': {
+        console.log('[api.notifications] Début de la suppression de toutes les notifications pour l\'utilisateur:', userId);
+        
+        const db = await getDb();
+        const batch = db.batch();
+        
+        // Récupérer toutes les notifications de l'utilisateur
+        const notificationsSnapshot = await db
+          .collection('notifications')
+          .where('userId', '==', userId)
+          .get();
+
+        console.log(`[api.notifications] ${notificationsSnapshot.size} notifications trouvées pour l'utilisateur ${userId}`);
+
+        if (notificationsSnapshot.empty) {
+          console.log('[api.notifications] Aucune notification à supprimer');
           return json({ 
-            success: true,
-            message: `Notification ${notificationId} supprimée de Firestore`
+            success: true, 
+            message: 'Aucune notification à supprimer' 
           });
-        } else {
+        }
+
+        let deletedCount = 0;
+        let skippedCount = 0;
+
+        // Ajouter chaque notification au batch
+        notificationsSnapshot.docs.forEach((doc: DocumentSnapshot) => {
+          const data = doc.data();
+          if (data?.locked) {
+            console.log(`[api.notifications] Notification ${doc.id} ignorée car verrouillée`);
+            skippedCount++;
+            return;
+          }
+          batch.delete(doc.ref);
+          deletedCount++;
+        });
+
+        if (deletedCount === 0) {
+          console.log('[api.notifications] Aucune notification supprimable (toutes verrouillées)');
           return json({ 
-            error: `Échec de la suppression de la notification ${notificationId} de Firestore`,
-            success: false
+            success: true, 
+            message: 'Aucune notification supprimable (toutes verrouillées)' 
+          });
+        }
+
+        try {
+          await batch.commit();
+          console.log(`[api.notifications] Suppression réussie: ${deletedCount} notifications supprimées, ${skippedCount} ignorées`);
+          return json({ 
+            success: true, 
+            message: `${deletedCount} notification${deletedCount > 1 ? 's' : ''} supprimée${deletedCount > 1 ? 's' : ''}${skippedCount > 0 ? `, ${skippedCount} ignorée${skippedCount > 1 ? 's' : ''} (verrouillée${skippedCount > 1 ? 's' : ''})` : ''}` 
+          });
+        } catch (error) {
+          console.error('[api.notifications] Erreur lors de la suppression globale:', error);
+          return json({ 
+            success: false, 
+            message: 'Erreur lors de la suppression des notifications' 
           }, { status: 500 });
         }
       }
-      else if (actionType === 'mark-all-read') {
-        if (!currentUserId) { // Vérifier si currentUserId est défini
-          return json({ error: 'Utilisateur non authentifié pour marquer tout comme lu' }, { status: 401 });
-        }
-        const success = await markAllNotificationsAsRead(currentUserId);
-        return json({ 
-          success,
-          message: success ? "Toutes les notifications marquées comme lues" : "Échec du marquage de toutes les notifications"
-        });
-      }
-      
-      return json({ error: 'Action non reconnue' }, { status: 400 });
-    } catch (error) {
-      console.error('Erreur lors du traitement de l\'action sur les notifications Firestore:', error);
-      return json({ error: 'Erreur interne du serveur' }, { status: 500 });
-    }
-  }
 
-  return json({ error: 'Méthode non autorisée' }, { status: 405 });
-}
+      default:
+        console.error(`[api.notifications] Action non reconnue: ${action}`);
+        return json({ 
+          success: false, 
+          message: `Action non reconnue: ${action}` 
+        }, { status: 400 });
+    }
+  } catch (error) {
+    console.error('[api.notifications] Erreur non gérée:', {
+      error,
+      stack: error instanceof Error ? error.stack : undefined,
+      message: error instanceof Error ? error.message : 'Erreur inconnue'
+    });
+    
+    return json({ 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Erreur inconnue' 
+    }, { status: 500 });
+  }
+};

@@ -117,15 +117,96 @@ export function NotificationsDropdown({
 
   const handleMarkAllAsRead = () => onMarkAllAsRead ? onMarkAllAsRead() : handleNotificationAction('/api/notifications/mark-all-read');
   const handleMarkAsRead = (id: string) => onMarkAsRead ? onMarkAsRead(id) : handleNotificationAction(`/api/notifications/${id}/read`);
-  const deleteNotification = (id: string) => handleNotificationAction(`/api/notifications/${id}/delete`);
-  
-  const handleClearAll = () => {
-    if (onClearAll) {
-      onClearAll();
-    } else {
-      notifications.forEach(notification => {
-        if (!isPlaceholder) deleteNotification(notification.id);
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      console.log(`[NotificationsDropdown] Début de la suppression de la notification ${notificationId}`);
+      
+      if (!notificationId) {
+        console.error('[NotificationsDropdown] ID de notification manquant');
+        throw new Error('ID de notification requis');
+      }
+
+      // Sauvegarder l'état actuel pour restauration en cas d'erreur
+      const previousNotifications = [...notifications];
+      
+      // Optimistic update
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      setNotificationCount(prev => Math.max(0, prev - 1));
+      
+      const formData = new FormData();
+      formData.append('action', 'delete');
+      formData.append('notificationId', notificationId);
+
+      console.log(`[NotificationsDropdown] Envoi de la requête de suppression pour ${notificationId}`);
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        body: formData,
       });
+
+      const result = await response.json();
+      console.log(`[NotificationsDropdown] Réponse de suppression pour ${notificationId}:`, result);
+
+      if (!result.success) {
+        console.error(`[NotificationsDropdown] Échec de la suppression de ${notificationId}:`, result.message);
+        // Restaurer l'état précédent en cas d'erreur
+        setNotifications(previousNotifications);
+        setNotificationCount(prev => prev + 1);
+        throw new Error(result.message || 'Erreur lors de la suppression');
+      }
+
+      // Rafraîchir la liste des notifications après une suppression réussie
+      await fetchNotifications();
+      
+    } catch (error) {
+      console.error(`[NotificationsDropdown] Erreur lors de la suppression de ${notificationId}:`, {
+        error,
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      });
+      // L'état a déjà été restauré dans le bloc try si nécessaire
+    }
+  };
+  
+  const handleClearAll = async () => {
+    try {
+      console.log('[NotificationsDropdown] Début de la suppression de toutes les notifications');
+      
+      // Sauvegarder l'état actuel
+      const previousNotifications = [...notifications];
+      const previousNotificationCount = notificationCount;
+      
+      // Optimistic update
+      setNotifications([]);
+      setNotificationCount(0);
+      
+      const formData = new FormData();
+      formData.append('action', 'clearAll');
+
+      console.log('[NotificationsDropdown] Envoi de la requête de suppression globale');
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      console.log('[NotificationsDropdown] Réponse de suppression globale:', result);
+
+      if (!result.success) {
+        console.error('[NotificationsDropdown] Échec de la suppression globale:', result.message);
+        // Restaurer l'état précédent
+        setNotifications(previousNotifications);
+        setNotificationCount(previousNotificationCount);
+        throw new Error(result.message || 'Erreur lors de la suppression globale');
+      }
+
+      // Rafraîchir la liste des notifications
+      await fetchNotifications();
+      
+    } catch (error) {
+      console.error('[NotificationsDropdown] Erreur lors de la suppression globale:', {
+        error,
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      });
+      // L'état a déjà été restauré dans le bloc try si nécessaire
     }
   };
 

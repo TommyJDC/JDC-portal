@@ -117,14 +117,83 @@ export const createNotification = async (notification: Omit<Notification, 'id' |
   }
 };
 
-export const deleteNotification = async (notificationId: string) => {
+export const deleteNotification = async (notificationId: string): Promise<{ success: boolean; message: string }> => {
   try {
+    console.log(`[deleteNotification] Début de la suppression de la notification ${notificationId}`);
+    
+    if (!notificationId) {
+      console.error('[deleteNotification] ID de notification manquant');
+      throw new Error('ID de notification requis');
+    }
+
     const db = await ensureDb();
-    await db.collection('notifications').doc(notificationId).delete();
-    return true;
+    const docRef = db.collection('notifications').doc(notificationId);
+    
+    console.log(`[deleteNotification] Vérification de l'existence du document ${notificationId}`);
+    const docSnapshot = await docRef.get();
+    if (!docSnapshot.exists) {
+      console.log(`[deleteNotification] Document ${notificationId} non trouvé`);
+      return {
+        success: false,
+        message: `Notification ${notificationId} introuvable`
+      };
+    }
+
+    // Vérifier si l'utilisateur a le droit de supprimer cette notification
+    const notificationData = docSnapshot.data();
+    if (notificationData) {
+      console.log(`[deleteNotification] Données de la notification:`, {
+        userId: notificationData.userId,
+        type: notificationData.type,
+        createdAt: notificationData.createdAt
+      });
+    }
+
+    // Vérifier si la notification est verrouillée ou si elle a des dépendances
+    if (notificationData?.locked) {
+      console.log(`[deleteNotification] Notification ${notificationId} est verrouillée`);
+      return {
+        success: false,
+        message: `La notification ${notificationId} ne peut pas être supprimée car elle est verrouillée`
+      };
+    }
+
+    console.log(`[deleteNotification] Suppression du document ${notificationId}`);
+    await docRef.delete();
+    console.log(`[deleteNotification] Document ${notificationId} supprimé avec succès`);
+    
+    return {
+      success: true,
+      message: `Notification ${notificationId} supprimée avec succès`
+    };
+
   } catch (error) {
-    console.error('Error deleting notification:', error);
-    return false;
+    console.error(`[deleteNotification] Erreur lors de la suppression de ${notificationId}:`, {
+      error,
+      stack: error instanceof Error ? error.stack : undefined,
+      message: error instanceof Error ? error.message : 'Erreur inconnue'
+    });
+
+    // Gérer les erreurs spécifiques de Firestore
+    if (error instanceof Error) {
+      if (error.message.includes('permission-denied')) {
+        return {
+          success: false,
+          message: 'Vous n\'avez pas les permissions nécessaires pour supprimer cette notification'
+        };
+      }
+      if (error.message.includes('not-found')) {
+        return {
+          success: false,
+          message: `Notification ${notificationId} introuvable`
+        };
+      }
+    }
+
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Erreur inconnue lors de la suppression'
+    };
   }
 };
 

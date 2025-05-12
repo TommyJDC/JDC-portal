@@ -1,5 +1,5 @@
-import { action as processGmailAction } from '~/routes/api.gmail-to-firestore';
-import { action as syncInstallationsAction } from '~/routes/api.sync-installations';
+// import { action as processGmailAction } from '~/routes/api.gmail-to-firestore'; // Supprimé
+// import { action as syncInstallationsAction } from '~/routes/api.sync-installations'; // Supprimé
 import { notifySapFromInstallations } from '~/services/notifications.service.server';
 import { getScheduledTaskState, updateScheduledTaskState } from '~/services/firestore.service.server'; // Importez les fonctions de service Firestore
 
@@ -7,9 +7,8 @@ export async function triggerScheduledTasks() {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // Une heure en millisecondes
 
+  // Ne conserve que la tâche de notification SAP pour le déclenchement via le dashboard
   const tasksToRun = [
-    { name: 'scheduled-gmail-processing', type: 'action', handler: processGmailAction },
-    { name: 'sync-installations', type: 'action', handler: syncInstallationsAction },
     { name: 'sap-notification', type: 'service', handler: notifySapFromInstallations },
   ];
 
@@ -20,38 +19,30 @@ export async function triggerScheduledTasks() {
       if (!taskState || (taskState.lastRun && taskState.lastRun.toDate() < oneHourAgo)) { // Vérifier l'existence de lastRun
         console.log(`[scheduledTasks] Déclenchement de la tâche : ${task.name}`);
 
-        let success = false;
-        if (task.type === 'action') {
-          // Créer un objet simulé avec la propriété 'method' attendue par les actions,
-          // et le caster en 'any' pour satisfaire TypeScript et éviter l'erreur Invalid URL sur Vercel.
-          const simulatedRequest = { method: 'POST' };
-          const response = await task.handler({ request: simulatedRequest as any, params: {}, context: {} }) as Response; // Caster en Response
-
-          if (response.status === 200) {
-            success = true;
-          } else {
-            // Tenter de lire le corps de l'erreur si la réponse n'est pas OK
-            try {
-                const errorBody = await response.json();
-                console.error(`[scheduledTasks] Erreur lors du déclenchement de la tâche ${task.name}:`, response.status, response.statusText, errorBody);
-            } catch (jsonError) {
-                // Si le corps n'est pas JSON, afficher le statut et le texte
-                console.error(`[scheduledTasks] Erreur lors du déclenchement de la tâche ${task.name}:`, response.status, response.statusText, "Impossible de parser le corps de l'erreur en JSON.");
-            }
+        // Puisque la seule tâche restante est de type 'service', nous simplifions la logique.
+        if (task.type === 'service') {
+          try {
+            // Appeler la fonction de service directement
+            await task.handler();
+            console.log(`[scheduledTasks] Tâche ${task.name} exécutée avec succès.`);
+            // Mettre à jour l'état de la tâche avec le nom de la tâche
+            await updateScheduledTaskState(task.name);
+          } catch (serviceError) {
+            console.error(`[scheduledTasks] Erreur lors de l'exécution du service ${task.name}:`, serviceError);
           }
-        } else if (task.type === 'service') {
-          // Appeler la fonction de service directement
-          await task.handler();
-          success = true; // Supposer le succès si aucune erreur n'est levée
+        } else {
+          // Ce cas ne devrait plus se produire avec la configuration actuelle de tasksToRun
+          console.warn(`[scheduledTasks] Type de tâche inconnu ou non géré: ${task.type} pour ${task.name}`);
         }
 
-        if (success) {
-          console.log(`[scheduledTasks] Tâche ${task.name} exécutée avec succès.`);
-          // Mettre à jour l'état de la tâche avec le nom de la tâche
-          await updateScheduledTaskState(task.name);
-        } else {
-           console.error(`[scheduledTasks] La tâche ${task.name} a échoué.`);
-        }
+        // La gestion du succès est maintenant à l'intérieur du bloc try/catch du service
+        // if (success) {
+        //   console.log(`[scheduledTasks] Tâche ${task.name} exécutée avec succès.`);
+        //   // Mettre à jour l'état de la tâche avec le nom de la tâche
+        //   await updateScheduledTaskState(task.name);
+        // } else {
+        //    console.error(`[scheduledTasks] La tâche ${task.name} a échoué.`);
+        // }
       } else {
         console.log(`[scheduledTasks] Tâche ${task.name} déjà exécutée récemment.`);
       }

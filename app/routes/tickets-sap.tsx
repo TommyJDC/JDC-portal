@@ -12,7 +12,8 @@ import TicketSAPDetails from "~/components/TicketSAPDetails";
 import {
   FaTicketAlt, FaFilter, FaSearch, FaSpinner,
   FaExclamationTriangle, FaPhone, FaMapMarkerAlt, FaUserTie, FaInfoCircle,
-  FaCalendarAlt, FaBuilding, FaChevronDown
+  FaCalendarAlt, FaBuilding, FaChevronDown, FaClipboardList, FaCheckCircle,
+  FaClock, FaHourglassHalf, FaEllipsisH, FaClipboard, FaLock, FaUnlock
 } from 'react-icons/fa';
 import { getTicketStatusStyle } from "~/utils/styleUtils";
 import { formatDate } from "~/utils/dateUtils";
@@ -237,25 +238,54 @@ export default function TicketsSap() {
 
       {/* Bandeau de statistiques */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
-          <span className="text-2xl font-bold text-text-primary">{ticketStats.total}</span>
-          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Total</span>
+        <div className="glass-card bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-xl p-6 border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-lg">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 rounded-full bg-gray-400/30 border-2 border-white/20 shadow-lg">
+              <FaClipboard className="text-white text-xl drop-shadow" />
+            </div>
+            <h3 className="font-bold text-lg text-white">Total</h3>
+          </div>
+          <div className="text-3xl font-bold text-white mt-2">{ticketStats.total}</div>
         </div>
-        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
-          <span className="text-2xl font-bold text-text-primary">{ticketStats.ouverts}</span>
-          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Ouverts</span>
+
+        <div className="glass-card bg-gradient-to-br from-red-400/20 to-red-700/30 rounded-xl p-6 border border-red-400/20 hover:border-red-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-red-400/20">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 rounded-full bg-red-400/30 border-2 border-white/20 shadow-lg">
+              <FaUnlock className="text-white text-xl drop-shadow" />
+            </div>
+            <h3 className="font-bold text-lg text-white">Ouverts</h3>
+          </div>
+          <div className="text-3xl font-bold text-white mt-2">{ticketStats.ouverts}</div>
         </div>
-        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
-          <span className="text-2xl font-bold text-text-primary">{ticketStats.enCours}</span>
-          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">En cours</span>
+
+        <div className="glass-card bg-gradient-to-br from-orange-400/20 to-orange-700/30 rounded-xl p-6 border border-orange-400/20 hover:border-orange-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-orange-400/20">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 rounded-full bg-orange-400/30 border-2 border-white/20 shadow-lg">
+              <FaClock className="text-white text-xl drop-shadow" />
+            </div>
+            <h3 className="font-bold text-lg text-white">En cours</h3>
+          </div>
+          <div className="text-3xl font-bold text-white mt-2">{ticketStats.enCours}</div>
         </div>
-        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
-          <span className="text-2xl font-bold text-text-primary">{ticketStats.clos}</span>
-          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Clos</span>
+
+        <div className="glass-card bg-gradient-to-br from-green-400/20 to-green-700/30 rounded-xl p-6 border border-green-400/20 hover:border-green-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-green-400/20">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 rounded-full bg-green-400/30 border-2 border-white/20 shadow-lg">
+              <FaLock className="text-white text-xl drop-shadow" />
+            </div>
+            <h3 className="font-bold text-lg text-white">Clos</h3>
+          </div>
+          <div className="text-3xl font-bold text-white mt-2">{ticketStats.clos}</div>
         </div>
-        <div className="bg-ui-surface shadow-lg rounded-lg p-4 flex flex-col items-center justify-center border border-ui-border">
-          <span className="text-2xl font-bold text-text-primary">{ticketStats.autres}</span>
-          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Autres</span>
+
+        <div className="glass-card bg-gradient-to-br from-blue-400/20 to-blue-700/30 rounded-xl p-6 border border-blue-400/20 hover:border-blue-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-blue-400/20">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 rounded-full bg-blue-400/30 border-2 border-white/20 shadow-lg">
+              <FaHourglassHalf className="text-white text-xl drop-shadow" />
+            </div>
+            <h3 className="font-bold text-lg text-white">Autres</h3>
+          </div>
+          <div className="text-3xl font-bold text-white mt-2">{ticketStats.autres}</div>
         </div>
       </div>
 

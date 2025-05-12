@@ -1,5 +1,5 @@
 import { getDb } from '~/firebase.admin.config.server'; // Modifié pour importer getDb
-import type { SapTicket, Notification, UserProfile } from '~/types/firestore.types';
+import type { SapTicket, Notification, UserProfile, Shipment } from '~/types/firestore.types';
 import { createNotification } from './notifications.service.server';
 import type { QuerySnapshot, DocumentChange } from 'firebase-admin/firestore'; // Importer les types pour onSnapshot
 
@@ -57,11 +57,10 @@ export async function notifyNewCTN(shipment: any) {
         return createNotification({
           userId: user.uid,
           title: `Nouvel envoi CTN - ${shipment.secteur}`,
-          message: `${shipment.nomClient} - ${shipment.ville}`,
-          type: 'new_shipment', // Corrigé pour correspondre à NotificationType
+          message: `${shipment.nomClient}`,
+          type: 'new_shipment',
           sourceId: shipment.id,
           link: `/envois-ctn?id=${shipment.id}`
-          // Les champs optionnels comme targetRoles, sector, metadata peuvent être ajoutés si nécessaire
         });
       }
       return null;
@@ -77,14 +76,76 @@ export async function notifyNewCTN(shipment: any) {
 
 // Fonction pour configurer les triggers Firestore
 export async function setupNotificationTriggers() {
-  // Note: L'utilisation de onSnapshot côté serveur pour des tâches de fond peut ne pas être fiable
-  // dans tous les environnements de déploiement. Des tâches planifiées ou des appels explicites
-  // après la création d'entités sont souvent plus robustes.
+  const db = getDb();
+  let pendingNotifications = new Map<string, { client: string; secteur: string; count: number; timestamp: number }>();
+  let notificationTimeout: NodeJS.Timeout | null = null;
 
-  // Les tickets SAP sont dans des collections par secteur, ex: 'CHR', 'HACCP', etc.
-  // Il faudrait un listener par collection de secteur pour les tickets.
-  const ticketSectors = ['CHR', 'HACCP', 'Kezia', 'Tabac']; 
-  const db = getDb(); // Obtenir l'instance de db
+  // Fonction pour envoyer les notifications groupées
+  const sendGroupedNotifications = async () => {
+    if (pendingNotifications.size === 0) return;
+
+    const users = await getNotifiableUsers();
+    const now = Date.now();
+    const notificationsToSend = Array.from(pendingNotifications.entries())
+      .filter(([_, data]) => now - data.timestamp <= 5000); // Ne garder que les notifications des 5 dernières secondes
+
+    if (notificationsToSend.length === 0) return;
+
+    const notificationPromises = users.flatMap(user => 
+      notificationsToSend.map(([client, data]) => {
+        if (user.secteurs.includes(data.secteur)) {
+          return createNotification({
+            userId: user.uid,
+            title: `Nouveaux envois CTN - ${data.secteur}`,
+            message: `${data.client} (${data.count} article${data.count > 1 ? 's' : ''})`,
+            type: 'new_shipment',
+            link: `/envois-ctn?client=${encodeURIComponent(data.client)}`
+          });
+        }
+        return null;
+      })
+    );
+
+    await Promise.all(notificationPromises.filter(Boolean));
+    notificationsToSend.forEach(([client]) => pendingNotifications.delete(client));
+  };
+
+  // Surveiller les nouveaux envois CTN (collection 'Envoi')
+  db.collection('Envoi').onSnapshot((snapshot: QuerySnapshot) => {
+    snapshot.docChanges().forEach((change: DocumentChange) => {
+      if (change.type === 'added') {
+        const shipment = {
+          id: change.doc.id,
+          ...change.doc.data()
+        } as Shipment;
+
+        const clientName = shipment.nomClient || 'Client Inconnu';
+        const secteur = shipment.secteur || 'Non défini';
+        const key = `${clientName}-${secteur}`;
+        const existing = pendingNotifications.get(key);
+
+        if (existing) {
+          existing.count++;
+        } else {
+          pendingNotifications.set(key, {
+            client: clientName,
+            secteur: secteur,
+            count: 1,
+            timestamp: Date.now()
+          });
+        }
+
+        // Réinitialiser le timeout à chaque nouveau changement
+        if (notificationTimeout) {
+          clearTimeout(notificationTimeout);
+        }
+        notificationTimeout = setTimeout(sendGroupedNotifications, 2000); // Attendre 2 secondes avant d'envoyer
+      }
+    });
+  });
+
+  // Garder le reste du code pour les tickets SAP
+  const ticketSectors = ['CHR', 'HACCP', 'Kezia', 'Tabac'];
   ticketSectors.forEach(sector => {
     db.collection(sector).onSnapshot((snapshot: QuerySnapshot) => { // Typer snapshot
       snapshot.docChanges().forEach((change: DocumentChange) => { // Typer change
@@ -108,19 +169,6 @@ export async function setupNotificationTriggers() {
         //   }
         // }
       });
-    });
-  });
-
-  // Surveiller les nouveaux envois CTN (collection 'Envoi')
-  db.collection('Envoi').onSnapshot((snapshot: QuerySnapshot) => { // Typer snapshot
-    snapshot.docChanges().forEach((change: DocumentChange) => { // Typer change
-      if (change.type === 'added') {
-        const shipment = {
-          id: change.doc.id,
-          ...change.doc.data()
-        };
-        notifyNewCTN(shipment);
-      }
     });
   });
 }
