@@ -214,33 +214,31 @@ const TicketSAPDetails: React.FC<TicketSAPDetailsProps> = ({ ticket, onClose, se
                     <section className="space-y-4">
                         <div>
                             <label htmlFor="modal-status" className="block text-sm font-medium text-text-secondary mb-1">Statut du ticket</label>
-                            <Select 
-                                value={currentStatus} 
-                                onValueChange={(value) => setCurrentStatus(value as SapTicketStatus)}
+                            <select 
+                                id="modal-status"
+                                name="status"
+                                value={currentStatus}
+                                onChange={(e) => setCurrentStatus(e.target.value as SapTicketStatus)}
                                 disabled={isLoadingAction}
+                                className="w-full bg-ui-background/70 border border-ui-border text-text-primary focus:border-brand-blue focus:ring-1 focus:ring-brand-blue rounded-md px-3 py-2 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{
+                                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundPosition: 'right 0.5rem center',
+                                    backgroundSize: '1.5em 1.5em',
+                                    paddingRight: '2.5rem'
+                                }}
                             >
-                                <SelectTrigger 
-                                    id="modal-status" 
-                                    className="w-full bg-ui-background/70 border-ui-border text-text-primary focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
-                                >
-                                    <SelectValue placeholder="Sélectionner un statut..." />
-                                </SelectTrigger>
-                                <SelectContent 
-                                  className="bg-ui-surface border-ui-border text-text-primary" // Style pour le dropdown
-                                >
-                                    <SelectGroup>
-                                        {ticketStatuses.map(s => (
-                                            <SelectItem 
-                                                key={s.value} 
-                                                value={s.value}
-                                                className="hover:bg-ui-background focus:bg-ui-background" // Style pour les items
-                                            >
-                                                {s.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
+                                {ticketStatuses.map(s => (
+                                    <option 
+                                        key={s.value} 
+                                        value={s.value}
+                                        className="bg-ui-surface text-text-primary"
+                                    >
+                                        {s.label}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label htmlFor="modal-technicianNotes" className="block text-sm font-medium text-text-secondary mb-1">Notes technicien</label>

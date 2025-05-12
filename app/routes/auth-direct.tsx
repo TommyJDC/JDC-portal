@@ -230,27 +230,40 @@ export default function AuthDirect() {
   const { authUrl, error } = useLoaderData<typeof loader>();
   
   return (
-    <div className="min-h-screen bg-jdc-gray-900 flex items-center justify-center p-4">
-      <div className="bg-jdc-card rounded-lg shadow-lg p-8 max-w-md w-full">
-        <h1 className="text-2xl font-bold text-white text-center mb-6">Connexion Directe</h1>
-        
-        {error && (
-          <div className="bg-red-900 text-white p-4 rounded-lg mb-6">
-            {error}
+    <div className="min-h-screen bg-gradient-to-br from-jdc-gray-900 via-slate-800 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Effet de fond avec des cercles */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 -right-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 left-1/3 w-72 h-72 bg-pink-500/20 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="relative w-full max-w-md">
+        <div className="backdrop-blur-xl bg-white/10 rounded-2xl shadow-2xl border border-white/20 p-8 space-y-6">
+          <div className="text-center">
+            <img 
+              src="https://www.jdc.fr/images/logo_jdc_blanc.svg" 
+              alt="JDC Logo" 
+              className="h-12 w-auto mx-auto mb-6"
+            />
+            <h1 className="text-2xl font-bold text-white mb-2">Connexion au Portail JDC</h1>
+            <p className="text-white/70 text-sm">
+              Connectez-vous avec votre compte Google pour accéder au tableau de bord.
+            </p>
           </div>
-        )}
-        
-        <div className="space-y-6">
-          <p className="text-jdc-gray-300 text-center">
-            Connectez-vous avec votre compte Google pour accéder au tableau de bord.
-          </p>
           
-          <div className="flex justify-center">
+          {error && (
+            <div className="bg-red-500/20 backdrop-blur-sm border border-red-500/30 text-white p-4 rounded-xl">
+              {error}
+            </div>
+          )}
+          
+          <div className="space-y-6">
             <a
               href={authUrl}
-              className="flex items-center justify-center gap-2 bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-6 border border-gray-400 rounded shadow transition-colors"
+              className="flex items-center justify-center gap-3 w-full bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-6 rounded-xl border border-white/20 transition-all duration-300 hover:shadow-lg hover:shadow-white/10 group"
             >
-              <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
                   <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
                   <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
@@ -258,23 +271,11 @@ export default function AuthDirect() {
                   <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
                 </g>
               </svg>
-              Se connecter avec Google
+              <span className="group-hover:translate-x-1 transition-transform">Se connecter avec Google</span>
             </a>
-          </div>
-          
-          <div className="text-center">
-            <div className="text-sm text-jdc-gray-400 mb-4">
-              <span className="font-bold text-yellow-400">Méthode directe</span> - Contourne Remix Auth
-            </div>
             
-            <div className="flex flex-wrap justify-center gap-4 text-sm">
-              <a href="/login" className="text-blue-400 hover:underline">
-                Méthode standard
-              </a>
-              <a href="/debug-session" className="text-blue-400 hover:underline">
-                Diagnostiquer la session
-              </a>
-              <a href="/reset-session" className="text-red-400 hover:underline">
+            <div className="text-center">
+              <a href="/reset-session" className="text-red-400/80 hover:text-red-300 transition-colors text-sm">
                 Réinitialiser la session
               </a>
             </div>

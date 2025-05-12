@@ -236,14 +236,14 @@ export function NotificationsDropdown({
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 mt-2 w-80 sm:w-96 origin-top-right rounded-lg bg-white/5 backdrop-blur-lg shadow-2xl border border-white/10 focus:outline-none divide-y divide-white/10 z-50">
+        <Menu.Items className="absolute right-0 mt-2 w-80 sm:w-96 origin-top-right rounded-lg bg-gray-900/95 backdrop-blur-lg shadow-2xl border border-gray-700/50 focus:outline-none divide-y divide-gray-700/50 z-50">
           <div className="p-3">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="font-semibold text-text-primary">Notifications</h3>
+              <h3 className="font-semibold text-gray-100">Notifications</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => fetchNotifications()}
-                  className="text-brand-blue text-xs hover:text-brand-blue-light transition-colors p-1 rounded-md hover:bg-white/5"
+                  className="text-brand-blue text-xs hover:text-brand-blue-light transition-colors p-1 rounded-md hover:bg-gray-800/50"
                   disabled={isLoading} title="Rafraîchir les notifications"
                 >
                   <svg className={`inline-block w-3.5 h-3.5 mr-1 ${isLoading ? 'animate-spin' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -252,12 +252,12 @@ export function NotificationsDropdown({
                   <span className="inline text-xs">{isLoading ? "..." : "Actualiser"}</span>
                 </button>
                 {notificationCount > 0 && !isPlaceholder && (
-                  <button onClick={handleMarkAllAsRead} className="text-brand-blue text-xs hover:text-brand-blue-light transition-colors p-1 rounded-md hover:bg-white/5">
+                  <button onClick={handleMarkAllAsRead} className="text-brand-blue text-xs hover:text-brand-blue-light transition-colors p-1 rounded-md hover:bg-gray-800/50">
                     <FaCheck className="mr-1 inline h-3 w-3" /> <span className="inline">Tout lire</span>
                   </button>
                 )}
                 {notifications.length > 0 && !isPlaceholder && (
-                  <button onClick={handleClearAll} className="text-xs text-text-secondary hover:text-red-500 transition-colors p-1 rounded-md hover:bg-white/5">
+                  <button onClick={handleClearAll} className="text-xs text-text-secondary hover:text-red-500 transition-colors p-1 rounded-md hover:bg-gray-800/50">
                     Vider
                   </button>
                 )}
@@ -265,23 +265,24 @@ export function NotificationsDropdown({
               </div>
             </div>
             {isPlaceholder && (
-              <div className="bg-ui-background/50 p-2 mb-2 rounded-md text-xs text-text-secondary flex items-center">
+              <div className="bg-gray-800/50 p-2 mb-2 rounded-md text-xs text-gray-300 flex items-center">
                 <FaInfoCircle className="text-brand-blue mr-2" /> Les notifications affichées sont des exemples.
               </div>
             )}
             <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
-              {isLoading && notifications.length === 0 ? ( // Afficher chargement seulement si pas de notifs existantes
-                <div className="text-center text-text-secondary py-4">Chargement...</div>
+              {isLoading && notifications.length === 0 ? (
+                <div className="text-center text-gray-400 py-4">Chargement...</div>
               ) : notifications.length === 0 ? (
-                <div className="text-center text-text-secondary py-4">Aucune notification</div>
+                <div className="text-center text-gray-400 py-4">Aucune notification</div>
               ) : (
                 notifications.map((notification) => (
                   <Menu.Item key={`${notification.source || 'unknown'}-${notification.id}`}>
                     {({ active }) => (
                       <div
                         className={`flex items-start p-2 rounded-md transition-colors ${
-                          active ? 'bg-white/20' : '' // Hover plus visible
-                        } ${!notification.isRead ? 'bg-brand-blue/20' : 'bg-white/5'}`} // Fond différent pour non lues et lues
+                          active ? 'bg-gray-800/50' : ''
+                        } ${!notification.isRead ? 'bg-brand-blue/20' : 'bg-gray-800/30'}`}
+                        role="button"
                       >
                         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => !isPlaceholder && !notification.isRead && handleMarkAsRead(notification.id)}>
                           {notification.link && !isPlaceholder ? (
@@ -324,15 +325,15 @@ const NotificationContent: React.FC<{ notification: NotificationDisplay }> = ({ 
   };
   return (
     <>
-      <p className={`text-sm font-medium truncate ${notification.isRead ? 'text-text-secondary' : 'text-text-primary'}`}>
+      <p className={`text-sm font-medium truncate ${notification.isRead ? 'text-gray-400' : 'text-gray-100'}`}>
         {notification.title || notification.message}
       </p>
       {notification.title && notification.title !== notification.message && (
-        <p className={`text-xs line-clamp-2 ${notification.isRead ? 'text-text-tertiary' : 'text-text-secondary'}`}> 
+        <p className={`text-xs line-clamp-2 ${notification.isRead ? 'text-gray-500' : 'text-gray-300'}`}> 
           {notification.message}
         </p>
       )}
-      <p className="text-xs text-text-tertiary/70 mt-1 flex justify-between">
+      <p className="text-xs text-gray-500 mt-1 flex justify-between">
         <span>{timeAgo(notification.timestamp)}</span>
         {notification.source && (<span className="italic">{notification.source === 'blockchain' ? 'Blockchain' : 'Système'}</span>)}
       </p>
