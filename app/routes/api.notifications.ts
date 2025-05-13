@@ -210,10 +210,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           });
         }
 
-        let deletedCount = 0;
+        let updatedCount = 0;
         let skippedCount = 0;
 
-        // Ajouter chaque notification au batch
+        // Ajouter chaque notification au batch pour mise à jour
         notificationsSnapshot.docs.forEach((doc: DocumentSnapshot) => {
           const data = doc.data();
           if (data?.locked) {
@@ -221,30 +221,37 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             skippedCount++;
             return;
           }
-          batch.delete(doc.ref);
-          deletedCount++;
+
+          // Mettre à jour le document pour ajouter l'utilisateur à la liste deletedForUsers
+          const deletedForUsers = data?.deletedForUsers || [];
+          if (!deletedForUsers.includes(userId)) {
+            batch.update(doc.ref, {
+              deletedForUsers: [...deletedForUsers, userId]
+            });
+            updatedCount++;
+          }
         });
 
-        if (deletedCount === 0) {
-          console.log('[api.notifications] Aucune notification supprimable (toutes verrouillées)');
+        if (updatedCount === 0) {
+          console.log('[api.notifications] Aucune notification à mettre à jour');
           return json({ 
             success: true, 
-            message: 'Aucune notification supprimable (toutes verrouillées)' 
+            message: 'Aucune notification à mettre à jour' 
           });
         }
 
         try {
           await batch.commit();
-          console.log(`[api.notifications] Suppression réussie: ${deletedCount} notifications supprimées, ${skippedCount} ignorées`);
+          console.log(`[api.notifications] Mise à jour réussie: ${updatedCount} notifications mises à jour, ${skippedCount} ignorées`);
           return json({ 
             success: true, 
-            message: `${deletedCount} notification${deletedCount > 1 ? 's' : ''} supprimée${deletedCount > 1 ? 's' : ''}${skippedCount > 0 ? `, ${skippedCount} ignorée${skippedCount > 1 ? 's' : ''} (verrouillée${skippedCount > 1 ? 's' : ''})` : ''}` 
+            message: `${updatedCount} notification${updatedCount > 1 ? 's' : ''} masquée${updatedCount > 1 ? 's' : ''}${skippedCount > 0 ? `, ${skippedCount} ignorée${skippedCount > 1 ? 's' : ''} (verrouillée${skippedCount > 1 ? 's' : ''})` : ''}` 
           });
         } catch (error) {
-          console.error('[api.notifications] Erreur lors de la suppression globale:', error);
+          console.error('[api.notifications] Erreur lors de la mise à jour:', error);
           return json({ 
             success: false, 
-            message: 'Erreur lors de la suppression des notifications' 
+            message: 'Erreur lors de la mise à jour des notifications' 
           }, { status: 500 });
         }
       }

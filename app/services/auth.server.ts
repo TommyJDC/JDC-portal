@@ -1,65 +1,23 @@
-import { Authenticator } from "remix-auth"; // Reste pour le type, même si l'instance est factice
+import { Authenticator } from "remix-auth";
 import { GoogleStrategy, type GoogleProfile } from "remix-auth-google";
 import { sessionStorage, type UserSessionData } from "./session.server";
 import { auth as adminAuth, initializeFirebaseAdmin } from "~/firebase.admin.config.server";
 import { getUserProfileSdk, createUserProfileSdk } from "./firestore.service.server";
 import type { UserProfile } from "~/types/firestore.types";
-import { redirect } from "@remix-run/node"; // Ajout de l'import pour redirect
+import { redirect } from "@remix-run/node";
 
-// Initialiser Firebase Admin au démarrage du module si ce n'est pas déjà fait ailleurs (ex: entry.server.tsx)
-// Il est préférable de l'appeler une seule fois. Si entry.server.tsx ou un autre point d'entrée l'appelle, cette ligne peut être redondante.
-// Pour l'instant, nous allons nous assurer qu'il est appelé.
+// Initialiser Firebase Admin
 initializeFirebaseAdmin().catch(error => {
   console.error("Failed to initialize Firebase Admin in auth.server.ts:", error);
-  // Gérer l'erreur d'initialisation si nécessaire, peut-être en arrêtant l'application ou en loggant sévèrement.
 });
 
-// --- DEBUT Neutralisation de Remix Auth ---
-// Create an instance of the authenticator
-// Le type générique est UserSessionData, qui sera stocké sous la clé "user".
-/*
+// Créer une instance de l'authenticator
 export const authenticator = new Authenticator<UserSessionData>(sessionStorage, {
-  sessionKey: 'user', // Spécifie que les données utilisateur sont stockées sous la clé 'user'
-  sessionErrorKey: 'authError', // Clé pour les messages d'erreur flash d'authentification
+  sessionKey: 'user',
+  sessionErrorKey: 'authError',
   throwOnError: true,
 });
-*/
 
-// Pour éviter les erreurs d'importation ailleurs, on peut exporter un objet factice ou commenter les usages.
-// Pour l'instant, on commente. Les erreurs d'importation devront être gérées.
-export const authenticator = {
-  isAuthenticated: async (request: Request, options?: { successRedirect?: string; failureRedirect?: string; throwOnError?: boolean; }) => {
-    console.warn("[AUTH.SERVER] authenticator.isAuthenticated a été appelé mais Remix Auth est neutralisé. Retourne null.");
-    // Simuler un utilisateur non authentifié pour l'instant
-    if (options?.failureRedirect) {
-      throw redirect(options.failureRedirect);
-    }
-    if (options?.throwOnError) {
-      throw new Error("User not authenticated (Remix Auth neutralisé)");
-    }
-    return null;
-  },
-  authenticate: async (strategy: string, request: Request, options?: { successRedirect?: string; failureRedirect?: string; throwOnError?: boolean; context?: any; }) => {
-    console.warn(`[AUTH.SERVER] authenticator.authenticate pour la stratégie ${strategy} a été appelé mais Remix Auth est neutralisé.`);
-    if (options?.failureRedirect) {
-      throw redirect(options.failureRedirect);
-    }
-    throw new Error("Authentication attempt failed (Remix Auth neutralisé)");
-  },
-  logout: async (request: Request, options: { redirectTo: string; }) => {
-    console.warn("[AUTH.SERVER] authenticator.logout a été appelé mais Remix Auth est neutralisé.");
-    const session = await sessionStorage.getSession(request.headers.get("Cookie"));
-    throw redirect(options.redirectTo, {
-      headers: {
-        "Set-Cookie": await sessionStorage.destroySession(session),
-      },
-    });
-  }
-  // Ajouter d'autres méthodes factices si nécessaire
-};
-
-// L'appel authenticator.use(...) n'est plus valide car 'authenticator' est un objet factice.
-/*
 // Configuration Google
 const googleClientId = process.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
@@ -78,33 +36,27 @@ authenticator.use(
       clientSecret: googleClientSecret,
       callbackURL: `${appBaseUrl}/auth/google/callback`,
       scope: [
-        'openid', // Pour l'ID token
-        'email',  // Pour l'adresse e-mail
-        'profile', // Pour les informations de base du profil (nom, photo)
-        'https://www.googleapis.com/auth/gmail.readonly',    // Gmail
-        'https://www.googleapis.com/auth/drive.readonly',    // Drive
-        'https://www.googleapis.com/auth/calendar.readonly' // Calendar
+        'openid',
+        'email',
+        'profile',
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+        'https://www.googleapis.com/auth/gmail.modify',
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/calendar.readonly'
       ],
-      accessType: "offline", // Pour obtenir un refreshToken
-      prompt: "consent" // Pour s'assurer que l'utilisateur voit l'écran de consentement et que le refreshToken est émis pour les nouveaux scopes
+      accessType: "offline",
+      prompt: "consent"
     },
     async ({ profile, accessToken, refreshToken, extraParams }) => {
-      // Toute cette logique est maintenant commentée car la stratégie n'est plus utilisée.
-      // La logique équivalente sera dans auth-direct.tsx
-      console.log("[AUTH.SERVER] Google Strategy (COMMENTÉE) - Profile received from Google:", JSON.stringify(profile, null, 2));
-      console.log("[AUTH.SERVER] Google Strategy (COMMENTÉE) - Access Token:", accessToken ? "Present" : "Absent");
+      console.log("[AUTH.SERVER] Google Strategy - Profile received from Google:", JSON.stringify(profile, null, 2));
+      console.log("[AUTH.SERVER] Google Strategy - Access Token:", accessToken ? "Present" : "Absent");
       console.log("[AUTH.SERVER] Google Strategy - Refresh Token:", refreshToken ? "Present" : "Absent");
-      console.log("[AUTH.SERVER] Google Strategy - Extra Params (id_token expected here):", JSON.stringify(extraParams, null, 2));
-
-      // L'ID token de Google est déjà validé par remix-auth-google en termes de signature.
-      // Nous utilisons les informations du profil Google directement.
-      // L'UID Google est dans profile.id
-      // L'email est dans profile.emails[0].value
 
       const googleUserId = profile.id;
       const email = profile.emails?.[0]?.value;
       const displayName = profile.displayName || email?.split('@')[0];
-      const photoURL = profile.photos?.[0]?.value; // URL de la photo de profil Google
+      const photoURL = profile.photos?.[0]?.value;
 
       if (!googleUserId || !email) {
         console.error("[AUTH.SERVER] Google Strategy - Google User ID or email is missing from profile.");
@@ -115,8 +67,6 @@ authenticator.use(
         let firebaseUid: string;
         let firebaseUserRecord;
 
-        // 1. Essayer de trouver l'utilisateur Firebase par son email
-        console.log(`[AUTH.SERVER] Google Strategy - Attempting to find Firebase user by email: ${email}`);
         try {
           firebaseUserRecord = await adminAuth().getUserByEmail(email);
           firebaseUid = firebaseUserRecord.uid;
@@ -130,13 +80,10 @@ authenticator.use(
             updates.photoURL = photoURL;
           }
           if (Object.keys(updates).length > 0) {
-            console.log(`[AUTH.SERVER] Google Strategy - Updating Firebase user ${firebaseUid} with:`, updates);
             await adminAuth().updateUser(firebaseUid, updates);
           }
-
         } catch (error: any) {
           if (error.code === 'auth/user-not-found') {
-            console.log(`[AUTH.SERVER] Google Strategy - Firebase user not found for email: ${email}. Creating new Firebase user.`);
             const newUser = {
               email: email,
               emailVerified: profile._json?.email_verified || false,
@@ -145,28 +92,22 @@ authenticator.use(
             };
             firebaseUserRecord = await adminAuth().createUser(newUser);
             firebaseUid = firebaseUserRecord.uid;
-            console.log(`[AUTH.SERVER] Google Strategy - Created new Firebase user. UID: ${firebaseUid}`);
           } else {
-            console.error("[AUTH.SERVER] Google Strategy - Error fetching Firebase user by email:", error);
             throw error;
           }
         }
 
-        console.log(`[AUTH.SERVER] Google Strategy - Checking for user profile in Firestore with Firebase UID: ${firebaseUid}`);
         let userProfileDoc = await getUserProfileSdk(firebaseUid);
-        console.log("[AUTH.SERVER] Google Strategy - Existing user profile from Firestore:", JSON.stringify(userProfileDoc, null, 2));
-
         const calculatedNom = profile.name?.familyName && profile.name?.givenName 
           ? `${profile.name.givenName} ${profile.name.familyName}` 
           : displayName;
 
         if (!userProfileDoc) {
-          console.log(`[AUTH.SERVER] Google Strategy - User profile not found in Firestore for UID: ${firebaseUid}. Creating new profile.`);
           const newUserProfileData: UserProfile = {
             uid: firebaseUid,
             email: email,
             displayName: displayName,
-            role: 'User', // Rôle par défaut
+            role: 'User',
             secteurs: [],
             nom: calculatedNom,
             phone: '', 
@@ -178,15 +119,14 @@ authenticator.use(
             labelSapClosed: '',
             labelSapNoResponse: '',
             labelSapRma: '',
-            createdAt: new Date(), // Restauré: initialiser avec la date actuelle
-            updatedAt: new Date(), // Restauré: initialiser avec la date actuelle
+            createdAt: new Date(),
+            updatedAt: new Date(),
           };
-          console.log("[AUTH.SERVER] Google Strategy - New user profile to create in Firestore (before SDK):", JSON.stringify(newUserProfileData, null, 2));
-          const createdProfile = await createUserProfileSdk(newUserProfileData);
-          userProfileDoc = createdProfile;
-          console.log("[AUTH.SERVER] Google Strategy - New user profile created/returned by SDK:", JSON.stringify(userProfileDoc, null, 2));
+          userProfileDoc = await createUserProfileSdk(newUserProfileData);
+          if (!userProfileDoc) {
+            throw new Error("Failed to create user profile");
+          }
         } else {
-          console.log("[AUTH.SERVER] Google Strategy - User profile found in Firestore. Current doc:", JSON.stringify(userProfileDoc, null, 2));
           let needsFirestoreUpdate = false;
           
           if (refreshToken && userProfileDoc.googleRefreshToken !== refreshToken) {
@@ -197,50 +137,184 @@ authenticator.use(
             userProfileDoc.displayName = displayName;
             needsFirestoreUpdate = true;
           }
-           if (calculatedNom && userProfileDoc.nom !== calculatedNom) {
+          if (calculatedNom && userProfileDoc.nom !== calculatedNom) {
             userProfileDoc.nom = calculatedNom;
             needsFirestoreUpdate = true;
           }
-          // updatedAt sera géré par createUserProfileSdk (utilisé pour la mise à jour)
-
+          
           if (needsFirestoreUpdate) {
-            console.log("[AUTH.SERVER] Google Strategy - Updating existing user profile in Firestore (before SDK):", JSON.stringify(userProfileDoc, null, 2));
-            // createUserProfileSdk mettra à jour updatedAt et conservera createdAt s'il existe et est une Date,
-            // ou l'initialisera si null/undefined.
             const updatedProfile = await createUserProfileSdk(userProfileDoc);
-            userProfileDoc = updatedProfile;
-            console.log("[AUTH.SERVER] Google Strategy - Existing user profile updated/returned by SDK:", JSON.stringify(userProfileDoc, null, 2));
+            if (updatedProfile) {
+              userProfileDoc = updatedProfile;
+            }
           }
         }
 
-        if (!userProfileDoc) {
-          console.error("[AUTH.SERVER] Critical: userProfileDoc is null or undefined before creating session data.");
-          throw new Error("User profile could not be definitively established.");
-        }
-
-        const sessionUserData: UserSessionData = {
+        return {
           userId: firebaseUid,
           email: email,
-          displayName: userProfileDoc.displayName,
+          displayName: displayName,
           role: userProfileDoc.role,
-          secteurs: userProfileDoc.secteurs || [],
-          googleRefreshToken: refreshToken,
+          secteurs: userProfileDoc.secteurs,
+          googleRefreshToken: refreshToken
         };
-        console.log("[AUTH.SERVER] Google Strategy - Returning session user data:", JSON.stringify(sessionUserData, null, 2));
-        return sessionUserData;
-
       } catch (error) {
-        console.error("[AUTH.SERVER] Error during Firebase user management or Firestore operation:", error);
-        if (error instanceof Error) {
-          console.error("Error message:", error.message);
-          console.error("Error stack:", error.stack);
-        }
-        // Il est important de relancer l'erreur pour que remix-auth la gère (ex: failureRedirect)
-        // Vous pouvez personnaliser le message d'erreur si nécessaire
-        throw new Error(`Authentication failed: ${error instanceof Error ? error.message : String(error)}`);
+        console.error("[AUTH.SERVER] Error in Google Strategy:", error);
+        throw error;
       }
     }
   )
 );
-*/
-// --- FIN Neutralisation de Remix Auth ---
+
+export async function authenticateUser(request: Request) {
+  const session = await sessionStorage.getSession(request.headers.get("Cookie"));
+  const user = session.get("user") as UserSessionData | null;
+  
+  if (!user) {
+    throw redirect("/login");
+  }
+  
+  return user;
+}
+
+export async function createUserSession(userData: UserSessionData, redirectTo: string) {
+  const session = await sessionStorage.getSession();
+  session.set("user", userData);
+  
+  return redirect(redirectTo, {
+    headers: {
+      "Set-Cookie": await sessionStorage.commitSession(session, {
+        maxAge: 60 * 60 * 24 * 30 // 30 jours
+      })
+    }
+  });
+}
+
+export async function destroyUserSession(request: Request) {
+  const session = await sessionStorage.getSession(request.headers.get("Cookie"));
+  
+  return redirect("/login", {
+    headers: {
+      "Set-Cookie": await sessionStorage.destroySession(session)
+    }
+  });
+}
+
+export async function handleGoogleAuth(profile: any, accessToken: string, refreshToken: string) {
+  console.log("[AUTH.SERVER] Google Auth - Profile received:", JSON.stringify(profile, null, 2));
+  console.log("[AUTH.SERVER] Google Auth - Access Token:", accessToken ? "Present" : "Absent");
+  console.log("[AUTH.SERVER] Google Auth - Refresh Token:", refreshToken ? "Present" : "Absent");
+
+  const googleUserId = profile.id;
+  const email = profile.emails?.[0]?.value;
+  const displayName = profile.displayName || email?.split('@')[0];
+  const photoURL = profile.photos?.[0]?.value;
+
+  if (!googleUserId || !email) {
+    console.error("[AUTH.SERVER] Google Auth - Google User ID or email is missing from profile.");
+    throw new Error("Google User ID or email is missing from profile.");
+  }
+
+  try {
+    let firebaseUid: string;
+    let firebaseUserRecord;
+
+    try {
+      firebaseUserRecord = await adminAuth().getUserByEmail(email);
+      firebaseUid = firebaseUserRecord.uid;
+      console.log(`[AUTH.SERVER] Google Auth - Found existing Firebase user. UID: ${firebaseUid}`);
+      
+      const updates: { displayName?: string; photoURL?: string } = {};
+      if (displayName && firebaseUserRecord.displayName !== displayName) {
+        updates.displayName = displayName;
+      }
+      if (photoURL && firebaseUserRecord.photoURL !== photoURL) {
+        updates.photoURL = photoURL;
+      }
+      if (Object.keys(updates).length > 0) {
+        await adminAuth().updateUser(firebaseUid, updates);
+      }
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        const newUser = {
+          email: email,
+          emailVerified: profile._json?.email_verified || false,
+          displayName: displayName,
+          photoURL: photoURL,
+        };
+        firebaseUserRecord = await adminAuth().createUser(newUser);
+        firebaseUid = firebaseUserRecord.uid;
+      } else {
+        throw error;
+      }
+    }
+
+    let userProfileDoc = await getUserProfileSdk(firebaseUid);
+    const calculatedNom = profile.name?.familyName && profile.name?.givenName 
+      ? `${profile.name.givenName} ${profile.name.familyName}` 
+      : displayName;
+
+    if (!userProfileDoc) {
+      const newUserProfileData: UserProfile = {
+        uid: firebaseUid,
+        email: email,
+        displayName: displayName,
+        role: 'User',
+        secteurs: [],
+        nom: calculatedNom,
+        phone: '', 
+        address: '',
+        googleRefreshToken: refreshToken || '', 
+        isGmailProcessor: false,
+        gmailAuthorizedScopes: [],
+        gmailAuthStatus: 'unauthorized',
+        labelSapClosed: '',
+        labelSapNoResponse: '',
+        labelSapRma: '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      userProfileDoc = await createUserProfileSdk(newUserProfileData);
+      if (!userProfileDoc) {
+        throw new Error("Failed to create user profile");
+      }
+    } else {
+      let needsFirestoreUpdate = false;
+      
+      if (refreshToken && userProfileDoc.googleRefreshToken !== refreshToken) {
+        userProfileDoc.googleRefreshToken = refreshToken;
+        needsFirestoreUpdate = true;
+      }
+      if (displayName && userProfileDoc.displayName !== displayName) {
+        userProfileDoc.displayName = displayName;
+        needsFirestoreUpdate = true;
+      }
+      if (calculatedNom && userProfileDoc.nom !== calculatedNom) {
+        userProfileDoc.nom = calculatedNom;
+        needsFirestoreUpdate = true;
+      }
+      
+      if (needsFirestoreUpdate) {
+        const updatedProfile = await createUserProfileSdk(userProfileDoc);
+        if (updatedProfile) {
+          userProfileDoc = updatedProfile;
+        }
+      }
+    }
+
+    return {
+      userId: firebaseUid,
+      email: email,
+      displayName: displayName,
+      role: userProfileDoc.role,
+      secteurs: userProfileDoc.secteurs,
+      googleRefreshToken: refreshToken,
+      googleAccessToken: accessToken,
+      tokenExpiry: Date.now() + 3600000 // 1 heure
+    };
+  } catch (error) {
+    console.error("[AUTH.SERVER] Error in Google Auth:", error);
+    throw error;
+  }
+}
+

@@ -197,9 +197,6 @@ export function NotificationsDropdown({
         setNotificationCount(previousNotificationCount);
         throw new Error(result.message || 'Erreur lors de la suppression globale');
       }
-
-      // Rafraîchir la liste des notifications
-      await fetchNotifications();
       
     } catch (error) {
       console.error('[NotificationsDropdown] Erreur lors de la suppression globale:', {

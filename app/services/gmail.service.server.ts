@@ -53,25 +53,32 @@ async function getMessageDetails(messageData: any): Promise<{
   if (!headers) return {};
 
   const from = headers.find((h: GmailHeader) => h?.name?.toLowerCase() === 'from')?.value;
-  // Assurez-vous que 'to' est toujours un tableau
   const to = headers.find((h: GmailHeader) => h?.name?.toLowerCase() === 'to')?.value?.split(',').map((email: string) => email.trim()).filter(Boolean) || [];
-  // Assurez-vous que 'cc' est toujours un tableau
   const cc = headers.find((h: GmailHeader) => h?.name?.toLowerCase() === 'cc')?.value?.split(',').map((email: string) => email.trim()).filter(Boolean) || [];
   const subject = headers.find((h: GmailHeader) => h?.name?.toLowerCase() === 'subject')?.value;
   const messageId = headers.find((h: GmailHeader) => h?.name?.toLowerCase() === 'message-id')?.value;
-  // Assurez-vous que 'references' est une chaîne, même si l'en-tête est manquant
   const references = headers.find((h: GmailHeader) => h?.name?.toLowerCase() === 'references')?.value || '';
   const dateStr = headers.find((h: GmailHeader) => h?.name?.toLowerCase() === 'date')?.value;
   const date = dateStr ? new Date(dateStr) : undefined;
 
-  return {
+  console.log('[GmailService] Détails du message extraits:', {
     from,
-    to, // Sera maintenant un tableau vide si l'en-tête est absent
-    cc, // Sera maintenant un tableau vide si l'en-tête est absent
+    toCount: to.length,
+    ccCount: cc.length,
     subject,
     threadId: messageData.threadId,
     messageId,
-    references, // Sera maintenant une chaîne vide si l'en-tête est absent
+    date: date?.toISOString()
+  });
+
+  return {
+    from,
+    to,
+    cc,
+    subject,
+    threadId: messageData.threadId,
+    messageId,
+    references,
     date
   };
 }
@@ -86,7 +93,6 @@ export async function extractEmailContent(
   const emailData: EmailData[] = [];
 
   try {
-    // Récupérer les IDs des labels
     console.log(`[GmailService] Recherche des labels pour ${collection}:`, labels);
     const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
     const allLabels = labelsResponse.data.labels || [];
@@ -106,7 +112,6 @@ export async function extractEmailContent(
       return [];
     }
 
-    // Rechercher les messages avec ces labels
     console.log(`[GmailService] Recherche des messages avec les labels:`, labelIds);
     const messagesResponse = await gmail.users.messages.list({
       userId: 'me',
@@ -117,7 +122,6 @@ export async function extractEmailContent(
     const messages = messagesResponse.data.messages || [];
     console.log(`[GmailService] ${messages.length} messages trouvés pour ${collection}`);
 
-    // Traiter chaque message
     for (const message of messages) {
       try {
         const messageResponse = await gmail.users.messages.get({
@@ -130,59 +134,25 @@ export async function extractEmailContent(
         const body = getMessageBody(messageData);
         const messageDetails = await getMessageDetails(messageData);
 
-        // Extraire les données avec des expressions régulières
-        // Prioriser Raison Sociale, sinon Enseigne, avec arrêt plus robuste (plus de termes, flag 's')
-        let raisonSociale = "Non trouvé";
-        // Lookahead: Stop before Enseigne, Grand Compte, Adresse, Client, Téléphone, Email, Horaires
-        let matchRS = /Raison Sociale\s*[\*:]?\s*(.*?)(?=\s*(?:Enseigne\s*[\*:]?|Grand Compte|Adresse\s*[\*:]?|Client\s*[\*:]?|T(?:=C3=A9|é)l(?:=C3=A9|é)phone|Email|Horaires|$))/is.exec(body);
-        if (matchRS && matchRS[1]) {
-            raisonSociale = matchRS[1].replace(/\*$/, '').trim();
-        } else {
-            // Lookahead: Stop before Grand Compte, Adresse, Client, Téléphone, Email, Horaires
-            matchRS = /Enseigne\s*[\*:]?\s*(.*?)(?=\s*(?:Grand Compte|Adresse\s*[\*:]?|Client\s*[\*:]?|T(?:=C3=A9|é)l(?:=C3=A9|é)phone|Email|Horaires|$))/is.exec(body);
-            if (matchRS && matchRS[1]) {
-                raisonSociale = matchRS[1].replace(/\*$/, '').trim();
-            }
-        }
-        raisonSociale = raisonSociale.replace(/\s+/g, ' ').trim(); // Clean up extra spaces
+        // Extraction des données avec des expressions régulières améliorées
+        const raisonSociale = extractRaisonSociale(body);
+        const numeroSAP = extractNumeroSAP(body);
+        const codeClient = extractCodeClient(body);
+        const adresse = extractAdresse(body);
+        const telephone = extractTelephone(body);
+        const demandeSAP = extractDemandeSAP(body);
 
-        // Chercher Numéro SAP (7+ chiffres) après "Numéro" OU entre astérisques
-        const numeroSAPMatch = /(?:Num(?:=C3=A9|é)ro\s*\*?\s*(\d{7,})\s*\*?|\*(\d{7,})\*)/i.exec(body);
-        // Utiliser le groupe de capture qui a fonctionné (le 1er ou le 2ème)
-        const numeroSAP = numeroSAPMatch ? (numeroSAPMatch[1] || numeroSAPMatch[2] || '').trim() : "Non trouvé";
-
-        const codeClientMatch = /(?:Code\s*)?Client\s*[\*:]?\s*(\d+)/i.exec(body); // Rend "Code " optionnel
-        const codeClient = codeClientMatch ? codeClientMatch[1] : "Non trouvé";
-
-        // Extraction de l'adresse (capturer uniquement la partie adresse)
-        const adresseMatch = /Adresse\s*:?\s*((?:\d+\s+[\w\s-]+\s+\d{5}\s+[\w\s-]+))/i.exec(body);
-        const adresse = adresseMatch ? adresseMatch[1].trim() : "Non trouvé";
-
-        // Extraction de la date (format complet avec jour de la semaine)
-        const dateMatch = /((?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+\d{1,2}\s+(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+\d{4})/i.exec(body);
-        const date = dateMatch ? dateMatch[0].trim() : "Non trouvé";
-
-        // Extraction des téléphones 1 et 2 (inchangé)
-        const tel1Match = /T(?:=C3=A9|é)l(?:=C3=A9|é)phone\s*1\s*(\d+)/i.exec(body);
-        const tel2Match = /T(?:=C3=A9|é)l(?:=C3=A9|é)phone\s*2\s*(\d+)/i.exec(body);
-        const tel1 = tel1Match ? tel1Match[1] : null;
-        const tel2 = tel2Match ? tel2Match[1] : null;
-        let telephone = "Non trouvé";
-        if (tel1 && tel2) {
-            telephone = `${tel1}, ${tel2}`;
-        } else if (tel1) {
-            telephone = tel1;
-        } else if (tel2) {
-            telephone = tel2;
-        }
-
-        // Extraction de la demande SAP (Commentaires)
-        const demandeSAPMatch = /Commentaires?\s*[\*:]?\s*(.*)/is.exec(body);
-        const demandeSAP = demandeSAPMatch ? demandeSAPMatch[1].trim() : "Non trouvé";
-        const messageId = messageData.id || '';
+        console.log(`[GmailService] Données extraites pour le message ${message.id}:`, {
+          raisonSociale,
+          numeroSAP,
+          codeClient,
+          adresse,
+          telephone: telephone ? 'présent' : 'absent',
+          demandeSAP: demandeSAP ? 'présent' : 'absent'
+        });
 
         emailData.push({
-          date: messageDetails.date ? messageDetails.date.toISOString() : date, // Utiliser la date de l'en-tête si disponible
+          date: messageDetails.date ? messageDetails.date.toISOString() : new Date().toISOString(),
           raisonSociale,
           numeroSAP,
           codeClient,
@@ -190,7 +160,6 @@ export async function extractEmailContent(
           telephone,
           demandeSAP,
           messageId: messageData.id || '',
-          // Ajouter les nouvelles informations d'email
           mailFrom: messageDetails.from,
           mailTo: messageDetails.to,
           mailCc: messageDetails.cc,
@@ -210,6 +179,48 @@ export async function extractEmailContent(
     console.error(`[GmailService] Erreur lors de l'extraction des emails pour ${collection}:`, error);
     throw new Error(`Impossible d'extraire les données des emails: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+// Fonctions d'extraction améliorées
+function extractRaisonSociale(body: string): string {
+  const matchRS = /Raison Sociale\s*[\*:]?\s*(.*?)(?=\s*(?:Enseigne\s*[\*:]?|Grand Compte|Adresse\s*[\*:]?|Client\s*[\*:]?|T(?:=C3=A9|é)l(?:=C3=A9|é)phone|Email|Horaires|$))/is.exec(body);
+  if (matchRS && matchRS[1]) {
+    return matchRS[1].replace(/\*$/, '').trim();
+  }
+  const matchEnseigne = /Enseigne\s*[\*:]?\s*(.*?)(?=\s*(?:Grand Compte|Adresse\s*[\*:]?|Client\s*[\*:]?|T(?:=C3=A9|é)l(?:=C3=A9|é)phone|Email|Horaires|$))/is.exec(body);
+  return matchEnseigne && matchEnseigne[1] ? matchEnseigne[1].replace(/\*$/, '').trim() : "Non trouvé";
+}
+
+function extractNumeroSAP(body: string): string {
+  const match = /(?:Num(?:=C3=A9|é)ro\s*\*?\s*(\d{7,})\s*\*?|\*(\d{7,})\*)/i.exec(body);
+  return match ? (match[1] || match[2] || '').trim() : "Non trouvé";
+}
+
+function extractCodeClient(body: string): string {
+  const match = /(?:Code\s*)?Client\s*[\*:]?\s*(\d+)/i.exec(body);
+  return match ? match[1] : "Non trouvé";
+}
+
+function extractAdresse(body: string): string {
+  const match = /Adresse\s*:?\s*((?:\d+\s+[\w\s-]+\s+\d{5}\s+[\w\s-]+))/i.exec(body);
+  return match ? match[1].trim() : "Non trouvé";
+}
+
+function extractTelephone(body: string): string {
+  const tel1Match = /T(?:=C3=A9|é)l(?:=C3=A9|é)phone\s*1\s*(\d+)/i.exec(body);
+  const tel2Match = /T(?:=C3=A9|é)l(?:=C3=A9|é)phone\s*2\s*(\d+)/i.exec(body);
+  const tel1 = tel1Match ? tel1Match[1] : null;
+  const tel2 = tel2Match ? tel2Match[1] : null;
+  
+  if (tel1 && tel2) return `${tel1}, ${tel2}`;
+  if (tel1) return tel1;
+  if (tel2) return tel2;
+  return "Non trouvé";
+}
+
+function extractDemandeSAP(body: string): string {
+  const match = /Commentaires?\s*[\*:]?\s*(.*)/is.exec(body);
+  return match ? match[1].trim() : "Non trouvé";
 }
 
 /**
@@ -341,33 +352,43 @@ export async function sapNumberExists(sapNumber: string, collection: string): Pr
  */
 export async function sendDataToFirebase(row: EmailData, sapNumber: string, collection: string): Promise<void> {
   try {
+    // S'assurer que les tableaux sont correctement initialisés
+    const mailTo = Array.isArray(row.mailTo) ? row.mailTo : [];
+    const mailCc = Array.isArray(row.mailCc) ? row.mailCc : [];
+
     const docData: Record<string, any> = {
-      date: row.date, // Utiliser la chaîne de date directement
-      raisonSociale: row.raisonSociale,
+      date: row.date,
+      raisonSociale: row.raisonSociale || '',
       numeroSAP: sapNumber,
-      codeClient: row.codeClient,
-      adresse: row.adresse,
-      telephone: row.telephone,
-      demandeSAP: row.demandeSAP,
-      status: 'open', // Ajouter le statut par défaut
-      // Nouvelles informations d'email (s'assurer qu'elles ne sont pas undefined)
-      mailFrom: row.mailFrom || '', // Assurer une chaîne vide si undefined
-      mailTo: row.mailTo || [], // Assurer un tableau vide si undefined
-      mailCc: row.mailCc || [], // Assurer un tableau vide si undefined
-      mailSubject: row.mailSubject || '', // Assurer une chaîne vide si undefined
-      mailThreadId: row.mailThreadId || '', // Assurer une chaîne vide si undefined
-      mailMessageId: row.mailMessageId || '', // Assurer une chaîne vide si undefined
-      mailReferences: row.mailReferences || '', // Assurer une chaîne vide si undefined
-      mailDate: row.mailDate || null, // Firestore accepte null pour les dates
+      codeClient: row.codeClient || '',
+      adresse: row.adresse || '',
+      telephone: row.telephone || '',
+      demandeSAP: row.demandeSAP || '',
+      status: 'open',
+      // Informations d'email
+      mailFrom: row.mailFrom || '',
+      mailTo: mailTo,
+      mailCc: mailCc,
+      mailSubject: row.mailSubject || '',
+      mailThreadId: row.mailThreadId || '',
+      mailMessageId: row.mailMessageId || '',
+      mailReferences: row.mailReferences || '',
+      mailDate: row.mailDate || null,
+      mailId: row.messageId || '',
       createdAt: FieldValue.serverTimestamp()
     };
 
-    // Ajouter mailId seulement s'il est défini
-    if (row.messageId) {
-      docData.mailId = row.messageId;
-    }
+    // Vérifier que toutes les données sont présentes avant l'envoi
+    console.log(`[GmailService] Préparation des données pour Firestore (${collection}):`, {
+      numeroSAP: docData.numeroSAP,
+      raisonSociale: docData.raisonSociale,
+      mailTo: docData.mailTo.length,
+      mailCc: docData.mailCc.length,
+      mailThreadId: docData.mailThreadId,
+      mailMessageId: docData.mailMessageId
+    });
 
-    await db.collection(collection).add(docData, { ignoreUndefinedProperties: true });
+    await db.collection(collection).add(docData);
     console.log(`[GmailService] Données envoyées à Firestore (${collection}) pour le numéro SAP: ${sapNumber}`);
   } catch (error) {
     console.error(`[GmailService] Erreur lors de l'envoi des données à Firestore (${collection}):`, error);
@@ -463,65 +484,66 @@ export async function sendSAPResponseEmail(
   htmlBody: string,
   caseType?: string
 ): Promise<string | null | undefined> {
-  if (!ticket.mailId) {
-    console.warn('No mail ID provided in ticket for email response');
-    return null;
-  }
-
-  const gmail = google.gmail({ version: 'v1', auth: authClient });
-
+  console.log('[gmail.service.server] Préparation de l\'envoi d\'email pour le ticket:', ticket.id);
+  
   try {
-    // Build email content
-    let htmlContent = htmlBody;
-    if (caseType === 'RMA' || caseType === 'MATERIAL') {
-      htmlContent = `@Pascal THOMINET\n${htmlContent}`;
+    // Vérifier les permissions Gmail
+    const gmail = google.gmail({ version: 'v1', auth: authClient });
+    try {
+      await gmail.users.getProfile({ userId: 'me' });
+      console.log('[gmail.service.server] Permissions Gmail vérifiées avec succès');
+    } catch (error: any) {
+      console.error('[gmail.service.server] Erreur de vérification des permissions Gmail:', error);
+      if (error.response?.status === 403) {
+        throw new Error('Permissions Gmail insuffisantes. Veuillez vous ré-authentifier.');
+      }
+      throw error;
     }
 
-    // Create RFC 2822 email message with all stored information
-    const emailLines = [
-      `From: ${ticket.mailFrom || ''}`,
-      `To: ${Array.isArray(ticket.mailTo) ? ticket.mailTo.join(', ') : ticket.mailTo || ''}`,
-      ticket.mailCc && ticket.mailCc.length > 0 ? `Cc: ${ticket.mailCc.join(', ')}` : '',
-      `Subject: ${subject}`,
-      ticket.mailMessageId ? `In-Reply-To: ${ticket.mailMessageId}` : '',
-      // Construire la chaîne References en ajoutant le nouveau Message-ID à la fin
-      ticket.mailReferences ? 
-        `References: ${ticket.mailReferences} ${ticket.mailMessageId}` : 
-        ticket.mailMessageId ? 
-          `References: ${ticket.mailMessageId}` : '',
+    // Vérifier que le ticket a les informations nécessaires
+    if (!ticket.mailTo || !Array.isArray(ticket.mailTo) || ticket.mailTo.length === 0) {
+      console.error('[gmail.service.server] Destinataires manquants pour le ticket:', ticket.id);
+      throw new Error('Destinataires manquants pour l\'envoi de l\'email');
+    }
+
+    // Préparer les destinataires
+    const to = ticket.mailTo.join(', ');
+    const cc = ticket.mailCc && Array.isArray(ticket.mailCc) ? ticket.mailCc.join(', ') : '';
+
+    // Préparer le corps du message
+    const message = [
+      'Content-Type: text/html; charset=utf-8',
       'MIME-Version: 1.0',
-      'Content-Type: text/html; charset=UTF-8',
+      `To: ${to}`,
+      cc ? `Cc: ${cc}` : '',
+      `Subject: ${subject}`,
       '',
-      htmlContent
-    ].filter(Boolean);
+      htmlBody
+    ].filter(Boolean).join('\r\n');
 
-    // Encode as base64url
-    const raw = Buffer.from(emailLines.join('\r\n'))
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
+    // Encoder le message en base64
+    const encodedMessage = Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-    // Send email, attaching it to the original thread
+    // Envoyer l'email
+    console.log('[gmail.service.server] Envoi de l\'email pour le ticket:', ticket.id);
     const response = await gmail.users.messages.send({
       userId: 'me',
       requestBody: {
-        raw,
+        raw: encodedMessage,
         threadId: ticket.mailThreadId
       }
     });
 
-    console.log(`Email sent successfully with ID: ${response.data.id}, using stored email information:
-      Thread ID: ${ticket.mailThreadId}
-      Original Message ID: ${ticket.mailMessageId}
-      References: ${ticket.mailReferences}
-      To: ${ticket.mailTo?.join(', ')}
-      Cc: ${ticket.mailCc?.join(', ')}`);
-    
+    console.log('[gmail.service.server] Email envoyé avec succès pour le ticket:', ticket.id);
     return response.data.id;
-  } catch (error) {
-    console.error('Error sending email reply:', error);
-    throw new Error(`Failed to send email reply: ${error instanceof Error ? error.message : String(error)}`);
+  } catch (error: any) {
+    console.error('[gmail.service.server] Erreur lors de l\'envoi de l\'email:', {
+      error: error.message,
+      ticketId: ticket.id,
+      mailId: ticket.mailId,
+      mailThreadId: ticket.mailThreadId
+    });
+    throw new Error(`Échec de l'envoi de l'email: ${error.message}`);
   }
 }
 
@@ -539,30 +561,45 @@ export async function applyGmailLabel(
   const gmail = google.gmail({ version: 'v1', auth: authClient });
 
   try {
-    // Find the label ID by name
+    // Récupérer tous les labels
     const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
     const allLabels = (labelsResponse.data.labels || []) as gmail_v1.Schema$Label[];
-    const label = allLabels.find((l: gmail_v1.Schema$Label) => l.name === labelName);
+    
+    // Trouver le label à appliquer
+    const targetLabel = allLabels.find((l: gmail_v1.Schema$Label) => l.name === labelName);
 
-    if (!label || !label.id) {
+    if (!targetLabel || !targetLabel.id) {
       console.warn(`[GmailService] Label "${labelName}" non trouvé. Impossible d'appliquer le label au thread ${threadId}.`);
-      // Optionally create the label here if it doesn't exist
       return;
     }
 
-    // Apply the label to the thread
+    // Récupérer le thread pour obtenir les labels actuels
+    const threadResponse = await gmail.users.threads.get({
+      userId: 'me',
+      id: threadId
+    });
+
+    // Récupérer tous les labels actuels du thread
+    const currentLabels = threadResponse.data.messages?.[0]?.labelIds || [];
+
+    // Supprimer tous les labels existants et appliquer uniquement le nouveau label
     await gmail.users.threads.modify({
       userId: 'me',
       id: threadId,
       requestBody: {
-        addLabelIds: [label.id],
+        addLabelIds: [targetLabel.id],
+        removeLabelIds: currentLabels // Supprimer tous les labels existants
       },
     });
 
-    console.log(`[GmailService] Label "${labelName}" appliqué au thread ${threadId}.`);
+    console.log(`[GmailService] Labels mis à jour pour le thread ${threadId}:`, {
+      labelAppliqué: labelName,
+      labelsSupprimés: currentLabels.length,
+      threadId: threadId
+    });
   } catch (error) {
-    console.error(`[GmailService] Erreur lors de l'application du label "${labelName}" au thread ${threadId}:`, error);
-    // Decide how to handle: log, notify user, retry?
+    console.error(`[GmailService] Erreur lors de la mise à jour des labels pour le thread ${threadId}:`, error);
+    throw new Error(`Échec de la mise à jour des labels: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

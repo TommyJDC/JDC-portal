@@ -45,14 +45,20 @@ export const getNotifications = async (userId: string) => {
     const db = await ensureDb();
     const notificationsRef = db.collection('notifications')
       .where('userId', '==', userId)
-      .orderBy('createdAt', 'desc') // Utiliser createdAt pour le tri, si timestamp n'existe pas/plus
+      .orderBy('createdAt', 'desc')
       .limit(50);
 
     const snapshot = await notificationsRef.get();
-    return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Notification[];
+    return snapshot.docs
+      .map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter((notification: Notification) => {
+        // Ne pas afficher les notifications qui ont été marquées comme supprimées pour cet utilisateur
+        const deletedForUsers = notification.deletedForUsers || [];
+        return !deletedForUsers.includes(userId);
+      }) as Notification[];
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return [];

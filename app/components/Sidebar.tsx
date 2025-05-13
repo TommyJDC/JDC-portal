@@ -3,7 +3,7 @@ import { Link, NavLink, Form, useLocation } from '@remix-run/react';
 import type { UserSessionData } from '~/services/session.server';
 import type { UserProfile } from '~/types/firestore.types';
 import {
-  FaTachometerAlt, FaTicketAlt, FaBuilding, FaTruck, FaUpload, FaCog, FaSignOutAlt, FaChevronDown, FaChevronUp
+  FaTachometerAlt, FaTicketAlt, FaBuilding, FaTruck, FaUpload, FaCog, FaSignOutAlt, FaChevronDown, FaChevronUp, FaChartLine
 } from 'react-icons/fa'; // Icônes existantes
 import { Squares2X2Icon, ArrowPathIcon, CogIcon } from '@heroicons/react/24/outline'; // Nouvelles icônes pour un look plus moderne si besoin
 
@@ -45,7 +45,7 @@ const SidebarMenu: React.FC<{ label: string; icon: React.ReactNode; open: boolea
   </div>
 );
 
-const SidebarSubLink: React.FC<{ to: string; label: string; }> = ({ to, label }) => {
+const SidebarSubLink: React.FC<{ to: string; label: string; icon?: React.ReactNode; }> = ({ to, label, icon }) => {
   const location = useLocation();
   const isActive = location.pathname.startsWith(to);
   return (
@@ -53,6 +53,7 @@ const SidebarSubLink: React.FC<{ to: string; label: string; }> = ({ to, label })
       to={to}
       className={`${baseLinkStyle} text-xs ${isActive ? activeLinkStyle : inactiveLinkStyle}`}
     >
+      {icon && <span className="mr-3">{icon}</span>}
       {label}
     </NavLink>
   );
@@ -62,6 +63,8 @@ const SidebarSubLink: React.FC<{ to: string; label: string; }> = ({ to, label })
 export const Sidebar: React.FC<SidebarProps> = ({ user, profile }) => {
   const location = useLocation();
   const isAdmin = profile?.role?.toLowerCase() === 'admin';
+  const isDirecteur = profile?.role?.toLowerCase() === 'directeur';
+  const isAlexis = user?.email === 'alexis.lhersonneau@jdc.fr';
   // Les secteurs sont utilisés pour conditionner l'affichage de certains liens
   const secteurs = isAdmin ? ['CHR', 'Tabac', 'HACCP', 'Kezia'] : (profile?.secteurs || []);
   const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({
@@ -89,6 +92,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, profile }) => {
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {/* Liens principaux */}
         <SidebarLink to="/dashboard" icon={<FaTachometerAlt />} label="Dashboard" active={location.pathname.startsWith('/dashboard')} />
+        {(isAdmin || isAlexis) && (
+          <SidebarLink to="/directeur-dashboard" icon={<FaChartLine />} label="Dashboard Directeur" active={location.pathname.startsWith('/directeur-dashboard')} />
+        )}
         <SidebarLink to="/tickets-sap" icon={<FaTicketAlt />} label="Tickets SAP" active={location.pathname.startsWith('/tickets-sap')} />
 
         {/* Menu Installations */}
@@ -127,6 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, profile }) => {
           active={location.pathname.startsWith('/commercial')}
         >
           <SidebarSubLink to="/commercial/upload" label="Upload" />
+          <SidebarSubLink to="/commercial/tickets-sap-create" label="Tickets SAP" />
         </SidebarMenu>
 
         {/* Lien Admin */}

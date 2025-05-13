@@ -151,21 +151,13 @@ function App({ children }: { children: ReactNode }) {
 }
 
 export default function Document() {
-  // ... (Document function reste inchangée)
   return (
     <html lang="fr" className="h-full" suppressHydrationWarning={true}>
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#111827" /> {/* Correspond à ui-background */}
-        <meta name="description" content="Portail de gestion JDC" />
-        <Meta />
-        <Links />
-      </head>
+      <head><meta charSet="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="theme-color" content="#111827" /><meta name="description" content="Portail de gestion JDC" /><Meta /><Links /></head>
       <body 
-        className="h-full font-sans" // bg-ui-background retiré d'ici
+        className="h-full font-sans"
         style={{
-          backgroundColor: '#111827', // ui-background (fond de base)
+          backgroundColor: '#111827',
           backgroundImage: `
             radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.2), transparent),
             radial-gradient(ellipse 80% 50% at 10% 100%, rgba(244, 114, 182, 0.15), transparent),
@@ -186,24 +178,36 @@ export default function Document() {
         <div id="modal-root"></div>
         <ScrollRestoration />
         <Scripts />
-        {/* Service worker script ... */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js').catch(error => {
+                    console.error('Erreur lors de l\'enregistrement du service worker:', error);
+                  });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
 }
 
 export function ErrorBoundary() {
-  // ... (ErrorBoundary reste inchangée mais pourrait être stylée avec les nouvelles couleurs)
   return (
     <html lang="fr" className="h-full bg-ui-background">
       <head>
         <title>Oops! Une erreur est survenue</title>
+        <meta charSet="utf-8" />
         <Meta />
         <Links />
       </head>
       <body className="h-full font-sans text-text-primary flex flex-col items-center justify-center p-4">
         <h1 className="text-2xl font-bold mb-4 text-brand-blue-light">Une erreur est survenue</h1>
-        <p className="text-center">Nous sommes désolés, quelque chose s'est mal passé sur le portail JDC.</p>
+        <p className="text-center">Nous sommes désolés, quelque chose s&apos;est mal passé sur le portail JDC.</p>
         <Scripts />
       </body>
     </html>

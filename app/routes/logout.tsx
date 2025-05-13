@@ -1,10 +1,9 @@
-import { ActionFunctionArgs, redirect } from "@remix-run/node";
-import { authenticator } from "../services/auth.server";
+import { ActionFunctionArgs } from "@remix-run/node";
+import { destroyUserSession } from "~/services/auth.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticator.logout(request, { redirectTo: "/login" });
-  return redirect("/login");
-};
+export async function action({ request }: ActionFunctionArgs) {
+  return destroyUserSession(request);
+}
 
 export default function Logout() {
   return null;

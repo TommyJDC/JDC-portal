@@ -104,15 +104,15 @@ export default function TicketsSap() {
     // On récupère tous les tickets filtrés (secteur, statut, recherche)
     let filtered = allTickets;
     if (selectedSector) {
-      filtered = filtered.filter(t => t.secteur === selectedSector);
+      filtered = filtered.filter((t: SapTicket) => t.secteur === selectedSector);
     }
     if (selectedStatus) {
       const status = selectedStatus.toLowerCase();
-      filtered = filtered.filter(t => getStringValue(t.statut, '').toLowerCase().includes(status));
+      filtered = filtered.filter((t: SapTicket) => getStringValue(t.statut, '').toLowerCase().includes(status));
     }
     if (searchTerm.trim()) {
       const term = searchTerm.trim().toLowerCase();
-      filtered = filtered.filter(t =>
+      filtered = filtered.filter((t: SapTicket) =>
         getStringValue(t.raisonSociale, '').toLowerCase().includes(term) ||
         getStringValue(t.client, '').toLowerCase().includes(term) ||
         getStringValue(t.id, '').toLowerCase().includes(term) ||
@@ -125,7 +125,7 @@ export default function TicketsSap() {
       );
     }
     // Tri par date décroissante
-    return filtered.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+    return filtered.sort((a: SapTicket, b: SapTicket) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
   }, [allTickets, searchTerm, selectedSector, selectedStatus]);
 
   const paginatedTickets = useMemo(() => {
@@ -172,7 +172,7 @@ export default function TicketsSap() {
       clos: 0,
       autres: 0,
     };
-    allTickets.forEach(t => {
+    allTickets.forEach((t: SapTicket) => {
       const statut = getStringValue(t.statut, '').toLowerCase();
       if (statut.includes('ouvert')) stats.ouverts++;
       else if (statut.includes('cours')) stats.enCours++;
@@ -305,7 +305,7 @@ export default function TicketsSap() {
               disabled={isLoading || availableSectors.length === 0}
             >
               <option value="">Tous</option>
-              {availableSectors.map(sector => (
+              {availableSectors.map((sector: string) => (
                 <option key={sector} value={sector}>{sector}</option>
               ))}
             </select>
@@ -363,8 +363,8 @@ export default function TicketsSap() {
       {!isLoading && !loaderError && filteredTickets.length > 0 && (
         <div className="bg-ui-surface shadow-lg rounded-lg overflow-hidden">
           <div className="divide-y divide-ui-border"> {/* Séparateurs entre les tickets */}
-            {paginatedTickets.map((ticket, idx) => {
-              const statusStyle = getTicketStatusStyle(ticket.statut || 'N/A'); // Sera adapté plus tard
+            {paginatedTickets.map((ticket: SapTicket, idx: number) => {
+              const statusStyle = getTicketStatusStyle(ticket.statut || 'N/A');
               const displayDate = formatDate(ticket.date);
               const phoneNumbers = getStringValue(ticket.telephone, '').split(',').map((n: string) => n.trim()).filter((n: string) => n) || [];
               return (

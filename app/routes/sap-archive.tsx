@@ -10,9 +10,10 @@ import {
   SelectContent,
   SelectItem,
 } from "~/components/ui/Select";
-import type { SAPArchive } from "~/types/firestore.types"; // Utiliser SAPArchive
-import { Timestamp } from 'firebase/firestore'; // Importer Timestamp depuis firebase/firestore
-import { getDb } from "~/firebase.admin.config.server"; // Importer getDb
+import type { SAPArchive } from "~/types/firestore.types";
+import { Timestamp } from 'firebase/firestore';
+import type { SapArchiveLoaderData } from "./sap-archive.loader";
+import { loader } from "./sap-archive.loader";
 
 // Helper function to safely extract string values from { stringValue: string } or simple strings
 function getSafeStringValue(prop: { stringValue: string } | string | undefined | null, defaultValue: string = ''): string {
@@ -28,50 +29,21 @@ function getSafeStringValue(prop: { stringValue: string } | string | undefined |
   return defaultValue;
 }
 
-// Déplacer la fonction getArchivedSapTickets ici pour qu'elle soit locale à ce fichier
-async function getArchivedSapTickets(): Promise<SAPArchive[]> {
-  try {
-    const db = getDb(); // Remplacé initializeFirebaseAdmin par getDb et supprimé await
-    const snapshot = await db.collection("sap-archive").get();
-
-    const archivedTickets: SAPArchive[] = [];
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      archivedTickets.push({
-        originalTicketId: data.originalTicketId,
-        archivedDate: data.archivedDate instanceof Timestamp ? data.archivedDate.toDate() : data.archivedDate, // Convertir Timestamp en Date
-        closureReason: data.closureReason as 'resolved' | 'no-response', // Assurer le type correct
-        technicianNotes: getSafeStringValue(data.technicianNotes), // Utiliser la fonction helper
-        technician: getSafeStringValue(data.technician, 'Technicien inconnu'), // Utiliser la fonction helper, ajouter une valeur par défaut
-        // Extraire les valeurs des champs { stringValue: string }
-        client: { stringValue: getSafeStringValue(data.client) }, // Assurer le format { stringValue: string }
-        raisonSociale: { stringValue: getSafeStringValue(data.raisonSociale) }, // Assurer le format { stringValue: string }
-        description: { stringValue: getSafeStringValue(data.description) }, // Assurer le format { stringValue: string }
-        secteur: data.secteur as 'CHR' | 'HACCP' | 'Kezia' | 'Tabac', // Assurer le type correct
-        numeroSAP: { stringValue: getSafeStringValue(data.numeroSAP) }, // Assurer le format { stringValue: string }
-        mailId: getSafeStringValue(data.mailId), // Utiliser la fonction helper
-        documents: Array.isArray(data.documents) ? data.documents.map((doc: any) => getSafeStringValue(doc)) : [], // Assurer que documents est un tableau de strings
-      });
-    });
-
-    return archivedTickets;
-  } catch (error) {
-    console.error("Erreur lors de la récupération des tickets archivés :", error);
-    return [];
-  }
-}
-
-
-export async function loader({ request }: LoaderFunctionArgs) {
-  const archivedTickets = await getArchivedSapTickets();
-  return json({ archivedTickets });
-}
-
-
 export default function SapArchivePage() {
-  const { archivedTickets } = useLoaderData<typeof loader>();
+  const { archivedTickets, error } = useLoaderData<typeof loader>() as SapArchiveLoaderData;
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSector, setSelectedSector] = useState<string>("all");
+
+  if (error) {
+    return (
+      <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 mx-auto mb-3 text-text-tertiary">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+        </svg>
+        <p className="font-medium">{error}</p>
+      </div>
+    );
+  }
 
   const filteredTickets = archivedTickets.filter((ticket) => {
     if (selectedSector !== "all" && ticket.secteur !== selectedSector) {
@@ -89,7 +61,7 @@ export default function SapArchivePage() {
   });
 
   return (
-    <div className="space-y-6"> {/* Fond géré par root.tsx, p-4 est sur le main */}
+    <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-text-primary">Tickets SAP Archivés</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end p-4 bg-ui-surface/80 backdrop-blur-lg border border-ui-border/70 rounded-xl shadow-lg">
@@ -123,21 +95,20 @@ export default function SapArchivePage() {
 
       {filteredTickets.length === 0 ? (
         <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
-           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 mx-auto mb-3 text-text-tertiary">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 mx-auto mb-3 text-text-tertiary">
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125V6.375c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v.001c0 .621.504 1.125 1.125 1.125z" />
           </svg>
           <p className="font-medium">Aucun ticket archivé trouvé pour ces critères.</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredTickets.map((ticket: SAPArchive) => {
+          {filteredTickets.map((ticket) => {
             let displayDate: Date | null = null;
             if (typeof ticket.archivedDate === 'string') {
               displayDate = new Date(ticket.archivedDate);
             } else if (typeof ticket.archivedDate === 'number') {
               displayDate = new Date(ticket.archivedDate);
             } else if (ticket.archivedDate && 'seconds' in ticket.archivedDate && 'nanoseconds' in ticket.archivedDate) {
-              // Cas où c'est un objet Timestamp Firestore sérialisé par Remix
               displayDate = new Timestamp((ticket.archivedDate as any).seconds, (ticket.archivedDate as any).nanoseconds).toDate();
             }
 

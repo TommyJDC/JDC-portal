@@ -70,7 +70,17 @@ export interface SapTicket {
   deducedSalesperson?: string | { stringValue: string };
   demandeSAP?: string | { stringValue: string };
   descriptionProbleme?: string | { stringValue: string };
-  mailId?: string; // Ajouté pour la cohérence avec SAPArchive et l'utilisation dans firestore.service
+  mailId?: string;
+  mailThreadId?: string;
+  mailMessageId?: string;
+  mailReferences?: string;
+  mailFrom?: string;
+  mailTo?: string[];
+  mailCc?: string[];
+  type?: 'incident' | 'demande' | 'question';
+  priorite?: 'basse' | 'moyenne' | 'haute' | 'critique';
+  materialType?: string;
+  materialDetails?: string;
   contactAttempts?: Array<{
     date: Date | null;
     notes: string;
@@ -91,6 +101,8 @@ export interface Notification {
   sector?: string[]; // Ajouté pour le ciblage par secteur
   metadata?: Record<string, any>; // Pour des données additionnelles spécifiques au type
   sourceId?: string; // ID de l'entité source (ticket, installation, etc.)
+  locked?: boolean;
+  deletedForUsers?: string[]; // Liste des utilisateurs qui ont "supprimé" cette notification
 }
 
 // Définition des types de notification
@@ -208,4 +220,14 @@ export interface GmailProcessingConfig {
   aiClosureTemplate?: string;
   aiRmaTemplate?: string;
   aiNoResponseTemplate?: string;
+}
+
+export interface TechnicianInstallations {
+  technicianId: string;
+  firstName: string;
+  lastName: string;
+  total: number;
+  completed: number;
+  inProgress: number;
+  pending: number;
 }

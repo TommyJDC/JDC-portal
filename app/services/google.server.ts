@@ -12,37 +12,41 @@ const APP_BASE_URL = appGoogleConfig.baseUrl; // Ou process.env.APP_BASE_URL;
 const REDIRECT_URI = `${APP_BASE_URL}/auth/google/callback`;
 
 
-export async function getGoogleAuthClient(session: UserSessionData | null | { googleRefreshToken: string }) { // MODIFIÉ ICI
+export async function getGoogleAuthClient(session: UserSessionData | null | { googleRefreshToken: string }) {
+  console.log('[google.server] Début de getGoogleAuthClient');
+  
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    console.error('[google.server] Configuration Google manquante');
     throw new Error("Google Client ID ou Client Secret ne sont pas configurés dans les variables d'environnement du serveur.");
   }
+
   if (!session?.googleRefreshToken) {
+    console.error('[google.server] Token de rafraîchissement manquant dans la session');
     throw new Error("User session or Google refresh token is missing.");
   }
 
+  console.log('[google.server] Création du client OAuth2');
   const oauth2Client = new google.auth.OAuth2(
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     REDIRECT_URI
   );
 
-  // Préparer les tokens pour les credentials de manière plus type-safe
   let accessToken: string | undefined = undefined;
   let expiryDate: number | undefined = undefined;
 
-  // session est garanti non-null ici à cause du check `!session?.googleRefreshToken`
-  // et googleRefreshToken est garanti d'exister sur session.
-  // Maintenant, vérifions les propriétés optionnelles.
   if ('googleAccessToken' in session && typeof session.googleAccessToken === 'string') {
     accessToken = session.googleAccessToken;
+    console.log('[google.server] Token d\'accès trouvé dans la session');
   }
   if ('tokenExpiry' in session && typeof session.tokenExpiry === 'number') {
     expiryDate = session.tokenExpiry;
+    console.log('[google.server] Date d\'expiration trouvée dans la session:', new Date(expiryDate).toISOString());
   }
 
   const tokens: Credentials = {
     access_token: accessToken,
-    refresh_token: session.googleRefreshToken, // Garanti d'exister et d'être une string
+    refresh_token: session.googleRefreshToken,
     token_type: 'Bearer',
     expiry_date: expiryDate,
   };
@@ -50,22 +54,54 @@ export async function getGoogleAuthClient(session: UserSessionData | null | { go
   oauth2Client.setCredentials(tokens);
 
   const needsRefresh = !tokens.access_token || (tokens.expiry_date && tokens.expiry_date < Date.now() + 60000);
+  console.log('[google.server] État du token:', {
+    hasAccessToken: !!tokens.access_token,
+    hasExpiryDate: !!tokens.expiry_date,
+    currentTime: new Date().toISOString(),
+    expiryTime: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : 'N/A',
+    needsRefresh
+  });
   
   if (needsRefresh) {
     try {
+      console.log('[google.server] Rafraîchissement du token Google nécessaire');
       oauth2Client.setCredentials({ refresh_token: session.googleRefreshToken });
       const { credentials } = await oauth2Client.refreshAccessToken();
+      console.log('[google.server] Nouveau token obtenu avec succès');
+      
       oauth2Client.setCredentials(credentials);
+      
+      try {
+        console.log('[google.server] Validation du nouveau token');
+        const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+        await gmail.users.getProfile({ userId: 'me' });
+        console.log('[google.server] Nouveau token Google validé avec succès');
+        
+        // Mettre à jour la session avec le nouveau token
+        if ('updateSession' in session && typeof session.updateSession === 'function') {
+          await session.updateSession({
+            googleAccessToken: credentials.access_token,
+            tokenExpiry: credentials.expiry_date
+          });
+          console.log('[google.server] Session mise à jour avec le nouveau token');
+        }
+      } catch (error) {
+        console.error('[google.server] Échec de la validation du nouveau token:', error);
+        throw new Error('Le nouveau token Google n\'est pas valide');
+      }
     } catch (error: any) {
       if (error.response?.data?.error === 'invalid_grant') {
-        // Il serait bon de logger l'email de l'utilisateur ici si possible, pour identifier qui doit se ré-authentifier
-        console.error(`Invalid grant for user (refresh token likely revoked). User needs to re-authorize. Session: ${JSON.stringify(session)}`);
-        throw new Error("Google authentication is invalid or revoked. Please re-authorize the application.");
+        console.error('[google.server] Token invalide pour l\'utilisateur:', {
+          userId: 'userId' in session ? session.userId : 'unknown',
+          email: 'email' in session ? session.email : 'unknown'
+        });
+        throw new Error("L'authentification Google n'est plus valide. Veuillez vous ré-authentifier.");
       }
-      // Logger plus de détails sur l'erreur
-      console.error(`Failed to refresh Google access token. Error: ${error.message}, Response: ${JSON.stringify(error.response?.data)}, Session: ${JSON.stringify(session)}`);
-      throw new Error(`Failed to refresh Google access token: ${error.message}`);
+      console.error('[google.server] Échec du rafraîchissement du token:', error);
+      throw new Error(`Impossible de rafraîchir le token Google: ${error.message}`);
     }
+  } else {
+    console.log('[google.server] Token actuel valide, pas besoin de rafraîchissement');
   }
 
   return oauth2Client;

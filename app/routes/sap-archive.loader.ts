@@ -2,6 +2,13 @@ import { getDb } from "~/firebase.admin.config.server"; // Modifié l'import
 import type { SAPArchive } from "~/types/firestore.types";
 import { Timestamp } from 'firebase/firestore'; // Import Timestamp from firebase/firestore
 import type { LoaderFunctionArgs } from "@remix-run/node"; // Importer le type LoaderFunctionArgs
+import { json } from "@remix-run/node";
+import { sessionStorage, type UserSessionData } from "~/services/session.server";
+
+export interface SapArchiveLoaderData {
+  archivedTickets: SAPArchive[];
+  error: string | null;
+}
 
 // Helper function to safely extract string values from { stringValue: string } or simple strings
 function getSafeStringValue(prop: { stringValue: string } | string | undefined | null, defaultValue: string = ''): string {
@@ -52,6 +59,24 @@ async function getArchivedSapTickets(): Promise<SAPArchive[]> {
 
 // Ajouter la fonction loader pour appeler getArchivedSapTickets côté serveur
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const cookieHeader = request.headers.get("Cookie");
+  let userSession: UserSessionData | null = null;
+  
+  if (cookieHeader) {
+    try {
+      const sessionStore = await sessionStorage.getSession(cookieHeader);
+      userSession = sessionStore.get("user") ?? null;
+      if (!userSession?.userId) {
+        return json<SapArchiveLoaderData>({ archivedTickets: [], error: "Utilisateur non authentifié." });
+      }
+    } catch (e) {
+      console.error("SAP Archive Loader: Erreur lors de la lecture de la session:", e);
+      return json<SapArchiveLoaderData>({ archivedTickets: [], error: "Erreur d'authentification." });
+    }
+  } else {
+    return json<SapArchiveLoaderData>({ archivedTickets: [], error: "Session non trouvée." });
+  }
+
   const archivedTickets = await getArchivedSapTickets();
-  return archivedTickets;
+  return json<SapArchiveLoaderData>({ archivedTickets, error: null });
 };

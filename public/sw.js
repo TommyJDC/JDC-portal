@@ -10,19 +10,43 @@ self.addEventListener('message', (event) => {
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open('offline-cache').then((cache) => {
-      return cache.addAll([
+      const urlsToCache = [
         '/',
         '/index.html',
         '/manifest.json',
         '/favicon.ico',
         '/icons/android/android-launchericon-192-192.png',
         '/icons/ios/180.png'
-      ]);
+      ];
+      
+      return Promise.allSettled(
+        urlsToCache.map(url => 
+          fetch(url)
+            .then(response => {
+              if (!response.ok) throw new Error(`Failed to fetch ${url}`);
+              return cache.put(url, response);
+            })
+            .catch(error => {
+              console.warn(`Failed to cache ${url}:`, error);
+            })
+        )
+      );
     })
   );
 });
 
 self.addEventListener('fetch', (event) => {
+  // Ne pas intercepter les requêtes non supportées
+  if (event.request.url.startsWith('chrome-extension://') ||
+      event.request.url.startsWith('chrome://') ||
+      event.request.url.startsWith('edge://') ||
+      event.request.url.startsWith('about:') ||
+      event.request.url.startsWith('data:') ||
+      event.request.url.startsWith('blob:') ||
+      event.request.url.startsWith('file:')) {
+    return;
+  }
+
   // Ne pas intercepter les requêtes de l'API ou de l'authentification
   if (event.request.url.includes('/api/') || 
       event.request.url.includes('/auth/') ||
@@ -43,7 +67,13 @@ self.addEventListener('fetch', (event) => {
           const responseToCache = response.clone();
           caches.open('offline-cache')
             .then(cache => {
-              cache.put(event.request, responseToCache);
+              cache.put(event.request, responseToCache)
+                .catch(error => {
+                  console.warn('Failed to cache response:', error);
+                });
+            })
+            .catch(error => {
+              console.warn('Failed to open cache:', error);
             });
         }
         return response;

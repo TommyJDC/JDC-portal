@@ -14,24 +14,43 @@ const recentEmailSent: { [ticketId: string]: number } = {};
 const EMAIL_COOLDOWN_MS = 5000; // 5 seconds cooldown
 
 export async function action({ request }: ActionFunctionArgs) {
+    console.log('[tickets-sap.action] Début de l\'action');
+    
     const session: UserSession | null = await authenticator.isAuthenticated(request);
+    console.log('[tickets-sap.action] Session:', {
+        hasSession: !!session,
+        userId: session?.userId,
+        email: session?.email
+    });
 
     if (!session?.userId) {
-        return json({ success: false, error: "Non authentifié." }, { status: 401 });
+        console.error('[tickets-sap.action] Erreur d\'authentification: Session invalide ou expirée');
+        return json({ success: false, error: "Session expirée. Veuillez vous reconnecter." }, { status: 401 });
     }
 
     // Get Google Auth Client for the authenticated user
     const authClient = await getGoogleAuthClient(session);
+    console.log('[tickets-sap.action] Client Google:', {
+        hasAuthClient: !!authClient,
+        userId: session.userId
+    });
 
     if (!authClient) {
-        return json({ success: false, error: "Client Google non disponible pour l'utilisateur authentifié." }, { status: 401 });
+        console.error('[tickets-sap.action] Erreur d\'authentification: Client Google non disponible');
+        return json({ success: false, error: "Authentification Google expirée. Veuillez vous reconnecter." }, { status: 401 });
     }
 
     // Get the authenticated user's profile
     const userProfile = await getUserProfileSdk(session.userId);
+    console.log('[tickets-sap.action] Profil utilisateur:', {
+        hasProfile: !!userProfile,
+        userId: session.userId,
+        role: userProfile?.role
+    });
 
     if (!userProfile) {
-        return json({ success: false, error: "Profil utilisateur introuvable." }, { status: 404 });
+        console.error('[tickets-sap.action] Erreur: Profil utilisateur introuvable');
+        return json({ success: false, error: "Profil utilisateur introuvable. Veuillez contacter l'administrateur." }, { status: 404 });
     }
 
     const formData = await request.formData();
@@ -77,6 +96,14 @@ export async function action({ request }: ActionFunctionArgs) {
                 return json({ success: false, error: "Nouveau statut manquant." }, { status: 400 });
             }
 
+            console.log(`[tickets-sap.action] Mise à jour du statut du ticket ${ticketId} vers ${newStatus}`);
+            console.log(`[tickets-sap.action] Informations du ticket:`, {
+                mailId: ticket.mailId,
+                mailThreadId: ticket.mailThreadId,
+                mailTo: ticket.mailTo,
+                mailCc: ticket.mailCc
+            });
+
             const updateData: Partial<SapTicket> = {
                 status: newStatus,
                 statutSAP: newStatus,
@@ -93,12 +120,13 @@ export async function action({ request }: ActionFunctionArgs) {
                         return json({ success: false, error: "Notes du technicien manquantes pour clôture." }, { status: 400 });
                     }
                     try {
-                        // Ne pas passer de template fixe, laisser le service AI le construire
+                        console.log(`[tickets-sap.action] Génération du résumé AI pour la clôture du ticket ${ticketId}`);
                         updateData.aiSummary = await generateAISummaryService(authClient, ticket, technicianNotes, 'CLOSURE');
                         emailContent = updateData.aiSummary;
                         gmailLabel = userProfile?.labelSapClosed || '';
+                        console.log(`[tickets-sap.action] Résumé AI généré avec succès pour le ticket ${ticketId}`);
                     } catch (aiError: any) {
-                        console.error(`Error generating AI summary for closure ticket ${ticketId}:`, aiError);
+                        console.error(`[tickets-sap.action] Erreur lors de la génération du résumé AI pour le ticket ${ticketId}:`, aiError);
                         updateData.aiSummary = `[Échec de la génération du résumé AI pour clôture] ${technicianNotes}`;
                         emailContent = updateData.aiSummary;
                         gmailLabel = userProfile?.labelSapClosed || '';
@@ -173,23 +201,39 @@ export async function action({ request }: ActionFunctionArgs) {
             // Send email if content is generated and mailId exists
             if (emailContent && ticket.mailId && authClient) {
                 try {
+                    console.log(`[tickets-sap.action] Tentative d'envoi d'email pour le ticket ${ticketId}`);
+                    console.log(`[tickets-sap.action] Détails de l'envoi:`, {
+                        mailId: ticket.mailId,
+                        mailThreadId: ticket.mailThreadId,
+                        mailTo: ticket.mailTo,
+                        mailCc: ticket.mailCc,
+                        hasAuthClient: !!authClient
+                    });
+
                     const sentMessageId = await sendSAPResponseEmail(
                         authClient,
-                        ticket, // Passer l'objet ticket complet
+                        ticket,
                         `Réponse concernant votre ticket SAP ${ticket.numeroSAP?.stringValue}`,
                         emailContent,
                         newStatus === 'rma_request' || newStatus === 'material_sent' ? 'RMA' : undefined
                     );
 
-                    if (gmailLabel && sentMessageId && ticket.mailThreadId) { // Vérifier si mailThreadId existe
+                    if (gmailLabel && sentMessageId && ticket.mailThreadId) {
+                        console.log(`[tickets-sap.action] Application du label Gmail pour le ticket ${ticketId}`);
                         await applyGmailLabel(authClient, ticket.mailThreadId, gmailLabel);
                     } else if (gmailLabel && sentMessageId) {
-                         console.warn(`[tickets-sap.action] mailThreadId is undefined for ticket ${ticketId}. Cannot apply label.`);
+                        console.warn(`[tickets-sap.action] mailThreadId est undefined pour le ticket ${ticketId}. Impossible d'appliquer le label.`);
                     }
-                    console.log(`Email response sent for ticket ${ticketId}`);
+                    console.log(`[tickets-sap.action] Email envoyé avec succès pour le ticket ${ticketId}`);
                 } catch (emailError: any) {
-                    console.error(`Error sending email for ticket ${ticketId}:`, emailError);
+                    console.error(`[tickets-sap.action] Erreur lors de l'envoi de l'email pour le ticket ${ticketId}:`, emailError);
                 }
+            } else {
+                console.warn(`[tickets-sap.action] Impossible d'envoyer l'email pour le ticket ${ticketId}. Conditions non remplies:`, {
+                    hasEmailContent: !!emailContent,
+                    hasMailId: !!ticket.mailId,
+                    hasAuthClient: !!authClient
+                });
             }
 
             // Handle archiving for closed tickets

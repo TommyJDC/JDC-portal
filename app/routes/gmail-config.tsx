@@ -10,7 +10,7 @@ import { Card, CardHeader, CardBody } from "~/components/ui/Card";
 import { Input } from "~/components/ui/Input";
 import { Textarea } from "~/components/ui/Textarea";
 import { Button } from "~/components/ui/Button";
-import { useEffect, useMemo, useState } from 'react'; // Ajout de useState
+import { useEffect, useMemo, useState } from 'react';
 import { FaCog, FaChevronLeft, FaSpinner, FaSave } from 'react-icons/fa';
 import { Switch } from "~/components/ui/Switch";
 import {
@@ -46,6 +46,13 @@ const DEFAULT_SECTOR_CONFIG: SectorGmailConfig = {
 
 const NO_LABEL_VALUE = "__NO_LABEL_SELECTED__";
 
+interface TestResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  details?: any;
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const sessionCookie = request.headers.get("Cookie");
   const sessionStore = await sessionStorage.getSession(sessionCookie);
@@ -71,10 +78,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       haccp: { ...DEFAULT_SECTOR_CONFIG },
       chr: { ...DEFAULT_SECTOR_CONFIG },
       tabac: { ...DEFAULT_SECTOR_CONFIG }
-    },
-    aiClosureTemplate: "Le ticket [TICKET_ID] concernant [SUBJECT] a été automatiquement clôturé car [REASON].",
-    aiRmaTemplate: "Une demande de RMA a été initiée pour le ticket [TICKET_ID] concernant [SUBJECT]. Détails : [DETAILS]",
-    aiNoResponseTemplate: "Aucune réponse reçue pour le ticket [TICKET_ID] concernant [SUBJECT]. Le ticket sera bientôt clôturé.",
+    }
   };
   
   let configData = configDoc.exists ? configDoc.data() as GmailProcessingConfig : defaultConfig;
@@ -139,12 +143,9 @@ export async function action({ request }: ActionFunctionArgs) {
             maxEmailsPerRun: parseInt(formData.get("maxEmailsPerRun") as string) || 50,
             processedLabelName: formData.get("processedLabelName") as string || "Traité-JDC-Portail",
             refreshInterval: parseInt(formData.get("refreshInterval") as string) || 15,
-            aiClosureTemplate: formData.get("aiClosureTemplate") as string,
-            aiRmaTemplate: formData.get("aiRmaTemplate") as string,
-            aiNoResponseTemplate: formData.get("aiNoResponseTemplate") as string,
             sectorCollections: {
               kezia: {
-                enabled: formData.get("kezia-enabled") === "on", // Checkbox value is "on" or null
+                enabled: formData.get("kezia-enabled") === "on",
                 labels: (formData.getAll("kezia-labels[]") as string[]).map(l => l.trim()).filter(l => l && l !== NO_LABEL_VALUE),
                 responsables: (formData.getAll("kezia-responsables[]") as string[]).map(r => r.trim()).filter(r => r)
               },
@@ -175,7 +176,10 @@ export async function action({ request }: ActionFunctionArgs) {
         const userId = formData.get("userId") as string;
         const isProcessor = formData.get("isProcessor") === "true";
         if (!userId) return json({ success: false, error: "ID utilisateur manquant." }, { status: 400 });
-        await updateUserProfileSdk(userId, { isGmailProcessor: isProcessor });
+        await updateUserProfileSdk(userId, { 
+          isGmailProcessor: isProcessor,
+          gmailAuthStatus: isProcessor ? 'active' : 'inactive'
+        });
         return json({ success: true, message: "Statut du processeur mis à jour." });
       }
       default:
@@ -190,8 +194,10 @@ export default function AdminGmailConfig() {
   const { users, config, userProfile, userRole } = useLoaderData<LoaderData>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
-  const fetcher = useFetcher<typeof action>();
+  const fetcher = useFetcher();
+  const testFetcher = useFetcher<TestResponse>();
   const isSubmitting = navigation.state === "submitting" || fetcher.state === "submitting";
+  const isTesting = testFetcher.state === "submitting";
   const isAdmin = userRole === 'Admin';
 
   const allUserGmailLabels = useMemo(() => {
@@ -213,6 +219,54 @@ export default function AdminGmailConfig() {
     { key: 'tabac', name: 'Tabac' },
   ];
 
+  const [selectedResponsables, setSelectedResponsables] = useState<Record<string, string[]>>({});
+  const [selectedLabels, setSelectedLabels] = useState<Record<string, string[]>>({});
+
+  // Fonction pour obtenir les labels des responsables sélectionnés
+  const getAvailableLabelsForSector = (secteurKey: string) => {
+    const selectedResponsablesForSector = selectedResponsables[secteurKey] || [];
+    if (selectedResponsablesForSector.length === 0) return [];
+
+    const labelsSet = new Set<string>();
+    selectedResponsablesForSector.forEach(responsableId => {
+      const user = users.find(u => u.uid === responsableId);
+      if (user?.gmailLabels) {
+        user.gmailLabels.forEach(label => {
+          if (label.name) labelsSet.add(label.name);
+        });
+      }
+    });
+
+    return Array.from(labelsSet).sort();
+  };
+
+  useEffect(() => {
+    // Initialiser les états avec les valeurs existantes
+    const initialResponsables: Record<string, string[]> = {};
+    const initialLabels: Record<string, string[]> = {};
+    
+    secteursConfig.forEach(secteur => {
+      initialResponsables[secteur.key] = config.sectorCollections?.[secteur.key]?.responsables || [];
+      initialLabels[secteur.key] = config.sectorCollections?.[secteur.key]?.labels || [];
+    });
+    
+    setSelectedResponsables(initialResponsables);
+    setSelectedLabels(initialLabels);
+  }, [config.sectorCollections]);
+
+  // Effet pour réinitialiser les labels quand les responsables changent
+  useEffect(() => {
+    const newLabels: Record<string, string[]> = {};
+    secteursConfig.forEach(secteur => {
+      const availableLabels = getAvailableLabelsForSector(secteur.key);
+      // Ne garder que les labels qui sont toujours disponibles
+      newLabels[secteur.key] = (selectedLabels[secteur.key] || []).filter(label => 
+        availableLabels.includes(label)
+      );
+    });
+    setSelectedLabels(newLabels);
+  }, [selectedResponsables]);
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -220,11 +274,54 @@ export default function AdminGmailConfig() {
           <FaCog className="mr-3 text-brand-blue h-6 w-6" />
           Configuration du Traitement Gmail
         </h1>
-        <Link to="/user-profile" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-ui-border text-text-secondary hover:bg-ui-border h-9 px-3 py-2">
+        <div className="flex items-center space-x-4">
+          {isAdmin && (
+            <testFetcher.Form method="post" action="/api/gmail-to-firestore">
+              <Button
+                type="submit"
+                disabled={isTesting}
+                variant="primary"
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isTesting ? (
+                  <>
+                    <FaSpinner className="animate-spin mr-2" />
+                    Test en cours...
+                  </>
+                ) : (
+                  <>
+                    <FaSpinner className="mr-2" />
+                    Tester la récupération
+                  </>
+                )}
+              </Button>
+            </testFetcher.Form>
+          )}
+          <Link to="/user-profile" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-ui-border text-text-secondary hover:bg-ui-border h-9 px-3 py-2">
             <FaChevronLeft className="mr-2 h-3 w-3" />
             Retour au profil
-        </Link>
+          </Link>
+        </div>
       </div>
+
+      {testFetcher.data && (
+        <div className={`p-3 rounded-md border text-sm ${
+          (testFetcher.data as TestResponse).success 
+            ? 'bg-green-500/10 border-green-500/30 text-green-700' 
+            : 'bg-red-500/10 border-red-500/30 text-red-700'
+        }`}>
+          {(testFetcher.data as TestResponse).success 
+            ? (testFetcher.data as TestResponse).message 
+            : (testFetcher.data as TestResponse).error}
+          {(testFetcher.data as TestResponse).details && (
+            <div className="mt-2 text-xs">
+              <pre className="whitespace-pre-wrap">
+                {JSON.stringify((testFetcher.data as TestResponse).details, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
 
       {actionData && (
         <div className={`p-3 rounded-md border text-sm ${ actionData.success ? 'bg-green-500/10 border-green-500/30 text-green-700' : 'bg-red-500/10 border-red-500/30 text-red-700' }`}>
@@ -260,10 +357,18 @@ export default function AdminGmailConfig() {
                     <SelectTrigger className="w-full bg-slate-900 border-slate-700 text-slate-100 focus:border-brand-blue focus:ring-brand-blue">
                       <SelectValue placeholder="-- Sélectionner un label --" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-700 text-slate-100">
-                      <SelectItem value={NO_LABEL_VALUE} className="text-slate-400 italic hover:bg-slate-700 focus:bg-slate-700">-- Aucun --</SelectItem>
+                    <SelectContent className="bg-slate-900 border-slate-700 text-slate-100 max-h-[300px] overflow-y-auto z-50">
+                      <SelectItem value={NO_LABEL_VALUE} className="text-slate-400 italic hover:bg-slate-700 focus:bg-slate-700 cursor-pointer">
+                        -- Aucun --
+                      </SelectItem>
                       {allUserGmailLabels.map(label => (
-                        <SelectItem key={label.id || label.name} value={label.name!} className="hover:bg-slate-700 focus:bg-slate-700">{label.name}</SelectItem>
+                        <SelectItem 
+                          key={label.id || label.name} 
+                          value={label.name!} 
+                          className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
+                        >
+                          {label.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -282,63 +387,91 @@ export default function AdminGmailConfig() {
                         name={`${secteurItem.key}-enabled`}
                         defaultChecked={config.sectorCollections?.[secteurItem.key]?.enabled || false}
                         disabled={!isAdmin}
+                        className="data-[state=checked]:bg-brand-blue data-[state=unchecked]:bg-slate-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                       />
-                      <label htmlFor={`${secteurItem.key}-enabled`} className="ml-2 text-sm font-medium text-text-primary">
+                      <label 
+                        htmlFor={`${secteurItem.key}-enabled`} 
+                        className={`ml-2 text-sm font-medium ${!isAdmin ? 'text-slate-500' : 'text-text-primary'} cursor-pointer`}
+                      >
                         Activer pour {secteurItem.name}
                       </label>
                     </div>
                     <div>
                       <label htmlFor={`${secteurItem.key}-responsables`} className="block text-xs font-medium text-text-secondary mb-1">Responsables {secteurItem.name}</label>
-                      <select
-                        id={`${secteurItem.key}-responsables`}
-                        name={`${secteurItem.key}-responsables[]`} // Important pour getAll
-                        multiple
-                        className="w-full bg-slate-900 border-slate-700 text-slate-100 focus:border-brand-blue focus:ring-brand-blue rounded-md p-2 text-sm min-h-[60px]"
-                        defaultValue={config.sectorCollections?.[secteurItem.key]?.responsables || []}
+                      <Select
+                        name={`${secteurItem.key}-responsables[]`}
+                        value={selectedResponsables[secteurItem.key]?.join(',') || ''}
                         disabled={!isAdmin}
+                        onValueChange={(value) => {
+                          const newValue = value.split(',').filter(Boolean);
+                          setSelectedResponsables(prev => ({
+                            ...prev,
+                            [secteurItem.key]: newValue
+                          }));
+                        }}
                       >
-                        {users.filter(u => u.googleRefreshToken).map(user => (
-                          <option key={user.uid} value={user.uid} className="bg-slate-900 text-slate-100 hover:bg-slate-700">{user.displayName} ({user.email})</option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-text-tertiary mt-1">Ctrl/Cmd + clic pour sélection multiple.</p>
+                        <SelectTrigger className="w-full bg-slate-900 border-slate-700 text-slate-100 focus:border-brand-blue focus:ring-brand-blue">
+                          <SelectValue placeholder="Sélectionner les responsables" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-700 text-slate-100 max-h-[300px] overflow-y-auto">
+                          {users.filter(u => u.googleRefreshToken).map(user => (
+                            <SelectItem 
+                              key={user.uid} 
+                              value={user.uid}
+                              className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
+                            >
+                              {user.displayName} ({user.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <input 
+                        type="hidden" 
+                        name={`${secteurItem.key}-responsables[]`} 
+                        value={selectedResponsables[secteurItem.key]?.join(',') || ''} 
+                      />
                     </div>
-                    <div>
-                      <label htmlFor={`${secteurItem.key}-labels`} className="block text-xs font-medium text-text-secondary mb-1">Labels Gmail pour {secteurItem.name}</label>
-                      <select
-                        id={`${secteurItem.key}-labels`}
-                        name={`${secteurItem.key}-labels[]`} // Important pour getAll
-                        multiple
-                        className="w-full bg-slate-900 border-slate-700 text-slate-100 focus:border-brand-blue focus:ring-brand-blue rounded-md p-2 text-sm min-h-[80px]"
-                        defaultValue={config.sectorCollections?.[secteurItem.key]?.labels || []}
-                        disabled={!isAdmin}
-                      >
-                        {allUserGmailLabels.map(label => (
-                          <option key={label.id || label.name} value={label.name!} className="bg-slate-900 text-slate-100 hover:bg-slate-700">{label.name}</option>
-                        ))}
-                      </select>
-                       <p className="text-xs text-text-tertiary mt-1">Labels disponibles basés sur les comptes des utilisateurs autorisés.</p>
-                    </div>
+                    {selectedResponsables[secteurItem.key]?.length > 0 && (
+                      <div>
+                        <label htmlFor={`${secteurItem.key}-labels`} className="block text-xs font-medium text-text-secondary mb-1">
+                          Labels Gmail pour {secteurItem.name}
+                        </label>
+                        <Select
+                          name={`${secteurItem.key}-labels[]`}
+                          value={selectedLabels[secteurItem.key]?.join(',') || ''}
+                          disabled={!isAdmin}
+                          onValueChange={(value) => {
+                            const newValue = value.split(',').filter(Boolean);
+                            setSelectedLabels(prev => ({
+                              ...prev,
+                              [secteurItem.key]: newValue
+                            }));
+                          }}
+                        >
+                          <SelectTrigger className="w-full bg-slate-900 border-slate-700 text-slate-100 focus:border-brand-blue focus:ring-brand-blue">
+                            <SelectValue placeholder="Sélectionner les labels" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-900 border-slate-700 text-slate-100 max-h-[300px] overflow-y-auto">
+                            {getAvailableLabelsForSector(secteurItem.key).map(label => (
+                              <SelectItem 
+                                key={label} 
+                                value={label}
+                                className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
+                              >
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <input 
+                          type="hidden" 
+                          name={`${secteurItem.key}-labels[]`} 
+                          value={selectedLabels[secteurItem.key]?.join(',') || ''} 
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
-              </div>
-            )}
-
-            {isAdmin && (
-              <div className="space-y-4 pt-4 border-t border-ui-border/50">
-                <h3 className="text-base font-medium text-text-primary">Templates IA (Admin)</h3>
-                <div>
-                  <label htmlFor="aiClosureTemplate" className="block text-xs font-medium text-text-secondary mb-1">Template IA - Clôture</label>
-                  <Textarea id="aiClosureTemplate" name="aiClosureTemplate" defaultValue={config.aiClosureTemplate} rows={3} className="bg-ui-input border-ui-border w-full text-sm" />
-                </div>
-                <div>
-                  <label htmlFor="aiRmaTemplate" className="block text-xs font-medium text-text-secondary mb-1">Template IA - RMA</label>
-                  <Textarea id="aiRmaTemplate" name="aiRmaTemplate" defaultValue={config.aiRmaTemplate} rows={3} className="bg-ui-input border-ui-border w-full text-sm" />
-                </div>
-                <div>
-                  <label htmlFor="aiNoResponseTemplate" className="block text-xs font-medium text-text-secondary mb-1">Template IA - Non Réponse</label>
-                  <Textarea id="aiNoResponseTemplate" name="aiNoResponseTemplate" defaultValue={config.aiNoResponseTemplate} rows={3} className="bg-ui-input border-ui-border w-full text-sm" />
-                </div>
               </div>
             )}
 
@@ -391,19 +524,30 @@ export default function AdminGmailConfig() {
                         <fetcher.Form method="post" className="inline">
                           <input type="hidden" name="_action" value="toggleProcessor" />
                           <input type="hidden" name="userId" value={u.uid} />
-                          <Switch
-                            checked={u.isGmailProcessor || false}
-                            onCheckedChange={(checked) => {
-                              const formDataSwitch = new FormData();
-                              formDataSwitch.append("_action", "toggleProcessor");
-                              formDataSwitch.append("userId", u.uid);
-                              formDataSwitch.append("isProcessor", checked.toString());
-                              fetcher.submit(formDataSwitch, { method: "post"});
-                            }}
-                            disabled={!u.googleRefreshToken || isSubmitting || !isAdmin}
-                            aria-label={`Activer processeur pour ${u.displayName}`}
-                          />
+                          <div className="flex items-center group relative">
+                            <Switch
+                              checked={u.isGmailProcessor || false}
+                              onCheckedChange={(checked) => {
+                                const formDataSwitch = new FormData();
+                                formDataSwitch.append("_action", "toggleProcessor");
+                                formDataSwitch.append("userId", u.uid);
+                                formDataSwitch.append("isProcessor", checked.toString());
+                                fetcher.submit(formDataSwitch, { method: "post"});
+                              }}
+                              disabled={isSubmitting || !isAdmin || !u.googleRefreshToken}
+                              aria-label={`Activer processeur pour ${u.displayName}`}
+                              className="border-2 border-red-500 bg-blue-500"
+                            />
+                            {(!u.googleRefreshToken) && (
+                              <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-slate-800 text-slate-100 text-xs rounded px-2 py-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+                                L'utilisateur doit connecter son Gmail pour activer le traitement.
+                              </span>
+                            )}
+                          </div>
                         </fetcher.Form>
+                        <div className="mt-1 text-xs text-gray-500">
+                          Debug: Token: {u.googleRefreshToken ? "Présent" : "Absent"}, isGmailProcessor: {u.isGmailProcessor ? "Oui" : "Non"}
+                        </div>
                       </td>
                     </tr>
                   ))}

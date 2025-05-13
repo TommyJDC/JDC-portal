@@ -124,8 +124,36 @@ const TicketSAPDetails: React.FC<TicketSAPDetailsProps> = ({ ticket, onClose, se
         } else {
             formData.delete("materialType"); formData.delete("materialDetails");
         }
+        
+        // Vérifier si l'action est en cours
+        if (fetcher.state === "submitting") {
+            return;
+        }
+
+        // Soumettre le formulaire
         fetcher.submit(formData, { method: "POST", action: "/tickets-sap" });
     };
+
+    // Ajouter un effet pour gérer la réponse de l'action
+    useEffect(() => {
+        if (fetcher.data && fetcher.state === "idle") {
+            if (fetcher.data.success) {
+                onTicketUpdated();
+                onClose();
+            } else {
+                const errorMessage = fetcher.data.error || "Une erreur est survenue lors de la mise à jour du ticket.";
+                console.error('[TicketSAPDetails] Erreur lors de la mise à jour:', errorMessage);
+                
+                // Gérer spécifiquement les erreurs d'authentification
+                if (errorMessage.includes("Session expirée") || errorMessage.includes("Authentification Google expirée")) {
+                    alert("Votre session a expiré. Vous allez être redirigé vers la page de connexion.");
+                    window.location.href = "/login"; // Rediriger vers la page de connexion
+                } else {
+                    alert(errorMessage);
+                }
+            }
+        }
+    }, [fetcher.data, fetcher.state, onTicketUpdated, onClose]);
 
     const ticketStatuses: { value: SapTicketStatus; label: string }[] = [
         { value: 'open', label: 'Ouvert' }, { value: 'pending', label: 'En attente' },

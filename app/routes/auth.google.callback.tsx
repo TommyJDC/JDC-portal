@@ -1,26 +1,20 @@
-/*
-import { LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { authenticator } from "../services/auth.server";
+import { ActionFunctionArgs, redirect } from "@remix-run/node";
+import { handleGoogleAuth, createUserSession } from "~/services/auth.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const profile = JSON.parse(formData.get("profile") as string);
+  const accessToken = formData.get("accessToken") as string;
+  const refreshToken = formData.get("refreshToken") as string;
+
   try {
-    // Authentifier l'utilisateur avec Firebase via le strategy
-    const user = await authenticator.authenticate("google", request, {
-      successRedirect: "/dashboard",
-      failureRedirect: "/login",
-    });
-
-    return user;
+    const userData = await handleGoogleAuth(profile, accessToken, refreshToken);
+    return createUserSession(userData, "/dashboard");
   } catch (error) {
-    console.error("Google callback error:", error);
-    return redirect("/login");
+    console.error("[auth.google.callback] Erreur lors de l'authentification:", error);
+    return redirect("/login?error=auth_failed");
   }
-};
-
-export default function GoogleCallback() {
-  return null; // Cette page ne sera jamais rendue
 }
-*/
 
 // Cette route n'est plus utilisée car auth-direct.tsx gère le callback.
 // Laisser un composant vide pour éviter les erreurs 404 si elle est encore appelée.

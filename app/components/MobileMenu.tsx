@@ -10,7 +10,8 @@ import {
   FaTruck,
   FaCog,
   FaSearch,
-  FaFileAlt
+  FaFileAlt,
+  FaChartLine
 } from 'react-icons/fa';
  import { Button } from './ui/Button';
  // Use UserSession from server loader instead of AppUser from client-side auth
@@ -31,12 +32,13 @@ import {
 // Main navigation items
 const navItems = [
   { name: 'Tableau de Bord', to: '/dashboard', icon: FaTachometerAlt },
+  { name: 'Dashboard Directeur', to: '/directeur-dashboard', icon: FaChartLine },
 ];
 
 // Technique menu items
 const techniqueItems = [
   { name: 'Tickets SAP', to: '/tickets-sap', icon: FaTicketAlt },
-  { name: 'Archive SAP', to: '/sap-archive', icon: FaFileAlt }, // Ajout du lien vers l'archive
+  { name: 'Archive SAP', to: '/sap-archive', icon: FaFileAlt },
   { name: 'Installations Kezia', to: '/installations/kezia-firestore', icon: FaFileAlt },
   { name: 'Installations CHR', to: '/installations/chr-firestore', icon: FaFileAlt },
   { name: 'Installations HACCP', to: '/installations/haccp-firestore', icon: FaFileAlt },
@@ -52,7 +54,8 @@ const logistiqueItems = [
 
 // Commercial menu items
 const commercialItems = [
-  { name: 'Upload Menus', to: '/commercial/upload', icon: FaFileAlt }
+  { name: 'Upload Menus', to: '/commercial/upload', icon: FaFileAlt },
+  { name: 'Tickets SAP', to: '/commercial/tickets-sap-create', icon: FaTicketAlt },
 ];
 
 // Define Admin item separately

@@ -1,13 +1,13 @@
 import React from 'react';
 import { Link } from '@remix-run/react';
-import { FaPlusCircle, FaMapMarkedAlt, FaCalendarAlt, FaStore, FaClipboardList, FaTruck, FaFileDownload, FaLifeRing, FaQuestionCircle } from 'react-icons/fa';
+import { FaPlusCircle, FaMapMarkedAlt, FaCalendarAlt, FaStore, FaClipboardList, FaTruck, FaFileDownload, FaLifeRing, FaQuestionCircle, FaTicketAlt } from 'react-icons/fa';
 
 const actions = [
   {
     label: 'Tickets ouverts',
     to: '/tickets-sap?statut=ouvert',
-    icon: FaClipboardList,
-    color: 'from-yellow-400 to-yellow-600 text-yellow-900',
+    icon: FaTicketAlt,
+    color: 'text-red-500',
     ring: 'focus:ring-yellow-400',
   },
   {

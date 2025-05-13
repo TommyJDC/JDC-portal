@@ -12,7 +12,8 @@ import type {
   Notification,
   Article,
   InstallationsSnapshot,
-  SAPArchive 
+  SAPArchive,
+  TechnicianInstallations
 } from "~/types/firestore.types";
 import type * as admin from 'firebase-admin';
 import fetch from 'node-fetch';
@@ -684,4 +685,69 @@ export async function deleteNotificationById(notificationId: string): Promise<{ 
       message: error instanceof Error ? error.message : 'Erreur inconnue lors de la suppression'
     };
   }
+}
+
+export async function getTechniciansInstallationsSdk(): Promise<TechnicianInstallations[]> {
+  const db = getDb();
+  
+  // Récupérer toutes les installations
+  const installationsSnapshot = await db.collection('installations').get();
+  
+  // Créer un Map pour stocker les statistiques par technicien
+  const techStats = new Map<string, {
+    total: number;
+    completed: number;
+    inProgress: number;
+    pending: number;
+  }>();
+
+  // Parcourir toutes les installations
+  installationsSnapshot.docs.forEach(doc => {
+    const data = doc.data();
+    const techName = data.tech;
+    
+    if (!techName) return; // Ignorer les installations sans technicien
+
+    // Initialiser les stats pour ce technicien si nécessaire
+    if (!techStats.has(techName)) {
+      techStats.set(techName, {
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        pending: 0
+      });
+    }
+
+    const stats = techStats.get(techName)!;
+    stats.total++;
+
+    // Incrémenter le compteur approprié selon le statut
+    switch (data.status) {
+      case 'installation terminée':
+        stats.completed++;
+        break;
+      case 'rendez-vous pris':
+        stats.inProgress++;
+        break;
+      case 'rendez-vous à prendre':
+        stats.pending++;
+        break;
+    }
+  });
+
+  // Convertir le Map en tableau de TechnicianInstallations
+  const techniciansData: TechnicianInstallations[] = Array.from(techStats.entries()).map(([techName, stats]) => {
+    const [firstName, ...lastNameParts] = techName.split(' ');
+    const lastName = lastNameParts.join(' ');
+
+    return {
+      technicianId: techName, // Utiliser le nom comme ID
+      firstName: firstName || '',
+      lastName: lastName || '',
+      ...stats
+    };
+  });
+
+  console.log('[FIRESTORE.SERVICE] Données finales des techniciens:', techniciansData);
+  return techniciansData;
 }
