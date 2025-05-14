@@ -22,6 +22,7 @@ import {
     SelectItem, 
     SelectValue 
 } from './ui/Select'; // Importer tous les sous-composants nécessaires
+import { Switch } from "~/components/ui/Switch";
 
 interface TicketSAPDetailsProps {
     ticket: SapTicket | null;
@@ -60,6 +61,7 @@ const TicketSAPDetails: React.FC<TicketSAPDetailsProps> = ({ ticket, onClose, se
     const [currentStatus, setCurrentStatus] = useState<SapTicketStatus>('open');
     const [isDescriptionOpen, setIsDescriptionOpen] = useState<boolean>(false);
     const [materialDetails, setMaterialDetails] = useState<string>('');
+    const [sendEmail, setSendEmail] = useState<boolean>(true);
 
     const isLoadingAction = fetcher.state !== 'idle';
 
@@ -114,6 +116,7 @@ const TicketSAPDetails: React.FC<TicketSAPDetailsProps> = ({ ticket, onClose, se
         formData.set("intent", "update_status");
         formData.set("ticketId", ticket?.id || '');
         formData.set("sectorId", sectorId);
+        formData.set("sendEmail", sendEmail.toString());
         if (formData.get('status') === 'closed' && !technicianNotes.trim()) { alert("Notes requises pour clôturer."); return; }
         if (technicianNotes.trim()) formData.set("technicianNotes", technicianNotes.trim());
         const statusValue = formData.get('status') as SapTicketStatus;
@@ -268,6 +271,21 @@ const TicketSAPDetails: React.FC<TicketSAPDetailsProps> = ({ ticket, onClose, se
                                 ))}
                             </select>
                         </div>
+
+                        {/* Option pour envoyer ou non l'email */}
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id="send-email"
+                                checked={sendEmail}
+                                onCheckedChange={setSendEmail}
+                                disabled={isLoadingAction}
+                                className="data-[state=checked]:bg-brand-blue data-[state=unchecked]:bg-slate-700"
+                            />
+                            <label htmlFor="send-email" className="text-sm font-medium text-text-secondary cursor-pointer">
+                                Envoyer un email au client
+                            </label>
+                        </div>
+
                         <div>
                             <label htmlFor="modal-technicianNotes" className="block text-sm font-medium text-text-secondary mb-1">Notes technicien</label>
                             <Textarea id="modal-technicianNotes" name="technicianNotes" value={technicianNotes} onChange={e => setTechnicianNotes(e.target.value)}

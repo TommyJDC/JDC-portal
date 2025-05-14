@@ -202,7 +202,9 @@ function generateAuthUrl() {
     'https://www.googleapis.com/auth/calendar.readonly',
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.labels',
-    'https://www.googleapis.com/auth/spreadsheets.readonly' // Ajout du scope pour Google Sheets
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/spreadsheets.readonly'
   ];
   
   return oauthClient.generateAuthUrl({

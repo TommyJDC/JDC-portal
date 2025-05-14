@@ -565,12 +565,28 @@ export async function applyGmailLabel(
     const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
     const allLabels = (labelsResponse.data.labels || []) as gmail_v1.Schema$Label[];
     
-    // Trouver le label à appliquer
-    const targetLabel = allLabels.find((l: gmail_v1.Schema$Label) => l.name === labelName);
+    console.log(`[GmailService] Labels disponibles:`, allLabels.map(l => l.name));
+    
+    // Trouver le label cible
+    let targetLabel = allLabels.find((l: gmail_v1.Schema$Label) => l.name === labelName);
+    if (!targetLabel) {
+      console.log(`[GmailService] Label "${labelName}" non trouvé dans la liste des labels. Création...`);
+      const createResponse = await gmail.users.labels.create({
+        userId: 'me',
+        requestBody: {
+          name: labelName,
+          labelListVisibility: 'labelShow',
+          messageListVisibility: 'show'
+        }
+      });
+      targetLabel = createResponse.data;
+      console.log(`[GmailService] Label "${labelName}" créé avec l'ID:`, targetLabel.id);
+    } else {
+      console.log(`[GmailService] Label "${labelName}" trouvé avec l'ID:`, targetLabel.id);
+    }
 
     if (!targetLabel || !targetLabel.id) {
-      console.warn(`[GmailService] Label "${labelName}" non trouvé. Impossible d'appliquer le label au thread ${threadId}.`);
-      return;
+      throw new Error(`Impossible de créer ou de trouver le label "${labelName}"`);
     }
 
     // Récupérer le thread pour obtenir les labels actuels
@@ -581,19 +597,26 @@ export async function applyGmailLabel(
 
     // Récupérer tous les labels actuels du thread
     const currentLabels = threadResponse.data.messages?.[0]?.labelIds || [];
+    console.log(`[GmailService] Labels actuels du thread ${threadId}:`, currentLabels);
 
-    // Supprimer tous les labels existants et appliquer uniquement le nouveau label
+    // Préparer les labels à ajouter
+    const addLabelIds = [targetLabel.id];
+
+    console.log(`[GmailService] Labels à ajouter:`, addLabelIds);
+    console.log(`[GmailService] Labels à supprimer:`, currentLabels);
+
+    // Supprimer tous les labels existants (y compris INBOX) et appliquer le nouveau label
     await gmail.users.threads.modify({
       userId: 'me',
       id: threadId,
       requestBody: {
-        addLabelIds: [targetLabel.id],
-        removeLabelIds: currentLabels // Supprimer tous les labels existants
+        addLabelIds: addLabelIds,
+        removeLabelIds: currentLabels // Supprimer tous les labels existants, y compris INBOX
       },
     });
 
     console.log(`[GmailService] Labels mis à jour pour le thread ${threadId}:`, {
-      labelAppliqué: labelName,
+      labelsAppliqués: addLabelIds,
       labelsSupprimés: currentLabels.length,
       threadId: threadId
     });
@@ -764,9 +787,16 @@ export async function processGmailToFirestore(
         const exists = await sapNumberExists(sapNumber, name);
         if (!exists) {
           await sendDataToFirebase(row, sapNumber, name);
-          // Ajouter le label "Traité" après le traitement réussi
-          const gmail = google.gmail({ version: 'v1', auth: authClient });
-          await addProcessedLabel(gmail, row.messageId, config.processedLabelName);
+          
+          // Appliquer le label "Traité" après le traitement réussi
+          try {
+            console.log(`[GmailService] Application du label "${config.processedLabelName}" au message ${row.messageId}`);
+            await applyGmailLabel(authClient, row.mailThreadId || '', config.processedLabelName);
+            console.log(`[GmailService] Label "${config.processedLabelName}" appliqué avec succès au message ${row.messageId}`);
+          } catch (labelError) {
+            console.error(`[GmailService] Erreur lors de l'application du label "${config.processedLabelName}" au message ${row.messageId}:`, labelError);
+            // Ne pas bloquer le processus si l'application du label échoue
+          }
         } else {
           console.log(`[GmailService] Numéro SAP déjà existant dans ${name}: ${sapNumber}`);
         }
@@ -785,7 +815,7 @@ export async function processGmailToFirestore(
       Message: ${error instanceof Error ? error.message : String(error)}
       Stack: ${error instanceof Error ? error.stack : 'Non disponible'}
       Collections configurées: ${collections.map((c: { name: string }) => c.name).join(', ')}
-      Dernière collection traitée: ${name ?? 'Aucune'}`); // Utiliser ?? pour gérer null/undefined
+      Dernière collection traitée: ${name ?? 'Aucune'}`);
     throw new Error(`Échec du traitement Gmail vers Firestore: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

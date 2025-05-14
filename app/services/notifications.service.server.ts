@@ -99,25 +99,80 @@ export const markAllNotificationsAsRead = async (userId: string) => {
   }
 };
 
-export const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => { // Omettre isRead
+// Fonction pour vérifier si une notification similaire existe déjà
+async function checkSimilarNotification(notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<boolean> {
   try {
+    const db = await ensureDb();
+    const notificationsRef = db.collection('notifications');
+    
+    // Vérifier que les valeurs requises ne sont pas undefined
+    if (!notification.userId || !notification.type) {
+      console.log('Valeurs manquantes pour la vérification des notifications similaires:', {
+        userId: notification.userId,
+        type: notification.type,
+        sourceId: notification.sourceId
+      });
+      return false;
+    }
+
+    // Pour les notifications de type new_shipment, on vérifie aussi le message
+    if (notification.type === 'new_shipment') {
+      const query = notificationsRef
+        .where('userId', '==', notification.userId)
+        .where('type', '==', notification.type)
+        .where('message', '==', notification.message);
+      
+      const snapshot = await query.get();
+      return !snapshot.empty;
+    }
+    
+    // Pour les autres types, on vérifie aussi le sourceId
+    if (!notification.sourceId) {
+      console.log('sourceId manquant pour la vérification des notifications similaires:', {
+        userId: notification.userId,
+        type: notification.type
+      });
+      return false;
+    }
+
+    const query = notificationsRef
+      .where('userId', '==', notification.userId)
+      .where('type', '==', notification.type)
+      .where('sourceId', '==', notification.sourceId);
+    
+    const snapshot = await query.get();
+    return !snapshot.empty;
+  } catch (error) {
+    console.error('Erreur lors de la vérification des notifications similaires:', error);
+    return false;
+  }
+}
+
+export const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => {
+  try {
+    // Vérifier si une notification similaire existe déjà
+    const similarExists = await checkSimilarNotification(notification);
+    if (similarExists) {
+      console.log('Une notification similaire existe déjà, création ignorée');
+      return null;
+    }
+
     const db = await ensureDb();
     const notificationData = {
       ...notification,
       createdAt: new Date(),
-      isRead: false // Initialiser isRead
+      isRead: false
     };
 
     // Wrap the Firestore add operation with retry logic
     const operation = () => db.collection('notifications').add(notificationData);
-    const docRef = await retryAsyncOperation(operation); // Default retries (3) for DEADLINE_EXCEEDED
+    const docRef = await retryAsyncOperation(operation);
 
     return {
       id: docRef.id,
       ...notificationData
-    } as Notification; // Caster pour assurer le type de retour complet
+    } as Notification;
   } catch (error) {
-    // The error here will be the one after retries have been exhausted or if it's not a retriable error
     console.error('Error creating notification after potential retries:', error);
     return null;
   }

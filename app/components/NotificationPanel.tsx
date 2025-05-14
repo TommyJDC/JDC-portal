@@ -174,9 +174,6 @@ export function NotificationPanel() {
           <Button onClick={fetchNotifications} variant="outline" size="sm" disabled={loading} className="border-ui-border text-text-secondary hover:bg-ui-border hover:text-text-primary">
             {loading && <FaSync className="mr-1.5 h-3.5 w-3.5 animate-spin" />} {loading ? "Chargement..." : "Rafraîchir"}
           </Button>
-          <Button onClick={testCreateNotification} variant="primary" size="sm" className="bg-brand-blue hover:bg-brand-blue-dark text-white">
-            <FaPlusCircle className="mr-1.5 h-3.5 w-3.5" /> Test Notif
-          </Button>
           <Button onClick={createDirectNotification} variant="primary" size="sm" className="bg-brand-blue hover:bg-brand-blue-dark text-white" disabled={directNotificationFetcher.state === "submitting"}>
             <FaPlusCircle className="mr-1.5 h-3.5 w-3.5" /> {directNotificationFetcher.state === "submitting" ? "Création..." : "Notif Directe"}
           </Button>

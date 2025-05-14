@@ -77,60 +77,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const firestoreNotifications: FirestoreNotification[] = await getNotifications(targetUserId);
     console.log(`[api.notifications] ${firestoreNotifications.length} notifications Firestore trouvées pour l'utilisateur`);
 
-    // La logique de placeholder peut être conservée si nécessaire, ou adaptée
-    if (firestoreNotifications.length === 0 && (forceExamples || (import.meta.env.DEV && !devBypass))) {
-      console.log("[api.notifications] Utilisation d'exemples de notifications (mode Firestore)");
-      const placeholderNotifications: NotificationDisplay[] = [
-        {
-          id: "fs_example_1",
-          title: "Bienvenue (Firestore)",
-          message: "Ceci est une notification d'exemple provenant de Firestore.",
-          type: "info",
-          userId: targetUserId, // Ou "all"
-          isRead: false,
-          timestamp: new Date(Date.now() - 1 * 24 * 3600000).toISOString(),
-          link: "/dashboard"
-        },
-      ];
-      const unreadCount = placeholderNotifications.filter(n => !n.isRead).length;
-      return json({
-        notifications: placeholderNotifications,
-        unreadCount,
-        isPlaceholder: true
-      });
-    }
-    
-    // Convertir les notifications Firestore au format d'affichage
-    const formattedNotifications: NotificationDisplay[] = firestoreNotifications.map(notif => ({
-      id: notif.id,
-      title: notif.title || "Sans titre",
-      message: notif.message || "",
-      type: notif.type || "info",
-      userId: notif.userId || "all", // Assurer que userId est toujours présent
-      isRead: notif.isRead || false,
-      timestamp: notif.createdAt instanceof Date 
-        ? notif.createdAt.toISOString() 
-        : (typeof notif.createdAt === 'string' ? notif.createdAt : new Date().toISOString()),
-      link: notif.link,
-      // sector: notif.sector // Décommenter si le type FirestoreNotification inclut 'sector' et que c'est nécessaire
-    }));
-
-    // Le filtrage par rôle/secteur est géré par `getNotifications` dans `notifications.service.server.ts`
-    // Si un filtrage supplémentaire est nécessaire ici, il peut être ajouté.
-    // Pour l'instant, on assume que getNotifications retourne déjà les bonnes notifications pour l'utilisateur.
-    // Si `includeAllNotifications` est vrai, il faudrait une autre fonction dans le service ou ajuster `getNotifications`.
-    // Pour simplifier, on va ignorer `includeAllNotifications` pour le moment ou supposer que `getNotifications` le gère.
-
-    // Trier par date (déjà fait par le service, mais on peut le refaire si besoin)
-    // formattedNotifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-    const unreadCount = await getUnreadNotificationsCount(targetUserId);
-
-    console.log(`[api.notifications] Retour de ${formattedNotifications.length} notifications Firestore (${unreadCount} non lues)`);
-    
     return json({
-      notifications: formattedNotifications,
-      unreadCount
+      notifications: firestoreNotifications,
+      unreadCount: firestoreNotifications.filter(n => !n.isRead).length,
+      isPlaceholder: false
     });
   } catch (error) {
     console.error('Erreur globale lors de la récupération des notifications:', error);
