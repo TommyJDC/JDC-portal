@@ -38,6 +38,18 @@ export interface Installation {
   adresse?: string;
   codePostal?: string;
   hasCTN?: boolean;
+  materiel?: string;
+  balance?: string;
+  materielExpedie?: boolean;
+  verificationBalancePlanifiee?: boolean;
+  materielPreParametrage?: string;
+  materielLivre?: string;
+  numeroColis?: string;
+  dateCdeMateriel?: string | Date;
+  commentaireInstall?: string;
+  dossier?: string;
+  identifiantMotDePasse?: string;
+  numerosSondes?: string;
 }
 
 export type InstallationStatus = 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';

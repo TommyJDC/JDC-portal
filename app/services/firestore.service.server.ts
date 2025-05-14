@@ -18,6 +18,8 @@ import type {
 import type * as admin from 'firebase-admin';
 import fetch from 'node-fetch';
 import FormData from 'form-data';
+import type { UserSessionData } from '~/services/session.server';
+import { checkAvailabilityAndCreateBalanceEvent } from './calendar.service.server';
 
 export async function getUserProfileSdk(uid: string): Promise<UserProfile | undefined> {
   const db = getDb(); 
@@ -127,7 +129,74 @@ export async function updateUserProfileSdk(uid: string, updates: Partial<UserPro
 export async function updateInstallation(id: string, updates: Partial<Installation>): Promise<void> {
   const db = getDb(); 
   const installationRef = db.collection('installations').doc(id);
+  
+  // Récupérer l'installation actuelle
+  const currentInstallation = await installationRef.get();
+  const currentData = currentInstallation.data() as Installation;
+
+  // Vérifier si le matériel vient d'être expédié
+  const isNewlyExpedied = !currentData.materielExpedie && updates.materielExpedie === true;
+
+  // Mettre à jour l'installation
   await installationRef.update(updates);
+
+  // Si le matériel vient d'être expédié et que c'est une installation Kezia avec une balance
+  if (isNewlyExpedied && 
+      currentData.secteur.toLowerCase() === 'kezia' && 
+      currentData.balance && 
+      !currentData.verificationBalancePlanifiee) {
+    
+    try {
+      // Récupérer l'utilisateur avec les droits Google
+      const userDoc = await db.collection('users').doc('105906689661054220398').get();
+      if (!userDoc.exists) throw new Error('User with Google token not found');
+      
+      const userData = userDoc.data();
+      if (!userData) throw new Error('User data is empty');
+
+      // Créer une session utilisateur pour l'utilisateur avec les droits Google
+      const userSession: UserSessionData = {
+        userId: userDoc.id,
+        email: userData.email,
+        displayName: userData.displayName,
+        role: userData.role,
+        secteurs: userData.secteurs,
+        googleRefreshToken: userData.googleRefreshToken
+      };
+
+      // Créer l'événement de vérification
+      const { success, error } = await checkAvailabilityAndCreateBalanceEvent(userSession, {
+        ...currentData,
+        ...updates
+      });
+
+      if (success) {
+        // Marquer la vérification comme planifiée
+        await installationRef.update({ verificationBalancePlanifiee: true });
+      } else {
+        console.error('Erreur lors de la planification de la vérification:', error);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la gestion de la vérification de balance:', error);
+    }
+  }
+
+  // Déclencher la synchronisation avec Google Sheets
+  try {
+    const baseUrl = process.env.APP_BASE_URL || 'https://jdc-portal.netlify.app';
+    const apiUrl = `${baseUrl}/.netlify/functions/sync-installations`;
+
+    await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('[updateInstallation] Synchronisation avec Google Sheets déclenchée');
+  } catch (error) {
+    console.error('[updateInstallation] Erreur lors de la synchronisation avec Google Sheets:', error);
+  }
 }
 
 export async function getInstallationsBySector(sector: string, filters?: InstallationFilters): Promise<Installation[]> {
@@ -141,9 +210,20 @@ export async function getInstallationsBySector(sector: string, filters?: Install
     }
   }
 
-  const snapshot = await query.get();
-  return snapshot.docs.map(doc => {
+  // Récupérer tous les envois CTN pour obtenir la liste des codes clients ayant reçu un envoi
+  const ctnSnapshot = await db.collection('Envoi').get();
+  const ctnClientCodes = new Set<string>();
+  ctnSnapshot.docs.forEach(doc => {
     const data = doc.data();
+    if (data.codeClient) {
+      ctnClientCodes.add(data.codeClient);
+    }
+  });
+
+  const snapshot = await query.get();
+  const installations = snapshot.docs.map(doc => {
+    const data = doc.data();
+    const hasCTN = ctnClientCodes.has(data.codeClient);
     const installation: Installation = {
       ...data, 
       id: doc.id, 
@@ -158,9 +238,12 @@ export async function getInstallationsBySector(sector: string, filters?: Install
       tech: data.tech || '',
       status: (data.status as InstallationStatus) || 'rendez-vous à prendre', 
       commentaire: data.commentaire || '',
+      hasCTN
     };
     return installation;
-  }) as Installation[];
+  });
+
+  return installations;
 }
 
 export async function getClientCodesWithShipment(sector: string): Promise<Set<string>> {
@@ -348,10 +431,18 @@ export async function getDistinctClientCountFromEnvoiSdk(userProfile: UserProfil
 }
 
 export async function getInstallationsSnapshot(userProfile: UserProfile): Promise<InstallationsSnapshot> {
+  console.log('[getInstallationsSnapshot] Début avec:', {
+    userRole: userProfile.role,
+    userName: userProfile.nom,
+    userSectors: userProfile.secteurs
+  });
+
   const db = getDb(); 
   const sectors = userProfile.role === 'Admin'
-    ? ['CHR', 'HACCP', 'Kezia', 'Tabac']
-    : userProfile.secteurs;
+    ? ['chr', 'haccp', 'kezia', 'tabac']
+    : userProfile.secteurs.map(s => s.toLowerCase());
+
+  console.log('[getInstallationsSnapshot] Secteurs à traiter:', sectors);
 
   const snapshot: InstallationsSnapshot = {
     total: 0,
@@ -360,24 +451,34 @@ export async function getInstallationsSnapshot(userProfile: UserProfile): Promis
   };
 
   const installationsSnapshotQuery = await db.collection('installations').get();
+  console.log('[getInstallationsSnapshot] Nombre total d\'installations:', installationsSnapshotQuery.docs.length);
+
   installationsSnapshotQuery.docs.forEach(doc => {
     const data = doc.data();
-    const installationSector = data.secteur as string;
+    const installationSector = (data.secteur as string)?.toLowerCase();
     const status = data.status as InstallationStatus;
 
+    // Vérifier si le secteur de l'installation correspond à un des secteurs autorisés
     if (sectors.includes(installationSector)) {
       snapshot.total++;
       snapshot.byStatus[status] = (snapshot.byStatus[status] || 0) + 1;
+
+      // Initialiser les stats du secteur si nécessaire
       if (!snapshot.bySector[installationSector]) {
         snapshot.bySector[installationSector] = {
           total: 0,
           byStatus: { 'rendez-vous à prendre': 0, 'rendez-vous pris': 0, 'installation terminée': 0 },
         };
       }
+
+      // Mettre à jour les stats du secteur
       snapshot.bySector[installationSector].total++;
-      snapshot.bySector[installationSector].byStatus[status] = (snapshot.bySector[installationSector].byStatus[status] || 0) + 1;
+      snapshot.bySector[installationSector].byStatus[status] = 
+        (snapshot.bySector[installationSector].byStatus[status] || 0) + 1;
     }
   });
+
+  console.log('[getInstallationsSnapshot] Snapshot final:', snapshot);
   return snapshot;
 }
 
@@ -750,4 +851,95 @@ export async function getTechniciansInstallationsSdk(): Promise<TechnicianInstal
 
   console.log('[FIRESTORE.SERVICE] Données finales des techniciens:', techniciansData);
   return techniciansData;
+}
+
+export async function createDailySapSnapshot() {
+  const db = getDb();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Récupérer les tickets SAP par secteur
+  const sectors = ['CHR', 'HACCP', 'Kezia', 'Tabac'];
+  const ticketCounts: Record<string, number> = {};
+
+  for (const sector of sectors) {
+    const counts = await getSapTicketCountBySectorSdk([sector]);
+    ticketCounts[sector] = counts[sector] || 0;
+  }
+
+  // Créer le snapshot
+  const snapshot = {
+    timestamp: today,
+    ticketCounts,
+    createdAt: new Date()
+  };
+
+  // Sauvegarder dans la collection 'sap_snapshots'
+  await db.collection('sap_snapshots').add(snapshot);
+
+  console.log('[FIRESTORE.SERVICE] Snapshot SAP quotidien créé:', snapshot);
+  return snapshot;
+}
+
+export async function getSapEvolution24h() {
+  const db = getDb();
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+
+  // Récupérer le snapshot d'hier
+  const snapshotQuery = await db.collection('sap_snapshots')
+    .where('timestamp', '>=', yesterday)
+    .orderBy('timestamp', 'desc')
+    .limit(1)
+    .get();
+
+  if (snapshotQuery.empty) {
+    console.log('[FIRESTORE.SERVICE] Aucun snapshot trouvé pour les dernières 24h');
+    return null;
+  }
+
+  const yesterdaySnapshot = snapshotQuery.docs[0].data();
+  const currentCounts = await getSapTicketCountBySectorSdk(['CHR', 'HACCP', 'Kezia', 'Tabac']);
+
+  // Calculer l'évolution par secteur
+  const evolution: Record<string, number> = {};
+  for (const sector of ['CHR', 'HACCP', 'Kezia', 'Tabac']) {
+    const yesterdayCount = yesterdaySnapshot.ticketCounts[sector] || 0;
+    const currentCount = currentCounts[sector] || 0;
+    evolution[sector] = currentCount - yesterdayCount;
+  }
+
+  return {
+    yesterday: yesterdaySnapshot.ticketCounts,
+    current: currentCounts,
+    evolution
+  };
+}
+
+export async function getTechnicians(sector?: string): Promise<{ id: string; name: string }[]> {
+  const db = getDb();
+  let query = db.collection('users')
+    .where('role', 'in', ['Technician', 'Admin']);
+
+  const snapshot = await query.get();
+  
+  return snapshot.docs
+    .map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: `${data.displayName || data.nom || 'Sans nom'}`,
+        secteurs: data.secteurs || [],
+        role: data.role || ''
+      };
+    })
+    .filter(tech => 
+      // Si un secteur est spécifié, ne garder que les techniciens qui ont ce secteur ou sont admin
+      !sector || 
+      tech.secteurs.map((s: string) => s.toLowerCase()).includes(sector.toLowerCase()) ||
+      tech.role === 'Admin'
+    )
+    .map(({ id, name }) => ({ id, name }));
 }

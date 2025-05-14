@@ -1,5 +1,5 @@
 import { initializeFirebaseAdmin, getDb } from '~/firebase.admin.config.server';
-import type { Notification, UserProfile, NotificationType, UserRole } from '~/types/firestore.types'; // Import UserProfile, NotificationType, and UserRole
+import type { Notification, UserProfile, NotificationType, UserRole, Shipment } from '~/types/firestore.types';
 import type { DocumentData, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 let db: FirebaseFirestore.Firestore;
@@ -101,51 +101,26 @@ export const markAllNotificationsAsRead = async (userId: string) => {
 
 // Fonction pour vérifier si une notification similaire existe déjà
 async function checkSimilarNotification(notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<boolean> {
-  try {
-    const db = await ensureDb();
-    const notificationsRef = db.collection('notifications');
-    
-    // Vérifier que les valeurs requises ne sont pas undefined
-    if (!notification.userId || !notification.type) {
-      console.log('Valeurs manquantes pour la vérification des notifications similaires:', {
-        userId: notification.userId,
-        type: notification.type,
-        sourceId: notification.sourceId
-      });
-      return false;
-    }
-
-    // Pour les notifications de type new_shipment, on vérifie aussi le message
-    if (notification.type === 'new_shipment') {
-      const query = notificationsRef
-        .where('userId', '==', notification.userId)
-        .where('type', '==', notification.type)
-        .where('message', '==', notification.message);
-      
-      const snapshot = await query.get();
-      return !snapshot.empty;
-    }
-    
-    // Pour les autres types, on vérifie aussi le sourceId
-    if (!notification.sourceId) {
-      console.log('sourceId manquant pour la vérification des notifications similaires:', {
-        userId: notification.userId,
-        type: notification.type
-      });
-      return false;
-    }
-
-    const query = notificationsRef
-      .where('userId', '==', notification.userId)
-      .where('type', '==', notification.type)
-      .where('sourceId', '==', notification.sourceId);
-    
-    const snapshot = await query.get();
-    return !snapshot.empty;
-  } catch (error) {
-    console.error('Erreur lors de la vérification des notifications similaires:', error);
+  const db = await ensureDb();
+  
+  // Vérifier que les champs requis ne sont pas undefined
+  if (!notification.type || !notification.userId) {
+    console.log('Type ou userId manquant, notification considérée comme unique');
     return false;
   }
+
+  // Construire la requête de base
+  let query = db.collection('notifications')
+    .where('type', '==', notification.type)
+    .where('userId', '==', notification.userId);
+
+  // Ajouter sourceId à la requête seulement s'il est défini
+  if (notification.sourceId) {
+    query = query.where('sourceId', '==', notification.sourceId);
+  }
+
+  const snapshot = await query.get();
+  return !snapshot.empty;
 }
 
 export const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => {
@@ -323,6 +298,71 @@ export async function notifySapFromInstallations() {
   return notifiedCount;
 }
 
+// Fonction pour récupérer les utilisateurs notifiables
+async function getNotifiableUsers(): Promise<UserProfile[]> {
+  const db = await ensureDb();
+  const snapshot = await db.collection('users').get();
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      uid: data.uid || doc.id,
+      email: data.email || '',
+      role: data.role || 'User',
+      secteurs: data.secteurs || [],
+      displayName: data.displayName || '',
+      nom: data.nom || '',
+      phone: data.phone || '',
+      address: data.address || '',
+      blockchainAddress: data.blockchainAddress || '',
+      jobTitle: data.jobTitle || '',
+      department: data.department || '',
+      googleRefreshToken: data.googleRefreshToken || '',
+      isGmailProcessor: data.isGmailProcessor || false,
+      gmailAuthorizedScopes: data.gmailAuthorizedScopes || [],
+      gmailAuthStatus: data.gmailAuthStatus || 'inactive',
+      labelSapClosed: data.labelSapClosed || '',
+      labelSapNoResponse: data.labelSapNoResponse || '',
+      labelSapRma: data.labelSapRma || '',
+      encryptedWallet: data.encryptedWallet || '',
+      createdAt: data.createdAt instanceof Date ? data.createdAt : undefined,
+      updatedAt: data.updatedAt instanceof Date ? data.updatedAt : undefined
+    } as UserProfile;
+  });
+}
+
+export async function notifyNewCTN(shipment: Shipment) {
+  try {
+    const db = await ensureDb();
+    const users = await getNotifiableUsers();
+
+    const notificationPromises = users.map(async (user: UserProfile) => {
+      if (user.secteurs.includes(shipment.secteur || '')) {
+        const notificationData: Omit<Notification, 'id' | 'createdAt' | 'isRead'> = {
+          userId: user.uid,
+          title: `Nouvel envoi CTN - ${shipment.secteur || 'Non défini'}`,
+          message: `${shipment.nomClient || shipment.client || 'Client inconnu'}`,
+          type: 'new_shipment',
+          sourceId: shipment.id || '',
+          link: `/envois-ctn?id=${shipment.id || ''}`
+        };
+        // Vérifier pour chaque utilisateur s'il existe déjà une notification similaire
+        const similarExists = await checkSimilarNotification(notificationData);
+        if (!similarExists) {
+          return createNotification(notificationData);
+        } else {
+          console.log(`Notification CTN déjà existante pour l'utilisateur ${user.uid}`);
+        }
+      }
+      return null;
+    });
+
+    await Promise.all(notificationPromises);
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la notification du nouvel envoi CTN:', error);
+    return false;
+  }
+}
 
 // New function for real-time listening
 // Note: This function runs on the server, so it uses firebase-admin

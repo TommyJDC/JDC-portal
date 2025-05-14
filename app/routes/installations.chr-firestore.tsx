@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node"; /
 import { json } from "@remix-run/node";
 import { useLoaderData, Link, useFetcher, useOutletContext } from "@remix-run/react";
 import { authenticator } from "~/services/auth.server";
-import { getInstallationsBySector } from "~/services/firestore.service.server";
+import { getInstallationsBySector, getTechnicians } from "~/services/firestore.service.server";
 import InstallationListItem from "~/components/InstallationListItem";
 import InstallationDetails from "~/components/InstallationDetails";
 import type { Installation } from "~/types/firestore.types";
@@ -42,12 +42,39 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    // Récupérer les installations depuis Firestore, en utilisant la casse correcte pour le secteur
-    const installations = await getInstallationsBySector('chr'); // Modifié en minuscules
-    return json<{ installations: Installation[] }>({ installations });
+    // Vérifier si l'utilisateur est authentifié
+    const user = await authenticator.isAuthenticated(request);
+    if (!user) {
+      return json({ 
+        installations: [], 
+        technicians: [], 
+        error: "Vous devez être connecté pour accéder à cette page." 
+      });
+    }
+
+    // Vérifier si l'utilisateur a accès au secteur CHR
+    const userSectors = user.secteurs.map(s => s.toLowerCase());
+    if (!userSectors.includes('chr') && user.role !== 'Admin') {
+      return json({ 
+        installations: [], 
+        technicians: [], 
+        error: "Vous n'avez pas accès au secteur CHR." 
+      });
+    }
+
+    // Récupérer les installations depuis Firestore
+    const installations = await getInstallationsBySector('chr');
+    // Récupérer les techniciens avec accès au secteur CHR
+    const technicians = await getTechnicians('chr');
+    
+    return json<{ installations: Installation[]; technicians: { id: string; name: string }[] }>({ 
+      installations,
+      technicians 
+    });
   } catch (error: any) {
-    return json<{ installations: Installation[]; error: string }>({
+    return json<{ installations: Installation[]; technicians: { id: string; name: string }[]; error: string }>({
       installations: [],
+      technicians: [],
       error: error.message || "Erreur lors du chargement des installations CHR depuis Firestore."
     });
   }
@@ -55,7 +82,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function CHRInstallations() {
   const { user } = useOutletContext<OutletContextType>();
-  const { installations, error } = useLoaderData<{ installations: Installation[]; error: string }>();
+  const { installations, technicians, error } = useLoaderData<{ 
+    installations: Installation[]; 
+    technicians: { id: string; name: string }[];
+    error?: string;
+  }>();
   const fetcher = useFetcher<ActionData>();
   const [searchTerm, setSearchTerm] = useState(''); 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -81,34 +112,30 @@ export default function CHRInstallations() {
     );
   }
 
-  const handleSave = async (updatedInstallation: Partial<Installation>) => {
-    if (!selectedInstallation) return;
-
-    // Ne soumettre que les champs qui ont changé et qui sont pertinents pour la sauvegarde.
-    // L'ID est nécessaire pour identifier le document à mettre à jour.
-    const updatesToSubmit: Partial<Installation> = {
-      dateInstall: updatedInstallation.dateInstall,
-      tech: updatedInstallation.tech,
-      status: updatedInstallation.status,
-      commentaire: updatedInstallation.commentaire,
-    };
+  const handleSave = (id: string, updates: Partial<Installation>) => {
+    if (!id) return;
 
     fetcher.submit(
       { 
-        installationId: selectedInstallation.id, 
-        updates: JSON.stringify(updatesToSubmit),
-        _action: "updateInstallation" // Pour identifier l'action si plusieurs existent
+        installationId: id, 
+        updates: JSON.stringify(updates),
+        _action: "updateInstallation"
       },
       { method: "post" }
     );
-    // Fermer la modale après la soumission, le rechargement des données se fera via Remix
-    // ou manuellement si l'action retourne les données mises à jour.
-    // Pour l'instant, on ferme la modale. L'UI pourrait afficher un indicateur de chargement.
-    handleCloseModal(); 
-    // Afficher un toast de succès ou d'attente
     toast.success("Mise à jour en cours..."); 
-    // Idéalement, le fetcher.data contiendrait le résultat de l'action pour un feedback plus précis.
   };
+
+  useEffect(() => {
+    if (fetcher.data) {
+      if (fetcher.data.success) {
+        handleCloseModal();
+        toast.success("Installation mise à jour avec succès");
+      } else {
+        toast.error(fetcher.data.error || "Erreur lors de la mise à jour");
+      }
+    }
+  }, [fetcher.data]);
 
   const handleInstallationClick = (installation: Installation) => {
     setSelectedInstallation(installation);
@@ -167,7 +194,7 @@ export default function CHRInstallations() {
         </div>
       )}
       
-      {isLoading && (
+      {fetcher.state === "loading" && !installations.length && (
         <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
           <svg className="animate-spin h-6 w-6 text-brand-blue mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -176,9 +203,8 @@ export default function CHRInstallations() {
           Chargement des installations...
         </div>
       )}
-
-      {!error && !isLoading && filteredInstallations.length > 0 && (
-        <div className="space-y-3"> {/* Réduction de l'espacement entre les items */}
+      {fetcher.state !== "loading" && filteredInstallations.length > 0 && (
+        <div className="space-y-3">
           {filteredInstallations.map((installation) => (
             <InstallationListItem 
               key={installation.id}
@@ -189,8 +215,7 @@ export default function CHRInstallations() {
           ))}
         </div>
       )}
-
-      {!error && !isLoading && filteredInstallations.length === 0 && (
+      {fetcher.state !== "loading" && filteredInstallations.length === 0 && (
         <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 mx-auto mb-3 text-text-tertiary">
             <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
@@ -205,7 +230,8 @@ export default function CHRInstallations() {
         <InstallationDetails
           installation={selectedInstallation}
           onClose={handleCloseModal}
-          onSave={() => handleSave(selectedInstallation)} // Adapter pour passer l'objet complet ou les updates
+          onSave={handleSave}
+          technicians={technicians}
         />
       )}
     </div>

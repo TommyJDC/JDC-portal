@@ -1,5 +1,5 @@
 // DEBUG PATCH: Log all props received by InstallationsSnapshot
-import React, { useEffect, useMemo } from 'react'; // Importer useMemo
+import React, { useEffect, useMemo, useState } from 'react'; // Importer useMemo and useState
 import { Link } from '@remix-run/react';
 import { Button } from '~/components/ui/Button';
 import { format } from 'date-fns';
@@ -22,16 +22,17 @@ interface InstallationStats {
 }
 
 interface InstallationsSnapshotProps {
-  stats?: { // Rendre stats optionnel
-    haccp: InstallationStats;
-    chr: InstallationStats;
-    tabac: InstallationStats;
-    kezia: InstallationStats;
+  stats: {
+    [key: string]: {
+      total: number;
+      enAttente: number;
+      planifiees: number;
+      terminees: number;
+    };
   };
-  allInstallations?: Installation[]; // Ajouter la prop pour la liste complète
+  installationsCount?: number;
   isLoading?: boolean;
-  lastUpdate?: Date;
-  onRefresh?: () => void;
+  lastUpdate?: Date | string;
 }
 
 const sectorConfig = {
@@ -97,151 +98,113 @@ const InstallationCard = ({
   badge: string;
   border: string;
   hover: string;
-}) => (
-  <Link
-    to={to}
-    className={`relative glass-card group bg-gradient-to-br ${gradient} rounded-2xl p-6 min-h-[220px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl ${shadow} border ${border} ${hover}`}
-    style={{backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}
-  >
-    <div className="flex items-center gap-3 mb-2">
-      <div className={`p-4 rounded-full bg-white/10 border-2 border-white/20 shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform duration-200 ${badge}`}>
-        <IconComponent className="text-white text-2xl drop-shadow" />
-      </div>
-      <h3 className="font-extrabold text-2xl text-white tracking-wide drop-shadow-lg">{title}</h3>
-    </div>
-    
-    <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-gray-200"> {/* Ajuster l'espacement */}
-      <div className="space-y-1"> {/* Ajuster l'espacement */}
-        <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Total</p> {/* Rendre le label plus petit et medium */}
-        <p className="text-2xl font-bold text-white animate-fade-in-up">{stats.total}</p> {/* Ajuster la taille et le poids de la valeur */}
-      </div>
-      <div className="space-y-1"> {/* Ajuster l'espacement */}
-        <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">En attente</p> {/* Rendre le label plus petit et medium */}
-        <p className="text-2xl font-bold text-yellow-300 animate-pulse-slow">{stats.enAttente}</p> {/* Ajuster la taille et le poids de la valeur */}
-      </div>
-      <div className="space-y-1"> {/* Ajuster l'espacement */}
-        <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Planifiées</p> {/* Rendre le label plus petit et medium */}
-        <p className="text-2xl font-bold text-blue-300 animate-fade-in-up">{stats.planifiees}</p> {/* Ajuster la taille et le poids de la valeur */}
-      </div>
-      <div className="space-y-1"> {/* Ajuster l'espacement */}
-        <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Terminées</p> {/* Rendre le label plus petit et medium */}
-        <p className="text-2xl font-bold text-green-300 animate-fade-in-up">{stats.terminees}</p> {/* Ajuster la taille et le poids de la valeur */}
-      </div>
-    </div>
-    <span className="absolute right-4 top-4 w-3 h-3 rounded-full bg-white/30 group-hover:scale-125 transition-transform duration-200 animate-pulse" />
-  </Link>
-);
+}) => {
+  // eslint-disable-next-line no-console
+  console.log(`[InstallationCard][DEBUG] Rendu carte ${title}:`, stats);
 
-export const InstallationsSnapshot: React.FC<InstallationsSnapshotProps> = (props) => {
+  return (
+    <Link
+      to={to}
+      className={`relative glass-card group bg-gradient-to-br ${gradient} rounded-2xl p-6 min-h-[220px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl ${shadow} border ${border} ${hover}`}
+      style={{backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}
+    >
+      <div className="flex items-center gap-3 mb-2">
+        <div className={`p-4 rounded-full bg-white/10 border-2 border-white/20 shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform duration-200 ${badge}`}>
+          <IconComponent className="text-white text-2xl drop-shadow" />
+        </div>
+        <h3 className="font-extrabold text-2xl text-white tracking-wide drop-shadow-lg">{title}</h3>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-gray-200"> {/* Ajuster l'espacement */}
+        <div className="space-y-1"> {/* Ajuster l'espacement */}
+          <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Total</p> {/* Rendre le label plus petit et medium */}
+          <p className="text-2xl font-bold text-white animate-fade-in-up">{stats.total}</p> {/* Ajuster la taille et le poids de la valeur */}
+        </div>
+        <div className="space-y-1"> {/* Ajuster l'espacement */}
+          <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">En attente</p> {/* Rendre le label plus petit et medium */}
+          <p className="text-2xl font-bold text-yellow-300 animate-pulse-slow">{stats.enAttente}</p> {/* Ajuster la taille et le poids de la valeur */}
+        </div>
+        <div className="space-y-1"> {/* Ajuster l'espacement */}
+          <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Planifiées</p> {/* Rendre le label plus petit et medium */}
+          <p className="text-2xl font-bold text-blue-300 animate-fade-in-up">{stats.planifiees}</p> {/* Ajuster la taille et le poids de la valeur */}
+        </div>
+        <div className="space-y-1"> {/* Ajuster l'espacement */}
+          <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Terminées</p> {/* Rendre le label plus petit et medium */}
+          <p className="text-2xl font-bold text-green-300 animate-fade-in-up">{stats.terminees}</p> {/* Ajuster la taille et le poids de la valeur */}
+        </div>
+      </div>
+      <span className="absolute right-4 top-4 w-3 h-3 rounded-full bg-white/30 group-hover:scale-125 transition-transform duration-200 animate-pulse" />
+    </Link>
+  );
+};
+
+export function InstallationsSnapshot({ stats, installationsCount, isLoading, lastUpdate }: InstallationsSnapshotProps) {
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[InstallationsSnapshot][DEBUG] props:', JSON.stringify(props));
-  }, [props]);
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
-  const { stats, allInstallations, isLoading = false, lastUpdate, onRefresh } = props;
+  // Formater la date de manière cohérente
+  const formattedDate = useMemo(() => {
+    if (!lastUpdate) return '';
+    const date = new Date(lastUpdate);
+    return format(date, 'dd/MM/yyyy HH:mm:ss');
+  }, [lastUpdate]);
 
-  const calculatedStats = useMemo(() => {
-    if (!allInstallations) {
-      return stats || { // Utiliser les stats passées si allInstallations n'est pas défini
-        haccp: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
-        chr: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
-        tabac: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 },
-        kezia: { total: 0, enAttente: 0, planifiees: 0, terminees: 0 }
-      };
-    }
-
-    const initialStats = {
-      total: 0,
-      enAttente: 0,
-      planifiees: 0,
-      terminees: 0,
-    };
-
-    const sectorStats: { [key: string]: InstallationStats } = {
-      haccp: { ...initialStats },
-      chr: { ...initialStats },
-      tabac: { ...initialStats },
-      kezia: { ...initialStats },
-    };
-
-    allInstallations.forEach((installation: Installation) => {
-      const sectorKey = installation.secteur?.toLowerCase() as keyof typeof sectorStats;
-      if (sectorKey && sectorStats[sectorKey]) {
-        sectorStats[sectorKey].total++;
-        switch (installation.status) {
-          case 'rendez-vous à prendre':
-            sectorStats[sectorKey].enAttente++;
-            break;
-          case 'rendez-vous pris':
-            sectorStats[sectorKey].planifiees++;
-            break;
-          case 'installation terminée':
-            sectorStats[sectorKey].terminees++;
-            break;
-          default:
-            // Gérer d'autres statuts si nécessaire
-            break;
-        }
-      }
-    });
-
-    return sectorStats;
-
-  }, [allInstallations, stats]); // Recalculer si allInstallations ou stats changent
-
-
-  if (isLoading) {
+  // Ne pas afficher le contenu pendant l'hydratation
+  if (!mounted) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="glass-card bg-gradient-to-br from-gray-700/40 to-gray-900/60 rounded-2xl shadow-xl h-[220px] animate-pulse" />
-        ))}
+      <div className="bg-ui-background rounded-lg shadow-lg p-6 animate-pulse">
+        <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[220px] bg-gray-200 rounded-lg"></div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  // Utiliser calculatedStats pour l'affichage
-  return (
-    <div className="glass-card bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-2xl p-8 shadow-2xl border border-white/10 backdrop-blur-xl">
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-extrabold text-white flex items-center drop-shadow-lg">
-          <FaChartPie className="mr-3 text-jdc-yellow text-2xl" />
-          Suivi des Installations
-        </h2>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-200/70">
-            Dernière mise à jour : {lastUpdate ? format(lastUpdate, 'HH:mm:ss') : 'N/A'}
-          </span>
-          <Button
-            onClick={onRefresh}
-            disabled={isLoading}
-            variant="secondary"
-            size="sm"
-            className="text-jdc-yellow hover:text-black hover:bg-jdc-yellow transition-colors shadow-md"
-            leftIcon={<FaSync className={isLoading ? "animate-spin" : ""} />}
-          >
-            Actualiser
-          </Button>
+  if (!stats) {
+    return (
+      <div className="bg-ui-background rounded-lg shadow-lg p-6">
+        <div className="text-text-secondary text-center py-8">
+          Aucune donnée disponible
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {Object.entries(sectorConfig).map(([key, conf]) => (
+    );
+  }
+
+  return (
+    <div className="bg-ui-background rounded-lg shadow-lg p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-text-primary">État des installations</h2>
+        {formattedDate && (
+          <div className="text-sm text-text-secondary">
+            Dernière mise à jour : {formattedDate}
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Object.entries(sectorConfig).map(([sector, config]) => (
           <InstallationCard
-            key={key}
-            title={conf.label}
-            stats={calculatedStats[key as keyof typeof calculatedStats]}
-            icon={conf.icon}
-            to={conf.to}
-            gradient={conf.gradient}
-            shadow={conf.shadow}
-            badge={conf.badge}
-            border={conf.border}
-            hover={conf.hover}
+            key={sector}
+            title={config.label}
+            stats={stats[sector] || { total: 0, enAttente: 0, planifiees: 0, terminees: 0 }}
+            icon={config.icon}
+            to={config.to}
+            gradient={config.gradient}
+            shadow={config.shadow}
+            badge={config.badge}
+            border={config.border}
+            hover={config.hover}
           />
         ))}
       </div>
     </div>
   );
-};
+}
 
 export default InstallationsSnapshot;

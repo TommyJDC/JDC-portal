@@ -3,7 +3,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node"; /
 import { json } from "@remix-run/node";
 import { useLoaderData, Link, useFetcher, useOutletContext } from "@remix-run/react"; // Ajout de useFetcher
 import { authenticator } from "~/services/auth.server";
-import { getInstallationsBySector } from "~/services/firestore.service.server";
+import { getInstallationsBySector, getTechnicians } from "~/services/firestore.service.server";
 import InstallationListItem from "~/components/InstallationListItem";
 import InstallationDetails from "~/components/InstallationDetails";
 import type { Installation } from "~/types/firestore.types";
@@ -43,12 +43,70 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
+    // Vérifier si l'utilisateur est authentifié
+    const user = await authenticator.isAuthenticated(request);
+    if (!user) {
+      return json({ 
+        installations: [], 
+        technicians: [], 
+        error: "Vous devez être connecté pour accéder à cette page." 
+      });
+    }
+
+    // Vérifier si l'utilisateur a accès au secteur HACCP
+    const userSectors = user.secteurs.map(s => s.toLowerCase());
+    if (!userSectors.includes('haccp') && user.role !== 'Admin') {
+      return json({ 
+        installations: [], 
+        technicians: [], 
+        error: "Vous n'avez pas accès au secteur HACCP." 
+      });
+    }
+
     // Récupérer les installations depuis Firestore
-    const installations = await getInstallationsBySector('haccp'); // Modifié en minuscules
-    return json<{ installations: Installation[] }>({ installations });
+    const installations = await getInstallationsBySector('haccp');
+    
+    // Transformer les données pour corriger le mapping
+    const transformedInstallations = installations.map(installation => {
+      // Fonction pour convertir la date au format JJ/MM en format ISO
+      const formatDate = (dateStr: string | undefined) => {
+        if (!dateStr) return '';
+        // Si la date est au format "JJ/MM"
+        if (dateStr.match(/^\d{2}\/\d{2}$/)) {
+          const [day, month] = dateStr.split('/');
+          return `2025-${month}-${day}`; // Format ISO: YYYY-MM-DD
+        }
+        return dateStr;
+      };
+
+      return {
+        ...installation,
+        // Correction des champs mal mappés
+        codeClient: installation.nom || '', // Le numéro client était dans nom
+        nom: installation.ville || '', // La raison sociale était dans ville
+        ville: installation.adresse?.split(' ')[0] || '', // La ville est le premier mot de l'adresse
+        adresse: installation.adresse?.split(' ').slice(1).join(' ') || '', // Le reste de l'adresse sans la ville
+        telephone: installation.commercial || '', // Le téléphone était dans commercial
+        commercial: installation.materielPreParametrage || '', // Le commercial était dans materielPreParametrage
+        tech: installation.materielLivre || '', // Le technicien était dans materielLivre
+        dateInstall: formatDate(installation.numeroColis), // La date d'installation était dans numeroColis
+        dateCdeMateriel: formatDate(installation.codeClient), // La date commande matériel était dans codeClient
+        commentaireInstall: installation.commentaire || '', // L'heure de RDV était dans commentaire
+        status: installation.status === 'rendez-vous à prendre' ? 'En attente' : installation.status,
+      };
+    });
+
+    // Récupérer les techniciens avec accès au secteur HACCP
+    const technicians = await getTechnicians('haccp');
+    
+    return json<{ installations: Installation[]; technicians: { id: string; name: string }[] }>({ 
+      installations: transformedInstallations,
+      technicians 
+    });
   } catch (error: any) {
-    return json<{ installations: Installation[]; error: string }>({
+    return json<{ installations: Installation[]; technicians: { id: string; name: string }[]; error: string }>({
       installations: [],
+      technicians: [],
       error: error.message || "Erreur lors du chargement des installations HACCP depuis Firestore."
     });
   }
@@ -56,9 +114,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function HACCPInstallations() {
   const { user } = useOutletContext<OutletContextType>();
-  const { installations, error } = useLoaderData<{ installations: Installation[]; error: string }>();
-  const fetcher = useFetcher<ActionData>(); // Ajout du fetcher
-  const [searchTerm, setSearchTerm] = useState(''); 
+  const { installations, technicians } = useLoaderData<{ installations: Installation[]; technicians: { id: string; name: string }[] }>();
+  const fetcher = useFetcher<ActionData>();
+  const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
 
@@ -79,20 +137,13 @@ export default function HACCPInstallations() {
     );
   }
 
-  const handleSave = async (updatedInstallation: Partial<Installation>) => {
-    if (!selectedInstallation) return;
-
-    const updatesToSubmit: Partial<Installation> = {
-      dateInstall: updatedInstallation.dateInstall,
-      tech: updatedInstallation.tech,
-      status: updatedInstallation.status,
-      commentaire: updatedInstallation.commentaire,
-    };
+  const handleSave = (id: string, updates: Partial<Installation>) => {
+    if (!id) return;
 
     fetcher.submit(
       { 
-        installationId: selectedInstallation.id, 
-        updates: JSON.stringify(updatesToSubmit),
+        installationId: id, 
+        updates: JSON.stringify(updates),
         _action: "updateInstallation"
       },
       { method: "post" }
@@ -146,15 +197,8 @@ export default function HACCPInstallations() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
         </svg>
       </div>
-      {error && (
-        <div className="p-4 rounded-md bg-red-500/10 border border-red-500/30 text-red-300">
-          <p className="font-semibold text-sm">Erreur de chargement :</p>
-          <p className="text-xs">{error}</p>
-        </div>
-      )}
-      {/* Ajout d'un état de chargement simple */}
       {fetcher.state === "loading" && !installations.length && (
-         <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
+        <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
           <svg className="animate-spin h-6 w-6 text-brand-blue mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -162,7 +206,7 @@ export default function HACCPInstallations() {
           Chargement des installations...
         </div>
       )}
-      {!error && fetcher.state !== "loading" && filteredInstallations.length > 0 && (
+      {fetcher.state !== "loading" && filteredInstallations.length > 0 && (
         <div className="space-y-3">
           {filteredInstallations.map((installation) => (
             <InstallationListItem 
@@ -174,9 +218,9 @@ export default function HACCPInstallations() {
           ))}
         </div>
       )}
-      {!error && fetcher.state !== "loading" && filteredInstallations.length === 0 && (
+      {fetcher.state !== "loading" && filteredInstallations.length === 0 && (
         <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
-           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 mx-auto mb-3 text-text-tertiary">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 mx-auto mb-3 text-text-tertiary">
             <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
           </svg>
           <p className="font-medium">Aucune installation HACCP à afficher.</p>
@@ -187,7 +231,8 @@ export default function HACCPInstallations() {
         <InstallationDetails
           installation={selectedInstallation}
           onClose={handleCloseModal}
-          onSave={() => handleSave(selectedInstallation)}
+          onSave={handleSave}
+          technicians={technicians}
         />
       )}
     </div>

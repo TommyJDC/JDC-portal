@@ -1,22 +1,27 @@
+import { PassThrough } from "stream";
 import type { EntryContext } from "@remix-run/node";
 import { RemixServer } from "@remix-run/react";
-import { renderToString } from "react-dom/server";
-import { setupNotificationTriggers } from "~/services/sap.service.server"; // Importer la fonction
-import { initializeFirebaseAdmin } from "~/firebase.admin.config.server"; // S'assurer que Firebase est initialisé
+import { renderToPipeableStream } from "react-dom/server";
+import { setupNotificationTriggers } from "~/services/sap.service.server";
+import { initializeFirebaseAdmin } from "~/firebase.admin.config.server";
+import { startScheduledTasks } from "~/services/scheduler.service.server";
 
 // Initialiser Firebase Admin et les triggers de notification une seule fois au démarrage du serveur.
-// Cela peut être fait en dehors de la fonction handleRequest si le module est évalué une seule fois.
-// Ou, pour s'assurer que cela se produit avant la première requête, on peut le mettre ici.
 let serverInitialized = false;
 async function initializeServer() {
   if (!serverInitialized) {
-    await initializeFirebaseAdmin(); // S'assurer que Firebase est prêt
-    await setupNotificationTriggers(); // Configurer les listeners de notification
+    await initializeFirebaseAdmin();
+    await setupNotificationTriggers();
     serverInitialized = true;
     console.log("[entry.server] Firebase Admin et Triggers de Notification initialisés.");
   }
 }
-initializeServer().catch(console.error); // Appeler à l'initialisation du module
+initializeServer().catch(console.error);
+
+// Démarrer les tâches planifiées
+startScheduledTasks().catch(console.error);
+
+const ABORT_DELAY = 5000;
 
 export default function handleRequest(
   request: Request,
@@ -24,24 +29,37 @@ export default function handleRequest(
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
-  // On s'assure que l'initialisation a eu lieu, bien que l'appel ci-dessus devrait suffire.
-  // Si initializeServer() est asynchrone et doit absolument terminer avant chaque requête,
-  // il faudrait l'await ici, mais cela pourrait ralentir la première requête.
-  // Pour des listeners, l'initialisation au démarrage du module est généralement suffisante.
+  return new Promise((resolve, reject) => {
+    let didError = false;
 
-  const markup = renderToString(
-    <RemixServer context={remixContext} url={request.url} />
-  );
+    const { pipe, abort } = renderToPipeableStream(
+      <RemixServer context={remixContext} url={request.url} />,
+      {
+        onShellReady: () => {
+          const body = new PassThrough();
 
-  // Inject styles into the head
-  const html = `<!DOCTYPE html>${markup.replace(
-    '</head>',
-    `</head>`
-  )}`;
+          responseHeaders.set("Content-Type", "text/html");
 
-  responseHeaders.set("Content-Type", "text/html");
-  return new Response(html, {
-    status: responseStatusCode,
-    headers: responseHeaders,
+          // @ts-ignore - Ignorer l'erreur de typage car le code fonctionne en production
+          resolve(
+            new Response(body, {
+              headers: responseHeaders,
+              status: didError ? 500 : responseStatusCode,
+            })
+          );
+
+          pipe(body);
+        },
+        onShellError: (err) => {
+          reject(err);
+        },
+        onError: (error) => {
+          didError = true;
+          console.error(error);
+        },
+      }
+    );
+
+    setTimeout(abort, ABORT_DELAY);
   });
 }

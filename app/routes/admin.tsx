@@ -25,7 +25,8 @@ import { UserManagementPanel } from '~/components/UserManagementPanel';
 import { StatsPanel } from '~/components/StatsPanel';
 import { LogsPanel } from '~/components/LogsPanel';
 import { NotificationPanel } from '~/components/NotificationPanel';
-import { FaCogs, FaUsers, FaChartBar, FaBell, FaBug } from 'react-icons/fa';
+import { SyncPanel } from '~/components/SyncPanel';
+import { FaCogs, FaUsers, FaChartBar, FaBell, FaBug, FaSync } from 'react-icons/fa';
 
 // Loader Firestore uniquement
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -148,6 +149,17 @@ export default function Admin() {
           </CardHeader>
           <CardBody>
             <LogsPanel />
+          </CardBody>
+        </Card>
+        <Card className="bg-ui-surface">
+          <CardHeader>
+            <div className="flex items-center text-text-primary">
+              <FaSync className="mr-3 h-5 w-5 text-brand-blue" />
+              <span className="font-semibold text-lg">Synchronisation</span>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <SyncPanel />
           </CardBody>
         </Card>
       </div>

@@ -1,54 +1,69 @@
 // import { action as processGmailAction } from '~/routes/api.gmail-to-firestore'; // Supprimé
 // import { action as syncInstallationsAction } from '~/routes/api.sync-installations'; // Supprimé
+import { getDb } from '~/firebase.admin.config.server';
 import { notifySapFromInstallations } from '~/services/notifications.service.server';
-import { getScheduledTaskState, updateScheduledTaskState } from '~/services/firestore.service.server'; // Importez les fonctions de service Firestore
+import { getScheduledTaskState, updateScheduledTaskState, createDailySapSnapshot } from '~/services/firestore.service.server'; // Importez les fonctions de service Firestore
 
 export async function triggerScheduledTasks() {
-  const now = new Date();
-  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // Une heure en millisecondes
+  console.log("[scheduledTasks] Déclenchement des tâches planifiées");
+  
+  try {
+    // Vérifier si un snapshot a déjà été créé aujourd'hui
+    const db = getDb();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  // Ne conserve que la tâche de notification SAP pour le déclenchement via le dashboard
-  const tasksToRun = [
-    { name: 'sap-notification', type: 'service', handler: notifySapFromInstallations },
-  ];
+    console.log("[scheduledTasks] Recherche d'un snapshot existant pour aujourd'hui:", today.toISOString());
 
-  for (const task of tasksToRun) {
-    try {
-      const taskState = await getScheduledTaskState(task.name); // Utiliser la fonction de service
+    const snapshotQuery = await db.collection('sap_snapshots')
+      .where('timestamp', '>=', today)
+      .limit(1)
+      .get();
 
-      if (!taskState || (taskState.lastRun && taskState.lastRun.toDate() < oneHourAgo)) { // Vérifier l'existence de lastRun
-        console.log(`[scheduledTasks] Déclenchement de la tâche : ${task.name}`);
+    if (snapshotQuery.empty) {
+      console.log("[scheduledTasks] Aucun snapshot trouvé pour aujourd'hui, création d'un nouveau snapshot");
+      const snapshot = await createDailySapSnapshot();
+      console.log("[scheduledTasks] Nouveau snapshot créé avec succès:", snapshot);
+    } else {
+      const existingSnapshot = snapshotQuery.docs[0].data();
+      console.log("[scheduledTasks] Un snapshot existe déjà pour aujourd'hui:", existingSnapshot);
+    }
 
-        // Puisque la seule tâche restante est de type 'service', nous simplifions la logique.
-        if (task.type === 'service') {
-          try {
-            // Appeler la fonction de service directement
-            await task.handler();
-            console.log(`[scheduledTasks] Tâche ${task.name} exécutée avec succès.`);
-            // Mettre à jour l'état de la tâche avec le nom de la tâche
-            await updateScheduledTaskState(task.name);
-          } catch (serviceError) {
-            console.error(`[scheduledTasks] Erreur lors de l'exécution du service ${task.name}:`, serviceError);
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+    // Ne conserve que la tâche de notification SAP pour le déclenchement via le dashboard
+    const tasksToRun = [
+      { name: 'sap-notification', type: 'service', handler: notifySapFromInstallations },
+    ];
+
+    for (const task of tasksToRun) {
+      try {
+        const taskState = await getScheduledTaskState(task.name);
+
+        if (!taskState || (taskState.lastRun && taskState.lastRun.toDate() < oneHourAgo)) {
+          console.log(`[scheduledTasks] Déclenchement de la tâche : ${task.name}`);
+
+          if (task.type === 'service') {
+            try {
+              await task.handler();
+              console.log(`[scheduledTasks] Tâche ${task.name} exécutée avec succès.`);
+              await updateScheduledTaskState(task.name);
+            } catch (serviceError) {
+              console.error(`[scheduledTasks] Erreur lors de l'exécution du service ${task.name}:`, serviceError);
+            }
+          } else {
+            console.warn(`[scheduledTasks] Type de tâche inconnu ou non géré: ${task.type} pour ${task.name}`);
           }
         } else {
-          // Ce cas ne devrait plus se produire avec la configuration actuelle de tasksToRun
-          console.warn(`[scheduledTasks] Type de tâche inconnu ou non géré: ${task.type} pour ${task.name}`);
+          console.log(`[scheduledTasks] Tâche ${task.name} déjà exécutée récemment.`);
         }
-
-        // La gestion du succès est maintenant à l'intérieur du bloc try/catch du service
-        // if (success) {
-        //   console.log(`[scheduledTasks] Tâche ${task.name} exécutée avec succès.`);
-        //   // Mettre à jour l'état de la tâche avec le nom de la tâche
-        //   await updateScheduledTaskState(task.name);
-        // } else {
-        //    console.error(`[scheduledTasks] La tâche ${task.name} a échoué.`);
-        // }
-      } else {
-        console.log(`[scheduledTasks] Tâche ${task.name} déjà exécutée récemment.`);
+      } catch (error) {
+        console.error(`[scheduledTasks] Erreur lors de l'exécution de la tâche ${task.name}:`, error);
       }
-    } catch (error) {
-      console.error(`[scheduledTasks] Erreur lors du traitement de la tâche ${task.name}:`, error);
     }
+  } catch (error) {
+    console.error("[scheduledTasks] Erreur lors de l'exécution des tâches planifiées:", error);
   }
 }
 

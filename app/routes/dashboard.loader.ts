@@ -14,7 +14,8 @@ import {
   getLatestStatsSnapshotsSdk,
   getInstallationsSnapshot,
   getAllInstallations,
-  getSapTicketCountBySectorSdk
+  getSapTicketCountBySectorSdk,
+  getSapEvolution24h
 } from "~/services/firestore.service.server";
 import type { SapTicket, Shipment, StatsSnapshot, UserProfile, InstallationsDashboardStats, Installation } from "~/types/firestore.types";
 // import type { UserSession } from "~/services/session.server"; // Remplacé par UserSessionData
@@ -43,6 +44,11 @@ export interface DashboardLoaderData {
   recentShipments: Shipment[];
   clientError: string | null;
   sapTicketCountsBySector: Record<string, number> | null;
+  sapEvolution24h: {
+    yesterday: Record<string, number>;
+    current: Record<string, number>;
+    evolution: Record<string, number>;
+  } | null;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -60,7 +66,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     recentTickets: [],
     recentShipments: [],
     clientError: null,
-    sapTicketCountsBySector: null
+    sapTicketCountsBySector: null,
+    sapEvolution24h: null
   };
 
   if (!userSession?.userId) return json(data); // Utiliser userSession
@@ -147,14 +154,28 @@ async function loadCalendarData(session: UserSessionData) { // Changer UserSessi
 
 async function loadFirestoreData(userProfile: UserProfile, sectorsForTickets: string[], sectorsForShipments: string[]) {
   try {
-    const [sapTicketCounts, recentTickets, shipments, installations, statsSnapshot, clientCount] = await Promise.all([
+    console.log('[loadFirestoreData] Début du chargement des données avec:', {
+      userRole: userProfile.role,
+      userName: userProfile.nom,
+      userSectors: userProfile.secteurs
+    });
+
+    const [sapTicketCounts, recentTickets, shipments, installations, statsSnapshot, clientCount, sapEvolution] = await Promise.all([
       getSapTicketCountBySectorSdk(sectorsForTickets),
       getRecentTicketsForSectors(sectorsForTickets, 5),
       getAllShipments(sectorsForShipments).then(s => s.slice(0, 5)),
       getAllInstallations(),
       getLatestStatsSnapshotsSdk(1),
-      getDistinctClientCountFromEnvoiSdk(userProfile)
+      getDistinctClientCountFromEnvoiSdk(userProfile),
+      getSapEvolution24h()
     ]);
+
+    console.log('[loadFirestoreData] Données chargées:', {
+      installationsCount: installations.length,
+      hasStatsSnapshot: !!statsSnapshot,
+      hasClientCount: clientCount !== null,
+      hasSapEvolution: !!sapEvolution
+    });
 
     const result: Partial<DashboardLoaderData> = {
       sapTicketCountsBySector: sapTicketCounts,
@@ -166,17 +187,23 @@ async function loadFirestoreData(userProfile: UserProfile, sectorsForTickets: st
         evolution: {
           distinctClientCountFromEnvoi: calculateClientEvolution(clientCount, statsSnapshot?.[0])
         }
-      }
+      },
+      sapEvolution24h: sapEvolution
     };
 
     const installationsData = await getInstallationsSnapshot(userProfile);
+    console.log('[loadFirestoreData] Données d\'installations:', {
+      hasInstallationsData: !!installationsData,
+      installationsData
+    });
+
     if (installationsData) {
       result.installationsStats = transformInstallationsData(installationsData);
     }
 
     return result;
   } catch (error) {
-    console.error("Erreur Firestore:", error);
+    console.error("[loadFirestoreData] Erreur Firestore:", error);
     return { clientError: "Erreur de chargement des données" };
   }
 }
@@ -193,9 +220,46 @@ function cleanTicketDates(ticket: SapTicket) {
 }
 
 function filterInstallations(installations: Installation[], userProfile: UserProfile) {
-  return userProfile.role === 'Admin' 
-    ? installations 
-    : installations.filter(inst => userProfile.secteurs?.includes(inst.secteur));
+  console.log("[filterInstallations] Début du filtrage avec:", {
+    totalInstallations: installations.length,
+    userRole: userProfile.role,
+    userName: userProfile.nom,
+    userSectors: userProfile.secteurs
+  });
+
+  let filtered: Installation[];
+  if (userProfile.role === 'Admin') {
+    console.log("[filterInstallations] Utilisateur Admin - retourne toutes les installations");
+    filtered = installations;
+  } else if (userProfile.role === 'Technique') {
+    filtered = installations.filter(inst => inst.tech === userProfile.nom);
+    console.log("[filterInstallations] Filtrage Technique:", {
+      techName: userProfile.nom,
+      installationsAvantFiltrage: installations.length,
+      installationsApresFiltrage: filtered.length
+    });
+  } else if (userProfile.role === 'Commercial') {
+    filtered = installations.filter(inst => inst.commercial === userProfile.nom);
+    console.log("[filterInstallations] Filtrage Commercial:", {
+      commercialName: userProfile.nom,
+      installationsAvantFiltrage: installations.length,
+      installationsApresFiltrage: filtered.length
+    });
+  } else {
+    filtered = installations.filter(inst => userProfile.secteurs?.includes(inst.secteur));
+    console.log("[filterInstallations] Filtrage par secteurs:", {
+      userSectors: userProfile.secteurs,
+      installationsAvantFiltrage: installations.length,
+      installationsApresFiltrage: filtered.length
+    });
+  }
+
+  console.log("[filterInstallations] Résultat final:", {
+    totalInstallations: filtered.length,
+    secteurs: [...new Set(filtered.map(inst => inst.secteur))]
+  });
+
+  return filtered;
 }
 
 function calculateClientEvolution(currentCount: number | null, snapshot?: StatsSnapshot) {
@@ -206,20 +270,36 @@ function calculateClientEvolution(currentCount: number | null, snapshot?: StatsS
 }
 
 function transformInstallationsData(data: any): InstallationsDashboardStats {
-  return {
+  console.log('[transformInstallationsData] Données reçues:', data);
+  
+  const result = {
     haccp: parseSectorData(data, 'HACCP'),
     chr: parseSectorData(data, 'CHR'),
     tabac: parseSectorData(data, 'Tabac'),
     kezia: parseSectorData(data, 'Kezia')
   };
+
+  console.log('[transformInstallationsData] Données transformées:', result);
+  return result;
 }
 
 function parseSectorData(data: any, sector: string) {
+  const sectorKey = sector.toLowerCase();
+  const sectorData = data.bySector?.[sectorKey];
+
+  console.log(`[parseSectorData] Traitement du secteur ${sector}:`, {
+    bySector: sectorData,
+    total: sectorData?.total || 0,
+    enAttente: sectorData?.byStatus?.['rendez-vous à prendre'] || 0,
+    planifiees: sectorData?.byStatus?.['rendez-vous pris'] || 0,
+    terminees: sectorData?.byStatus?.['installation terminée'] || 0
+  });
+
   return {
-    total: data.bySector?.[sector]?.total || 0,
-    enAttente: data.bySector?.[sector]?.byStatus?.['rendez-vous à prendre'] || 0,
-    planifiees: data.bySector?.[sector]?.byStatus?.['rendez-vous pris'] || 0,
-    terminees: data.bySector?.[sector]?.byStatus?.['installation terminée'] || 0
+    total: sectorData?.total || 0,
+    enAttente: sectorData?.byStatus?.['rendez-vous à prendre'] || 0,
+    planifiees: sectorData?.byStatus?.['rendez-vous pris'] || 0,
+    terminees: sectorData?.byStatus?.['installation terminée'] || 0
   };
 }
 

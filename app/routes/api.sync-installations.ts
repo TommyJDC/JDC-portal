@@ -3,6 +3,11 @@ import { json } from '@remix-run/node';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue, Firestore } from 'firebase-admin/firestore';
 import { google, sheets_v4 } from 'googleapis';
+import { LoaderFunctionArgs } from '@remix-run/node';
+import type { Installation } from '~/types/firestore.types';
+import { getDb } from '~/firebase.admin.config.server';
+import type { InstallationStatus } from '~/types/firestore.types';
+import { getGoogleAuthClient } from "~/services/google.server";
 
 type Sector = 'chr' | 'haccp' | 'tabac' | 'kezia';
 type SpreadsheetConfig = Record<Sector, { spreadsheetId: string; range: string }>;
@@ -109,8 +114,7 @@ export const COLUMN_MAPPINGS: ColumnMappings = {
   }
 };
 
-import { initializeFirebaseAdmin, getDb } from '~/firebase.admin.config.server';
-import type { InstallationStatus } from "~/types/firestore.types"; // Importer le type InstallationStatus
+import { initializeFirebaseAdmin } from '~/firebase.admin.config.server';
 
 console.log("[api.sync-installations] Action déclenchée.");
 
@@ -124,10 +128,32 @@ async function ensureFirebaseInitialized() {
   return db;
 }
 
+// Renommée pour plus de clarté : ne retourne que le token, pas l'objet auth complet
+export async function getGoogleRefreshTokenFromFirestore() {
+  try {
+    const db = await ensureFirebaseInitialized();
+    const adminSnapshot = await db.collection('users').where('role', '==', 'Admin').get();
+    const adminWithToken = adminSnapshot.docs.find(doc => doc.data().googleRefreshToken != null);
+    if (adminWithToken) {
+      console.log("Utilisateur admin trouvé avec token Google (refresh token)");
+      return adminWithToken.data().googleRefreshToken;
+    }
+    const userSnapshot = await db.collection('users').get();
+    const userWithToken = userSnapshot.docs.find(doc => doc.data().googleRefreshToken != null);
+    if (userWithToken) {
+      console.log("Utilisateur (non-admin) trouvé avec token Google (refresh token)");
+      return userWithToken.data().googleRefreshToken;
+    }
+    throw new Error("Aucun utilisateur avec refresh token Google trouvé dans Firestore");
+  } catch (error) {
+    console.error("Erreur lors de la récupération du refresh token Google depuis Firestore:", error);
+    throw error;
+  }
+}
 
-async function getSheetData(auth: any, spreadsheetId: string, range: string) {
-  console.log(`[sync-installations] Récupération données sheet ${spreadsheetId}`);
-  const sheets = google.sheets({ version: 'v4', auth });
+async function getSheetData(authClient: any, spreadsheetId: string, range: string) {
+  console.log(`[sync-installations] Récupération données sheet ${spreadsheetId} avec client OAuth2`);
+  const sheets = google.sheets({ version: 'v4', auth: authClient });
   try {
     const response = await sheets.spreadsheets.values.get({ spreadsheetId, range });
     return response.data.values || [];
@@ -137,29 +163,6 @@ async function getSheetData(auth: any, spreadsheetId: string, range: string) {
     }
     return [];
   }
-}
-
-async function getGoogleSheetsAuth(db: Firestore) {
-  console.log('[sync-installations] Récupération auth Google Sheets');
-  const userDoc = await db.collection('users').doc('105906689661054220398').get();
-  if (!userDoc.exists) throw new Error('User with Google token not found');
-  
-  const userData = userDoc.data();
-  if (!userData) throw new Error('User data is empty');
-  if (!userData.googleRefreshToken) throw new Error('Google refresh token not found');
-
-  const auth = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET
-  );
-  
-  auth.setCredentials({
-    refresh_token: userData.googleRefreshToken,
-    scope: userData.gmailAuthorizedScopes?.join(' ') || 'https://www.googleapis.com/auth/spreadsheets.readonly',
-    token_type: 'Bearer'
-  });
-  
-  return auth;
 }
 
 async function getAllInstallationsFromFirestore(db: Firestore, sector: Sector) {
@@ -174,103 +177,141 @@ async function getAllInstallationsFromFirestore(db: Firestore, sector: Sector) {
   return installations;
 }
 
-async function syncSector(sector: Sector, config: { spreadsheetId: string; range: string }, auth: any) {
+async function syncSector(sector: Sector, config: { spreadsheetId: string; range: string }, authClient: any) {
   const db = await ensureFirebaseInitialized();
   console.log(`[sync-installations] Début synchronisation secteur ${sector}`);
   
-  const [sheetData, firestoreData] = await Promise.all([
-    getSheetData(auth, config.spreadsheetId, config.range),
-    getAllInstallationsFromFirestore(db, sector)
+  const [sheetData, firestoreDataObj] = await Promise.all([
+    getSheetData(authClient, config.spreadsheetId, config.range),
+    getAllInstallationsFromFirestore(db, sector) // Renommé firestoreDataObj pour clarté
   ]);
 
   if (!sheetData) {
     console.error(`[sync-installations] Aucune donnée sheet pour ${sector}`);
-    return { added: 0, updated: 0, terminated: 0 };
+    // Retourner le nombre d'installations existantes comme potentiellement "terminées" ou "à vérifier"
+    return { added: 0, updated: 0, deleted: 0, existingInFirestore: Object.keys(firestoreDataObj).length }; 
   }
 
-  console.log(`[sync-installations] ${sheetData.length} lignes trouvées pour ${sector}`);
+  console.log(`[sync-installations] ${sheetData.length} lignes trouvées dans Google Sheet pour ${sector}`);
 
-  const sheetCodeClients = new Set();
+  const sheetCodeClients = new Set<string>();
   const updates: any[] = [];
   const adds: any[] = [];
   const sectorMapping = COLUMN_MAPPINGS[sector];
 
   for (const row of sheetData) {
-    const codeClient = row[sectorMapping.codeClient];
-    if (!codeClient) continue;
+    const codeClientValue = row[sectorMapping.codeClient];
+    if (!codeClientValue) continue;
     
+    const codeClient = String(codeClientValue).trim(); // Assurer que c'est une chaîne et trim
     sheetCodeClients.add(codeClient);
-    // Construire l'objet installationData en mappant toutes les colonnes définies dans COLUMN_MAPPINGS
+    
     const installationData: Record<string, any> = {
-      secteur: sector, // Toujours inclure le secteur
-      codeClient: codeClient, // Toujours inclure le code client
-      status: 'rendez-vous à prendre', // Définir un statut par défaut si non présent dans la feuille? Ou mapper depuis la feuille si un champ status existe? (Actuellement non mappé dans COLUMN_MAPPINGS)
+      secteur: sector, 
+      codeClient: codeClient, 
+      status: 'rendez-vous à prendre', 
     };
 
-    // Log pour le débogage - Afficher la ligne brute et les données mappées pour Kezia
     if (sector === 'kezia') {
       console.log(`[sync-installations][DEBUG] Kezia Row:`, row);
       console.log(`[sync-installations][DEBUG] Kezia Mapped Data (before processing):`, installationData);
     }
 
-    // Mapper tous les champs définis dans le mapping du secteur
     for (const key in sectorMapping) {
       const columnIndex = sectorMapping[key];
       const value = row[columnIndex];
       
-      // Gérer les cas spécifiques ou formater si nécessaire (ex: dates)
       if (key === 'dateInstall' || key === 'dateCdeMateriel' || key === 'dateSignatureCde') {
-        // Tenter de parser la date si elle existe
         const date = value ? new Date(value) : null;
-        // Vérifier si la date est valide. Si non, stocker null.
-        installationData[key] = date && !isNaN(date.getTime()) ? date : null;
-      } else if (key === 'telephone' && sector === 'tabac') {
-         // Gérer le cas spécifique du téléphone pour Tabac si le champ est nommé différemment dans la feuille
-         // Note: Le mapping COLUMN_MAPPINGS.tabac.coordonneesTel est déjà utilisé pour 'telephone' ci-dessous
-         installationData['telephone'] = value || '';
-      }
-       else {
-        // Pour les autres champs, stocker la valeur brute (ou une chaîne vide si undefined/null)
+        installationData[key] = date && !isNaN(date.getTime()) ? date.toISOString() : null; // Stocker en ISO string ou null
+      } else if (key === 'telephone' && sector === 'tabac' && sectorMapping.coordonneesTel !== undefined) {
+         // Utiliser le mapping spécifique pour le téléphone Tabac si défini
+         installationData['telephone'] = row[sectorMapping.coordonneesTel] || '';
+      } else if (key !== 'codeClient') { // Éviter de ré-écraser codeClient qui est déjà traité
         installationData[key] = value || '';
       }
     }
-
-    // Assurer que les champs obligatoires par le type Installation sont présents, même s'ils sont vides
-    // (Cela peut être redondant si le mapping les couvre, mais assure la robustesse)
     installationData.nom = installationData.nom || '';
     installationData.codeClient = installationData.codeClient || '';
     installationData.status = (installationData.status as InstallationStatus) || 'rendez-vous à prendre';
 
-
-    const existing = firestoreData[codeClient];
+    const existing = firestoreDataObj[codeClient];
     if (existing) {
-      updates.push(installationData);
+      let hasChanges = false;
+      for (const keyToCompare in installationData) {
+        let sheetValue = installationData[keyToCompare];
+        let firestoreValueAtKey = existing[keyToCompare]; // Renommé pour éviter confusion avec la variable de scope externe
+
+        if (keyToCompare.startsWith('date')) {
+          try {
+            sheetValue = sheetValue ? new Date(sheetValue).toISOString() : null;
+          } catch (e) {
+            sheetValue = null; // Invalide, considérer comme différent
+          }
+          
+          try {
+            if (firestoreValueAtKey && typeof (firestoreValueAtKey as any).toDate === 'function') {
+              // Cas Timestamp Firestore
+              firestoreValueAtKey = (firestoreValueAtKey as any).toDate().toISOString();
+            } else if (firestoreValueAtKey) {
+              // Cas string ISO, objet Date JS, ou autre chose convertible
+              firestoreValueAtKey = new Date(firestoreValueAtKey as string | number | Date).toISOString();
+            } else {
+              firestoreValueAtKey = null;
+            }
+          } catch (e) {
+            firestoreValueAtKey = null; // Invalide ou non convertible, considérer comme différent
+          }
+        }
+
+        if (String(sheetValue || '') !== String(firestoreValueAtKey || '')) {
+          hasChanges = true;
+          console.log(`[sync-installations][DEBUG] Changement détecté pour ${codeClient} sur le champ ${keyToCompare}: Sheet='${sheetValue}', Firestore='${firestoreValueAtKey}'`);
+          break;
+        }
+      }
+
+      if (hasChanges) {
+        updates.push({ id: existing.id, ...installationData });
+      }
     } else {
       adds.push(installationData);
     }
   }
 
-  console.log(`[sync-installations] Secteur ${sector}: ${adds.length} ajouts, ${updates.length} mises à jour`);
-
-  // Enregistrer les nouvelles installations
-  const batch = db.batch();
-  for (const add of adds) {
-    const newDocRef = db.collection('installations').doc();
-    batch.set(newDocRef, add);
+  // Logique de suppression
+  const firestoreInstallationsArray = Object.values(firestoreDataObj);
+  const deletes: string[] = [];
+  for (const firestoreInst of firestoreInstallationsArray) {
+    if (firestoreInst.codeClient && !sheetCodeClients.has(String(firestoreInst.codeClient).trim())) {
+      deletes.push(firestoreInst.id); 
+    }
   }
-
-  // Mettre à jour les installations existantes
-  for (const update of updates) {
-    const docRef = db.collection('installations').doc(firestoreData[update.codeClient].id);
-    batch.update(docRef, update);
+  console.log(`[sync-installations] Secteur ${sector}: ${adds.length} ajouts, ${updates.length} mises à jour, ${deletes.length} suppressions`);
+  if (adds.length > 0 || updates.length > 0 || deletes.length > 0) {
+    const batch = db.batch();
+    for (const add of adds) {
+      const newDocRef = db.collection('installations').doc();
+      batch.set(newDocRef, add);
+    }
+    for (const update of updates) {
+      const { id, ...updateData } = update;
+      const docRef = db.collection('installations').doc(id);
+      batch.update(docRef, updateData);
+    }
+    for (const docIdToDelete of deletes) {
+      const docRef = db.collection('installations').doc(docIdToDelete);
+      batch.delete(docRef);
+    }
+    await batch.commit();
+    console.log(`[sync-installations] Batch commit pour ${sector} effectué.`);
+  } else {
+    console.log(`[sync-installations] Aucune modification à appliquer pour ${sector}.`);
   }
-
-  await batch.commit();
-  
   return { 
     added: adds.length, 
     updated: updates.length, 
-    terminated: Object.keys(firestoreData).length 
+    deleted: deletes.length
   };
 }
 
@@ -284,12 +325,22 @@ export async function action({ request }: DataFunctionArgs) {
 
   try {
     console.log('[sync-installations] Initialisation Firebase...');
-    db = await ensureFirebaseInitialized();
+    await ensureFirebaseInitialized();
     console.log('[sync-installations] Firebase initialisé avec succès');
     
-    console.log('[sync-installations] Récupération auth Google Sheets...');
-    const auth = await getGoogleSheetsAuth(db);
-    console.log('[sync-installations] Auth Google Sheets récupérée avec succès');
+    console.log('[sync-installations] Récupération refresh token Google...');
+    const refreshToken = await getGoogleRefreshTokenFromFirestore();
+    if (!refreshToken) {
+      throw new Error("Impossible de récupérer le refresh token Google pour la synchronisation Sheets.");
+    }
+    console.log('[sync-installations] Refresh token Google récupéré.');
+
+    console.log('[sync-installations] Création du client OAuth2 Google...');
+    const authClient = await getGoogleAuthClient({ googleRefreshToken: refreshToken });
+    if (!authClient) {
+      throw new Error("Impossible de créer le client OAuth2 Google pour la synchronisation Sheets.");
+    }
+    console.log('[sync-installations] Client OAuth2 Google créé avec succès.');
     
     const results: Record<string, any> = {};
     console.log('[sync-installations] Début synchronisation secteurs');
@@ -297,35 +348,55 @@ export async function action({ request }: DataFunctionArgs) {
     for (const sector in SPREADSHEET_CONFIG) {
       const typedSector = sector as Sector;
       console.log(`[sync-installations] Synchronisation secteur ${typedSector}`);
-      results[typedSector] = await syncSector(typedSector, SPREADSHEET_CONFIG[typedSector], auth);
+      results[typedSector] = await syncSector(typedSector, SPREADSHEET_CONFIG[typedSector], authClient);
       console.log(`[sync-installations] Secteur ${typedSector} synchronisé:`, results[typedSector]);
     }
+    
+    console.log('[sync-installations] Synchronisation terminée avec succès', results);
+    return json({ success: true, message: 'Synchronisation terminée avec succès', results });
 
-    console.log('[sync-installations] Synchronisation terminée avec succès');
-    return json({ success: true, results });
   } catch (error: any) {
-    console.error('[sync-installations] Erreur de synchronisation:', error);
-    
-    // Log supplémentaire pour Firebase
-    if (error.code && error.code.startsWith('firebase')) {
-      console.error('[sync-installations] Erreur Firebase:', error.code, error.details);
-    }
-    
-    // Log supplémentaire pour Google Sheets
-    if (error.response) {
-      console.error('[sync-installations] Erreur Google API:', {
-        status: error.response.status,
-        data: error.response.data
-      });
-    }
-
-    return json({ 
-      error: error.message || 'An unknown error has occurred',
-      details: process.env.NODE_ENV === 'development' ? {
-        code: error.code,
-        stack: error.stack,
-        response: error.response?.data
-      } : undefined
-    }, { status: 500 });
+    console.error('[sync-installations] Erreur majeure lors de la synchronisation:', error);
+    return json({ success: false, error: error.message || "Erreur inconnue de synchronisation" }, { status: 500 });
   }
+}
+
+interface SheetData {
+  id?: string;
+  codeClient: string;
+  nom: string;
+  ville: string;
+  contact: string;
+  telephone: string;
+  commercial: string;
+  dateInstall: string;
+  tech: string;
+  status: string;
+  commentaire: string;
+  secteur: string;
+}
+
+export async function syncInstallationsFromGoogleSheets() {
+  console.warn("[sync-installations] syncInstallationsFromGoogleSheets EST OBSOLETE ET NE DEVRAIT PLUS ETRE APPELEE DIRECTEMENT PAR LE SCHEDULER. UTILISER LA ROUTE /api/sync-installations.");
+  try {
+    await ensureFirebaseInitialized();
+    const refreshToken = await getGoogleRefreshTokenFromFirestore();
+    if (!refreshToken) throw new Error("Refresh token manquant");
+    const authClient = await getGoogleAuthClient({ googleRefreshToken: refreshToken });
+    if (!authClient) throw new Error("Client OAuth2 manquant");
+
+    const results: Record<string, any> = {};
+    for (const sector in SPREADSHEET_CONFIG) {
+      const typedSector = sector as Sector;
+      results[typedSector] = await syncSector(typedSector, SPREADSHEET_CONFIG[typedSector], authClient);
+    }
+    return { success: true, results };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  // Cette route est POST-only pour la synchro, le loader peut retourner une simple info
+  return json({ message: "Utilisez POST pour synchroniser les installations." });
 }

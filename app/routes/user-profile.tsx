@@ -115,24 +115,37 @@ export async function action({ request }: ActionFunctionArgs) {
     
     try {
       const formData = await request.formData();
+      const department = formData.get("department") as 'technique' | 'commercial' | 'admin';
+      
+      // Définir le rôle en fonction du département
+      let role: string;
+      switch (department) {
+        case 'technique':
+          role = 'Technique';
+          break;
+        case 'commercial':
+          role = 'Commercial';
+          break;
+        case 'admin':
+          role = 'Admin';
+          break;
+        default:
+          role = 'Technique'; // Rôle par défaut
+      }
+
       const updatedProfileData: Partial<UserProfile> = {
         displayName: formData.get("displayName") as string,
         nom: formData.get("nom") as string,
         phone: formData.get("phone") as string,
         address: formData.get("address") as string,
         jobTitle: formData.get("jobTitle") as string,
-        department: formData.get("department") as 'technique' | 'commercial' | 'admin',
+        department: department,
+        role: role, // Ajouter le rôle mis à jour
         secteurs: formData.getAll("sectors") as string[],
       };
 
       console.log("[user-profile-direct] Action: Données du formulaire reçues:", Object.fromEntries(formData.entries()));
       console.log("[user-profile-direct] Action: Données de mise à jour:", updatedProfileData);
-
-      // S'assurer que le rôle ne peut pas être modifié via cette action
-      if ('role' in updatedProfileData) {
-        console.warn("[user-profile-direct] Action: Tentative de modification du rôle, ignorée.");
-        delete updatedProfileData.role;
-      }
 
       try {
         // Tenter de récupérer le profil existant

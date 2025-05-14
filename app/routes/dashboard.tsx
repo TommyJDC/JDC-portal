@@ -43,7 +43,9 @@ export default function Dashboard() {
     calendarEvents,
     recentTickets: serializedTickets,
     sapTicketCountsBySector,
-    allInstallations
+    allInstallations,
+    sapEvolution24h,
+    installationsStats
   } = useLoaderData<typeof loader>();
 
   const recentTickets: BlockchainSapTicket[] = serializedTickets ?? [];
@@ -108,6 +110,14 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
 
+      {/* Section Suivi des Installations */}
+      <InstallationsSnapshot
+        stats={installationsStats}
+        allInstallations={firestoreInstallationsData}
+        lastUpdate={new Date()}
+        onRefresh={() => window.location.reload()}
+      />
+
       {/* Section Statistiques Tickets SAP */}
       <section className="glass-card bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-2xl p-8 shadow-2xl border border-white/10 backdrop-blur-xl">
         <h2 className="text-2xl font-extrabold text-white flex items-center drop-shadow-lg mb-6">
@@ -123,6 +133,20 @@ export default function Dashboard() {
               <h3 className="font-bold text-lg text-white">HACCP</h3>
             </div>
             <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['HACCP'] ?? 0}</div>
+            {sapEvolution24h && (
+              <div className="mt-2 text-sm flex items-center gap-1">
+                {sapEvolution24h.evolution['HACCP'] !== 0 && (
+                  <>
+                    <span className={`${sapEvolution24h.evolution['HACCP'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
+                      {sapEvolution24h.evolution['HACCP'] > 0 ? '↑' : '↓'}
+                    </span>
+                    <span className={`${sapEvolution24h.evolution['HACCP'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
+                      {Math.abs(sapEvolution24h.evolution['HACCP'])} sur 24h
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="glass-card bg-gradient-to-br from-blue-400/20 to-blue-700/30 rounded-xl p-6 border border-blue-400/20 hover:border-blue-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-blue-400/20">
@@ -133,6 +157,20 @@ export default function Dashboard() {
               <h3 className="font-bold text-lg text-white">CHR</h3>
             </div>
             <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['CHR'] ?? 0}</div>
+            {sapEvolution24h && (
+              <div className="mt-2 text-sm flex items-center gap-1">
+                {sapEvolution24h.evolution['CHR'] !== 0 && (
+                  <>
+                    <span className={`${sapEvolution24h.evolution['CHR'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
+                      {sapEvolution24h.evolution['CHR'] > 0 ? '↑' : '↓'}
+                    </span>
+                    <span className={`${sapEvolution24h.evolution['CHR'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
+                      {Math.abs(sapEvolution24h.evolution['CHR'])} sur 24h
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="glass-card bg-gradient-to-br from-red-400/20 to-red-700/30 rounded-xl p-6 border border-red-400/20 hover:border-red-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-red-400/20">
@@ -143,6 +181,20 @@ export default function Dashboard() {
               <h3 className="font-bold text-lg text-white">Tabac</h3>
             </div>
             <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['Tabac'] ?? 0}</div>
+            {sapEvolution24h && (
+              <div className="mt-2 text-sm flex items-center gap-1">
+                {sapEvolution24h.evolution['Tabac'] !== 0 && (
+                  <>
+                    <span className={`${sapEvolution24h.evolution['Tabac'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
+                      {sapEvolution24h.evolution['Tabac'] > 0 ? '↑' : '↓'}
+                    </span>
+                    <span className={`${sapEvolution24h.evolution['Tabac'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
+                      {Math.abs(sapEvolution24h.evolution['Tabac'])} sur 24h
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="glass-card bg-gradient-to-br from-purple-400/20 to-purple-700/30 rounded-xl p-6 border border-purple-400/20 hover:border-purple-400/40 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-purple-400/20">
@@ -153,74 +205,24 @@ export default function Dashboard() {
               <h3 className="font-bold text-lg text-white">Kezia</h3>
             </div>
             <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['Kezia'] ?? 0}</div>
+            {sapEvolution24h && (
+              <div className="mt-2 text-sm flex items-center gap-1">
+                {sapEvolution24h.evolution['Kezia'] !== 0 && (
+                  <>
+                    <span className={`${sapEvolution24h.evolution['Kezia'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
+                      {sapEvolution24h.evolution['Kezia'] > 0 ? '↑' : '↓'}
+                    </span>
+                    <span className={`${sapEvolution24h.evolution['Kezia'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
+                      {Math.abs(sapEvolution24h.evolution['Kezia'])} sur 24h
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Section Statistiques Installations */}
-      <section className="glass-card bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-2xl p-8 shadow-2xl border border-white/10 backdrop-blur-xl">
-        <h2 className="text-2xl font-extrabold text-white flex items-center drop-shadow-lg mb-6">
-          <FaStore className="mr-3 text-jdc-yellow text-2xl" />
-          Installations
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: 'HACCP', icon: FaClipboardCheck, stats: sectorStats.haccp },
-            { label: 'CHR', icon: FaUtensils, stats: sectorStats.chr },
-            { label: 'Tabac', icon: FaSmoking, stats: sectorStats.tabac },
-            { label: 'Kezia', icon: FaStore, stats: sectorStats.kezia }
-          ].map(cardData => {
-            const gradient = cardData.label === 'HACCP' ? 'from-green-400/20 to-green-700/30' :
-                           cardData.label === 'CHR' ? 'from-blue-400/20 to-blue-700/30' :
-                           cardData.label === 'Tabac' ? 'from-red-400/20 to-red-700/30' :
-                           'from-purple-400/20 to-purple-700/30';
-            const border = cardData.label === 'HACCP' ? 'border-green-400/20 hover:border-green-400/40' :
-                         cardData.label === 'CHR' ? 'border-blue-400/20 hover:border-blue-400/40' :
-                         cardData.label === 'Tabac' ? 'border-red-400/20 hover:border-red-400/40' :
-                         'border-purple-400/20 hover:border-purple-400/40';
-            const shadow = cardData.label === 'HACCP' ? 'shadow-green-400/20' :
-                         cardData.label === 'CHR' ? 'shadow-blue-400/20' :
-                         cardData.label === 'Tabac' ? 'shadow-red-400/20' :
-                         'shadow-purple-400/20';
-            const badge = cardData.label === 'HACCP' ? 'bg-green-400/30' :
-                        cardData.label === 'CHR' ? 'bg-blue-400/30' :
-                        cardData.label === 'Tabac' ? 'bg-red-400/30' :
-                        'bg-purple-400/30';
-
-            return (
-              <div key={cardData.label} 
-                className={`glass-card bg-gradient-to-br ${gradient} rounded-xl p-6 border ${border} transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${shadow}`}
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`p-3 rounded-full ${badge} border-2 border-white/20 shadow-lg`}>
-                    <cardData.icon className="text-white text-xl drop-shadow" />
-                  </div>
-                  <h3 className="font-bold text-lg text-white">{cardData.label}</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Total</p>
-                    <p className="text-2xl font-bold text-white">{cardData.stats.total}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">En attente</p>
-                    <p className="text-2xl font-bold text-yellow-300">{cardData.stats.enAttente}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Planifiées</p>
-                    <p className="text-2xl font-bold text-blue-300">{cardData.stats.planifiees}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-100/70 font-medium uppercase tracking-wider">Terminées</p>
-                    <p className="text-2xl font-bold text-green-300">{cardData.stats.terminees}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-      
       {/* Section Prochaines Installations */}
       <section className="glass-card bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-2xl p-8 shadow-2xl border border-white/10 backdrop-blur-xl">
         <h2 className="text-2xl font-extrabold text-white flex items-center drop-shadow-lg mb-6">

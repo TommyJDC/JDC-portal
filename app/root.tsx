@@ -28,6 +28,7 @@ import type { UserProfile } from '~/types/firestore.types';
 import type { UserSessionData } from "~/services/session.server";
 import { sessionStorage } from "~/services/session.server";
 import { getUserProfileSdk, createUserProfileSdk } from "~/services/firestore.service.server";
+import { startScheduledTasks, stopScheduledTasks } from "~/services/scheduler.service";
 
 // MobileNavBar n'est plus utilisé dans ce nouveau design
 // import { MobileNavBar } from "~/components/Sidebar"; 
@@ -108,6 +109,27 @@ function App({ children }: { children: ReactNode }) {
     if (navigation.state === 'idle') NProgress.done();
     else NProgress.start();
   }, [navigation.state]);
+
+  // Démarrer les tâches planifiées au chargement de l'application
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | undefined;
+
+    const startTasks = async () => {
+      try {
+        intervalId = await startScheduledTasks();
+      } catch (error) {
+        console.error('Erreur lors du démarrage des tâches planifiées:', error);
+      }
+    };
+
+    startTasks();
+
+    return () => {
+      if (intervalId) {
+        stopScheduledTasks(intervalId);
+      }
+    };
+  }, []);
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const openAuthModal = () => setIsAuthModalOpen(true);

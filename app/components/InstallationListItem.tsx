@@ -63,84 +63,53 @@ const InstallationListItem: React.FC<InstallationListItemProps> = ({
     >
       {/* Header: Nom Client, Code Client, Statut CTN */}
       <div className="flex justify-between items-start">
-        <div className="flex items-center min-w-0">
-          <FaBuilding className="mr-2 text-brand-blue flex-shrink-0 h-4 w-4" />
-          <span className="text-text-primary font-semibold text-base mr-2 truncate" title={installation.nom || 'Sans nom'}>
+        <div>
+          <h3 className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-400">
             {installation.nom || 'Client sans nom'}
-          </span>
-          <span className="text-text-secondary text-xs">
-            ({installation.codeClient || 'Code inconnu'})
-          </span>
+          </h3>
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <span className="px-2 py-1 rounded bg-jdc-gray/50 font-mono">
+              {installation.codeClient}
+            </span>
+            <span className="text-gray-500">•</span>
+            <span>{installation.ville}</span>
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
-          {onSendToBlockchain && (
-            <button
-              className="flex-shrink-0 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-brand-blue/10 text-brand-blue border border-brand-blue/30 hover:bg-brand-blue/20"
-              title="Envoyer vers la blockchain"
-              onClick={handleBlockchainClick}
-            >
-              <FaLink className="mr-1.5 h-3 w-3" />
-              Blockchain
-            </button>
-          )}
-          <span
-            className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${hasCTN ? 'bg-green-500/10 text-green-700 border-green-500/30' : 'bg-red-500/10 text-red-700 border-red-500/30'}`}
-            title={hasCTN ? "Envoyé à CTN" : "Non envoyé à CTN"}
-          >
-            {hasCTN ? <FaPaperPlane className="mr-1 h-3 w-3" /> : <FaExclamationTriangle className="mr-1 h-3 w-3" />}
-            {hasCTN ? "Envoyé" : "Non envoyé"}
-          </span>
+        {/* CTN Status Badge */}
+        <div className={`px-2 py-1 rounded text-xs ${hasCTN ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+          {hasCTN ? 'Matériel envoyé' : 'Matériel non envoyé'}
         </div>
       </div>
 
-      {/* Body: Statut, Date, Commercial/Tech */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-3 gap-y-1 text-xs text-text-secondary">
-        <div className="flex items-center" title={`Statut: ${installation.status || 'Non défini'}`}> 
-          <StatusIcon className="mr-1.5 w-3.5 h-3.5 flex-shrink-0" style={{ color: statusColor }} />
-          <span className="font-medium" style={{ color: statusColor }}>
-            {installation.status || 'Non défini'}
-          </span>
+      {/* Main Content */}
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <FaPhone className="text-gray-400" />
+            <span>{installation.telephone || 'Non renseigné'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <FaUserTie className="text-gray-400" />
+            <span>{installation.commercial || 'Non assigné'}</span>
+          </div>
         </div>
-        <div className="flex items-center" title={`Date Installation: ${installation.dateInstall ? formatDate(installation.dateInstall) : 'N/A'}`}> 
-          <FaCalendarAlt className="mr-1.5 text-text-tertiary w-3.5 h-3.5 flex-shrink-0" />
-          <span className="text-text-primary">{installation.dateInstall ? formatDate(installation.dateInstall) : 'N/A'}</span>
-        </div>
-        <div className="flex items-center truncate" title={`Commercial: ${installation.commercial || 'N/A'} / Technicien: ${installation.tech || 'N/A'}`}> 
-          <FaUserTie className="mr-1.5 text-text-tertiary w-3.5 h-3.5 flex-shrink-0" />
-          <span className="truncate text-text-primary">
-            {installation.commercial || 'N/A'} / {installation.tech || 'N/A'}
-          </span>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <FaCalendarAlt className="text-gray-400" />
+            <span>{installation.dateInstall ? new Date(installation.dateInstall).toLocaleDateString('fr-FR') : 'Non planifié'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <StatusIcon className="text-gray-400" />
+            <span className="capitalize">{installation.status}</span>
+          </div>
         </div>
       </div>
 
-      {/* Footer: Adresse, Téléphone */}
-      {(installation.adresse || installation.ville || installation.codePostal || installation.telephone) && (
-        <div className="border-t border-ui-border pt-2 mt-2 space-y-1 text-xs text-text-secondary">
-          {(installation.adresse || installation.ville || installation.codePostal) && (
-            <div className="flex items-center">
-              <FaMapMarkerAlt className="mr-1.5 text-text-tertiary w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate" title={
-                `${installation.adresse || ''}${installation.codePostal ? ', ' + installation.codePostal : ''}${installation.ville ? ' ' + installation.ville : ''}`
-              }>
-                {installation.adresse || ''}
-                {installation.codePostal ? ', ' + installation.codePostal : ''}
-                {installation.ville ? ' ' + installation.ville : ''}
-              </span>
-            </div>
-          )}
-          {installation.telephone && (
-            <div className="flex items-center">
-              <FaPhone className="mr-1.5 text-text-tertiary w-3.5 h-3.5 flex-shrink-0" />
-              <span>{installation.telephone}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Commentaire (si existe) */}
+      {/* Commentaire */}
       {installation.commentaire && (
-        <div className="text-xs text-text-tertiary pt-2 border-t border-ui-border mt-2 italic">
-          <p className="line-clamp-2" title={installation.commentaire}>"{installation.commentaire}"</p>
+        <div className="text-sm text-gray-300 bg-black/20 p-3 rounded">
+          <p className="text-gray-400 mb-1">Commentaire:</p>
+          <p>{installation.commentaire}</p>
         </div>
       )}
     </div>
