@@ -50,6 +50,7 @@ export interface Installation {
   dossier?: string;
   identifiantMotDePasse?: string;
   numerosSondes?: string;
+  lastSync?: string;
 }
 
 export type InstallationStatus = 'rendez-vous à prendre' | 'rendez-vous pris' | 'installation terminée';

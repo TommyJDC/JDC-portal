@@ -1,5 +1,5 @@
 import { google } from "googleapis";
-import { getGoogleRefreshTokenFromFirestore as getGoogleRefreshToken } from "~/routes/api.sync-installations";
+import { getGoogleRefreshTokenFromFirestore } from "~/services/sync-installations.server";
 import { getGoogleAuthClient } from "~/services/google.server";
 import { getDb } from "~/firebase.admin.config.server";
 
@@ -7,7 +7,7 @@ export async function getEmails() {
   try {
     console.log("Démarrage de la récupération des emails...");
     
-    const refreshToken = await getGoogleRefreshToken();
+    const refreshToken = await getGoogleRefreshTokenFromFirestore();
     if (!refreshToken) {
       throw new Error("Impossible d'obtenir le refresh token Google");
     }
