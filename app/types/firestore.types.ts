@@ -98,6 +98,10 @@ export interface SapTicket {
     notes: string;
     outcome: string;
   }>;
+  aiSummary?: string;
+  commentaires?: string[];
+  summary?: string;
+  technicianNotes?: string;
 }
 
 export interface Notification {
@@ -150,8 +154,8 @@ export interface SAPArchive {
 
 export interface Article {
   id?: string; // identifiant unique Firestore
-  code: string;
-  designation: string;
+  Code: string;
+  Désignation: string;
   type: string;
   category: string;
   images?: string[];

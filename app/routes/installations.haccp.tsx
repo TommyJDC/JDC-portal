@@ -1,15 +1,14 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node"; // Ajout de ActionFunctionArgs
 import { json } from "@remix-run/node";
-import { useLoaderData, Link, useFetcher, useOutletContext } from "@remix-run/react"; // Ajout de useFetcher
+import { useLoaderData, Link, useFetcher, useOutletContext, useNavigate } from "@remix-run/react"; // Ajout de useFetcher et useNavigate
 import { authenticator } from "~/services/auth.server";
 import { getInstallationsBySector, getTechnicians } from "~/services/firestore.service.server";
 import InstallationListItem from "~/components/InstallationListItem";
 import InstallationDetails from "~/components/InstallationDetails";
 import type { Installation } from "~/types/firestore.types";
 import type { UserSessionData } from "~/services/session.server"; // Correction du type
-import { useState } from 'react';
-import { toast } from "react-hot-toast";
+import { useToast } from "~/context/ToastContext";
 
 type OutletContextType = {
   user: UserSessionData | null; // Correction du type
@@ -114,23 +113,46 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function HACCPInstallations() {
   const { user } = useOutletContext<OutletContextType>();
-  const { installations, technicians } = useLoaderData<{ installations: Installation[]; technicians: { id: string; name: string }[] }>();
+  const { installations, technicians, error } = useLoaderData<{ installations: Installation[]; technicians: { id: string; name: string }[]; error?: string }>();
   const fetcher = useFetcher<ActionData>();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
+  const navigate = useNavigate(); // Ajout de useNavigate
+  const { addToast } = useToast(); // Ajout de useToast
 
-  if (!user) {
+  // Vérifier l'accès au secteur et gérer la réponse du fetcher pour la sauvegarde
+  useEffect(() => {
+    if (user) {
+      const userSectors = user.secteurs.map(s => s.toLowerCase());
+      if (!userSectors.includes('haccp') && user.role !== 'Admin') {
+        navigate('/dashboard');
+      }
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (fetcher.state === 'idle' && fetcher.data) {
+      if (fetcher.data.success && fetcher.data.installationId) {
+        addToast({ type: 'success', message: "Installation HACCP mise à jour !" });
+        handleCloseModal();
+      } else if (fetcher.data.error) {
+        addToast({ type: 'error', message: `Erreur HACCP: ${fetcher.data.error}` });
+      }
+    }
+  }, [fetcher.state, fetcher.data, navigate, addToast]); // navigate et addToast ajoutés aux dépendances
+
+  if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#1a2250] to-[#1e2746] p-6 font-bold font-jetbrains">
         <h1 className="text-3xl font-extrabold text-jdc-yellow drop-shadow-neon mb-4">Installations HACCP</h1>
         <div className="bg-[#10182a] p-6 rounded-xl shadow-xl border-2 border-jdc-yellow/20 text-center">
-          <p className="text-jdc-yellow-200 mb-4">Vous devez être connecté pour accéder aux installations HACCP.</p>
+          <p className="text-jdc-yellow-200 mb-4">Erreur lors du chargement des installations HACCP.</p>
           <Link 
-            to="/auth/google" 
+            to="/dashboard" 
             className="inline-block bg-gradient-to-r from-jdc-blue to-jdc-blue-dark px-6 py-3 rounded-lg font-bold text-white shadow-lg hover:scale-105 transition-transform"
           >
-            Se connecter avec Google
+            Retour au Tableau de Bord
           </Link>
         </div>
       </div>
@@ -148,8 +170,6 @@ export default function HACCPInstallations() {
       },
       { method: "post" }
     );
-    handleCloseModal(); 
-    toast.success("Mise à jour en cours..."); 
   };
 
   const handleInstallationClick = (installation: Installation) => {

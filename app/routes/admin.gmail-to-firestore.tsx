@@ -58,9 +58,8 @@ export async function action({ request }: ActionFunctionArgs) {
     const configDoc = await dbAdmin.collection('settings').doc('gmailProcessingConfig').get();
     const config = configDoc.exists ? configDoc.data() as GmailProcessingConfig : {
       maxEmailsPerRun: 50,
-      targetLabels: [],
-      processedLabelName: "Traité",
-      refreshInterval: 5,
+      processedLabelName: "Traité-JDC-Portail",
+      refreshInterval: 15,
       sectorCollections: {
         kezia: { enabled: false, labels: [], responsables: [] },
         haccp: { enabled: false, labels: [], responsables: [] },

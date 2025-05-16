@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node"; // Ajout de ActionFunctionArgs
 import { json } from "@remix-run/node";
-import { useLoaderData, Link, useFetcher, useOutletContext } from "@remix-run/react";
+import { useLoaderData, Link, useFetcher, useOutletContext, useNavigate } from "@remix-run/react";
 import { authenticator } from "~/services/auth.server";
 import { getInstallationsBySector, getTechnicians } from "~/services/firestore.service.server";
 import InstallationListItem from "~/components/InstallationListItem";
@@ -8,7 +8,7 @@ import InstallationDetails from "~/components/InstallationDetails";
 import type { Installation } from "~/types/firestore.types";
 import type { UserSessionData } from "~/services/session.server"; // Correction du type
 import { useState, useEffect } from 'react';
-import { toast } from "react-hot-toast";
+import { useToast } from "~/context/ToastContext";
 
 type OutletContextType = {
   user: UserSessionData | null; // Correction du type
@@ -92,6 +92,28 @@ export default function CHRInstallations() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    if (user) {
+      const userSectors = user.secteurs.map(s => s.toLowerCase());
+      if (!userSectors.includes('chr') && user.role !== 'Admin') {
+        navigate('/dashboard');
+      }
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (fetcher.state === 'idle' && fetcher.data) {
+      if (fetcher.data.success && fetcher.data.installationId) {
+        addToast({ type: 'success', message: "Installation CHR mise à jour avec succès !" });
+        handleCloseModal();
+      } else if (fetcher.data.error) {
+        addToast({ type: 'error', message: `Erreur CHR: ${fetcher.data.error}` });
+      }
+    }
+  }, [fetcher.state, fetcher.data, navigate, addToast]);
 
   // Si l'utilisateur n'est pas connecté, afficher un message convivial
   if (!user) {
@@ -123,19 +145,7 @@ export default function CHRInstallations() {
       },
       { method: "post" }
     );
-    toast.success("Mise à jour en cours..."); 
   };
-
-  useEffect(() => {
-    if (fetcher.data) {
-      if (fetcher.data.success) {
-        handleCloseModal();
-        toast.success("Installation mise à jour avec succès");
-      } else {
-        toast.error(fetcher.data.error || "Erreur lors de la mise à jour");
-      }
-    }
-  }, [fetcher.data]);
 
   const handleInstallationClick = (installation: Installation) => {
     setSelectedInstallation(installation);

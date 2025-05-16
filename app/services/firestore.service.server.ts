@@ -184,7 +184,19 @@ export async function updateInstallation(id: string, updates: Partial<Installati
   // Déclencher la synchronisation avec Google Sheets
   try {
     const baseUrl = process.env.APP_BASE_URL || 'https://jdc-portal.netlify.app';
-    const apiUrl = `${baseUrl}/.netlify/functions/sync-installations`;
+    let path;
+
+    // Utiliser process.env.NODE_ENV pour déterminer l'environnement
+    if (process.env.NODE_ENV === 'development') {
+      path = '/api/sync-installations'; // Chemin direct de l'API Remix pour le développement local
+      console.log('[updateInstallation] NODE_ENV is development. Using Remix conventional API path.');
+    } else {
+      path = '/.netlify/functions/sync-installations'; // Chemin de la fonction Netlify pour la production
+      console.log('[updateInstallation] NODE_ENV is not development. Using Netlify function path.');
+    }
+
+    const apiUrl = `${baseUrl}${path}`;
+    console.log(`[updateInstallation] Calling API URL: ${apiUrl}`);
 
     await fetch(apiUrl, {
       method: 'POST',
@@ -589,22 +601,54 @@ export async function searchArticles({ code, nom }: { code: string; nom: string 
   const upperCode = code.toUpperCase();
   const upperNom = nom.toUpperCase();
 
-  if (upperCode) {
-    console.log("[searchArticles] Searching by code (uppercase):", upperCode);
-    query = query.where('Code', '==', upperCode);
-    const snapshot = await query.get();
-    articles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Article[];
-  } else if (upperNom) {
-    console.log("[searchArticles] Searching by nom (uppercase):", upperNom);
-    query = query.where('Désignation', '>=', upperNom)
-                 .where('Désignation', '<=', upperNom + '\uf8ff');
-    const snapshot = await query.get();
-    articles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Article[];
-  } else {
-    console.log("[searchArticles] No search criteria provided.");
-    articles = [];
+  try {
+    if (upperCode) {
+      console.log("[searchArticles] Searching by code (uppercase):", upperCode);
+      query = query.where('Code', '==', upperCode);
+      const snapshot = await query.get();
+      articles = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log("[searchArticles] Article data from Firestore:", data);
+        return { 
+          id: doc.id, 
+          Code: data.Code || '',
+          Désignation: data.Désignation || '',
+          type: data.type || '',
+          category: data.category || '',
+          images: data.imageUrls || []
+        };
+      });
+      console.log("[searchArticles] Found articles by code:", articles.length);
+    } else if (upperNom) {
+      console.log("[searchArticles] Searching by nom (uppercase):", upperNom);
+      query = query.where('Désignation', '>=', upperNom)
+                   .where('Désignation', '<=', upperNom + '\uf8ff');
+      const snapshot = await query.get();
+      articles = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log("[searchArticles] Article data from Firestore:", data);
+        return { 
+          id: doc.id, 
+          Code: data.Code || '',
+          Désignation: data.Désignation || '',
+          type: data.type || '',
+          category: data.category || '',
+          images: data.imageUrls || []
+        };
+      });
+      console.log("[searchArticles] Found articles by nom:", articles.length);
+    } else {
+      console.log("[searchArticles] No search criteria provided.");
+      articles = [];
+    }
+
+    // Log final results
+    console.log("[searchArticles] Final articles array:", JSON.stringify(articles, null, 2));
+    return articles;
+  } catch (error) {
+    console.error("[searchArticles] Error searching articles:", error);
+    throw error;
   }
-  return articles;
 }
 
 function getSafeStringValue(prop: { stringValue: string } | string | undefined | null, defaultValue: string = ''): string {
@@ -942,4 +986,54 @@ export async function getTechnicians(sector?: string): Promise<{ id: string; nam
       tech.role === 'Admin'
     )
     .map(({ id, name }) => ({ id, name }));
+}
+
+// Fonctions pour la gestion des tâches planifiées personnalisées
+
+const TASK_SCHEDULE_LOG_COLLECTION = 'task_schedule_log';
+
+/**
+ * Récupère les créneaux déjà traités pour une tâche spécifique à une date donnée.
+ * Un créneau est une chaîne comme "09:00_UTC".
+ */
+export async function getProcessedSlotsForTask(taskName: string, date: Date): Promise<string[]> {
+  const db = getDb();
+  const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
+  const docId = `${taskName}_${dateString}`;
+
+  try {
+    const docRef = db.collection(TASK_SCHEDULE_LOG_COLLECTION).doc(docId);
+    const docSnap = await docRef.get();
+
+    if (docSnap.exists) {
+      const data = docSnap.data();
+      return data?.processedSlots || [];
+    }
+    return [];
+  } catch (error) {
+    console.error(`Erreur lors de la récupération des créneaux traités pour ${taskName} le ${dateString}:`, error);
+    throw error; // Propager pour que l'appelant puisse gérer
+  }
+}
+
+/**
+ * Marque un créneau comme traité pour une tâche spécifique à une date donnée.
+ */
+export async function markSlotAsProcessedForTask(taskName: string, date: Date, slot: string): Promise<void> {
+  const db = getDb();
+  const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
+  const docId = `${taskName}_${dateString}`;
+
+  try {
+    const docRef = db.collection(TASK_SCHEDULE_LOG_COLLECTION).doc(docId);
+    await docRef.set({
+      taskName,
+      date: dateString,
+      processedSlots: FieldValue.arrayUnion(slot) // Ajoute le créneau au tableau s'il n'y est pas déjà
+    }, { merge: true }); // Merge pour ne pas écraser d'autres créneaux potentiellement ajoutés en parallèle (peu probable ici)
+    console.log(`Créneau ${slot} marqué comme traité pour la tâche ${taskName} le ${dateString}`);
+  } catch (error) {
+    console.error(`Erreur lors du marquage du créneau ${slot} pour ${taskName} le ${dateString}:`, error);
+    throw error;
+  }
 }

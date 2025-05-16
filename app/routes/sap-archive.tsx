@@ -15,6 +15,8 @@ import { Timestamp } from 'firebase/firestore';
 import type { SapArchiveLoaderData } from "./sap-archive.loader";
 import { loader } from "./sap-archive.loader";
 
+export { loader };
+
 // Helper function to safely extract string values from { stringValue: string } or simple strings
 function getSafeStringValue(prop: { stringValue: string } | string | undefined | null, defaultValue: string = ''): string {
   if (prop === undefined || prop === null) {

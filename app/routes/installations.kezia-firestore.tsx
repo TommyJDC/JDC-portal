@@ -8,7 +8,7 @@ import InstallationDetails from "~/components/InstallationDetails";
 import type { Installation } from "~/types/firestore.types";
 import type { UserSessionData } from "~/services/session.server"; // Correction du type
 import { useState, useEffect } from 'react';
-import { toast } from "react-hot-toast";
+import { useToast } from "~/context/ToastContext";
 
 type OutletContextType = {
   user: UserSessionData | null; // Correction du type
@@ -88,8 +88,8 @@ export default function KeziaInstallations() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
-  // Vérifier l'accès au secteur Kezia
   useEffect(() => {
     if (user) {
       const userSectors = user.secteurs.map(s => s.toLowerCase());
@@ -98,6 +98,25 @@ export default function KeziaInstallations() {
       }
     }
   }, [user, navigate]);
+
+  // Gérer la réponse du fetcher pour la sauvegarde
+  useEffect(() => {
+    if (fetcher.state === 'idle' && fetcher.data) {
+      if (fetcher.data.success && fetcher.data.installationId) {
+        addToast({ type: 'success', message: "Installation mise à jour avec succès !" });
+        handleCloseModal();
+        // Remix devrait automatiquement revalider les données du loader après une action
+        // Si ce n'est pas le cas ou si un rechargement forcé est souhaité :
+        // navigate('.', { replace: true }); 
+      } else if (fetcher.data.error) {
+        addToast({ type: 'error', message: `Erreur lors de la mise à jour: ${fetcher.data.error}` });
+      }
+      // Réinitialiser fetcher.data pour éviter de retraiter le même message en cas de re-render
+      // Cela dépend de la version de Remix et du comportement souhaité.
+      // Si des toasts multiples apparaissent, envisagez de faire fetcher.data = undefined; ici,
+      // mais cela peut nécessiter une gestion d'état plus complexe si fetcher.data est utilisé ailleurs.
+    }
+  }, [fetcher.state, fetcher.data, navigate, addToast]); // navigate et addToast sont inclus car utilisés potentiellement pour recharger
 
   if (!user) {
     return (
@@ -146,8 +165,9 @@ export default function KeziaInstallations() {
       },
       { method: "post" }
     );
-    handleCloseModal(); 
-    toast.success("Mise à jour en cours..."); 
+    // Ne plus fermer la modale ni afficher de toast ici
+    // handleCloseModal(); 
+    // toast.success("Mise à jour en cours..."); 
   };
 
   const handleInstallationClick = (installation: Installation) => {

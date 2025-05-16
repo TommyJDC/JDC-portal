@@ -4,7 +4,7 @@ import { getGoogleAuthClient } from "~/services/google.server";
 import { processGmailToFirestore } from "~/services/gmail.service.server";
 import { getUserProfileSdk, getAllUserProfilesSdk } from "~/services/firestore.service.server";
 import type { GmailProcessingConfig, UserProfile } from "~/types/firestore.types";
-import type { UserSession } from "~/services/session.server";
+import type { UserSessionData } from "~/services/session.server";
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { google , gmail_v1 } from 'googleapis';
@@ -52,13 +52,13 @@ export async function action({ request }: ActionFunctionArgs) {
     const configDoc = await db.collection('settings').doc('gmailProcessingConfig').get();
     const config: GmailProcessingConfig = configDoc.exists ? configDoc.data() as GmailProcessingConfig : {
       maxEmailsPerRun: 50,
-      processedLabelName: "Traité",
-      refreshInterval: 5,
+      processedLabelName: "Traité-JDC-Portail",
+      refreshInterval: 15,
       sectorCollections: {
-        chr: { enabled: true, labels: ["CHR"], responsables: [] },
-        haccp: { enabled: true, labels: ["HACCP"], responsables: [] },
-        tabac: { enabled: true, labels: ["TABAC"], responsables: [] },
-        kezia: { enabled: true, labels: ["KEZIA"], responsables: [] }
+        kezia: { enabled: false, labels: [], responsables: [] },
+        haccp: { enabled: false, labels: [], responsables: [] },
+        chr: { enabled: false, labels: [], responsables: [] },
+        tabac: { enabled: false, labels: [], responsables: [] }
       }
     };
 
@@ -84,11 +84,13 @@ export async function action({ request }: ActionFunctionArgs) {
           continue;
         }
         try {
-          const session: UserSession = {
+          const session: UserSessionData = {
             userId: user.uid,
             email: user.email,
             displayName: user.displayName,
-            googleRefreshToken: user.googleRefreshToken
+            googleRefreshToken: user.googleRefreshToken,
+            role: user.role,
+            secteurs: user.secteurs || []
           };
           const authClient = await getGoogleAuthClient(session);
           if (!authClient) throw new Error(`Impossible d'obtenir le client Google pour ${user.email}`);

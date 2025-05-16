@@ -11,7 +11,7 @@ import { Input } from "~/components/ui/Input";
 import { Textarea } from "~/components/ui/Textarea";
 import { Button } from "~/components/ui/Button";
 import { useEffect, useMemo, useState } from 'react';
-import { FaCog, FaChevronLeft, FaSpinner, FaSave } from 'react-icons/fa';
+import { FaCog, FaChevronLeft, FaSpinner, FaSave, FaCheck } from 'react-icons/fa';
 import { Switch } from "~/components/ui/Switch";
 import {
   Select,
@@ -139,8 +139,14 @@ export async function action({ request }: ActionFunctionArgs) {
         }
 
         if (isAdmin) {
+          const maxEmailsPerRunString = formData.get("maxEmailsPerRun") as string;
+          const parsedMaxEmails = parseInt(maxEmailsPerRunString);
+          // Utiliser 50 par défaut si la conversion échoue (NaN) ou si la chaîne est vide/nulle après trim.
+          // Si la chaîne est valide et donne un nombre (y compris 0), utiliser ce nombre.
+          const maxEmailsValue = !isNaN(parsedMaxEmails) ? parsedMaxEmails : 50;
+
           const updates: Partial<GmailProcessingConfig> = {
-            maxEmailsPerRun: parseInt(formData.get("maxEmailsPerRun") as string) || 50,
+            maxEmailsPerRun: maxEmailsValue,
             processedLabelName: formData.get("processedLabelName") as string || "Traité-JDC-Portail",
             refreshInterval: parseInt(formData.get("refreshInterval") as string) || 15,
             sectorCollections: {
@@ -399,37 +405,49 @@ export default function AdminGmailConfig() {
                     <div>
                       <label htmlFor={`${secteurItem.key}-responsables`} className="block text-xs font-medium text-text-secondary mb-1">Responsables {secteurItem.name}</label>
                       <Select
-                        name={`${secteurItem.key}-responsables[]`}
-                        value={selectedResponsables[secteurItem.key]?.join(',') || ''}
                         disabled={!isAdmin}
-                        onValueChange={(value) => {
-                          const newValue = value.split(',').filter(Boolean);
-                          setSelectedResponsables(prev => ({
-                            ...prev,
-                            [secteurItem.key]: newValue
-                          }));
+                        onValueChange={(responsableId) => {
+                          setSelectedResponsables(prev => {
+                            const currentSelection = prev[secteurItem.key] || [];
+                            const newSelection = currentSelection.includes(responsableId)
+                              ? currentSelection.filter(id => id !== responsableId)
+                              : [...currentSelection, responsableId];
+                            return {
+                              ...prev,
+                              [secteurItem.key]: newSelection
+                            };
+                          });
                         }}
                       >
                         <SelectTrigger className="w-full bg-slate-900 border-slate-700 text-slate-100 focus:border-brand-blue focus:ring-brand-blue">
-                          <SelectValue placeholder="Sélectionner les responsables" />
+                          <SelectValue placeholder="Sélectionner les responsables">
+                            {selectedResponsables[secteurItem.key]?.length > 0 
+                              ? `${selectedResponsables[secteurItem.key]?.length} responsable(s) sélectionné(s)`
+                              : "Sélectionner les responsables"
+                            }
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="bg-slate-900 border-slate-700 text-slate-100 max-h-[300px] overflow-y-auto">
                           {users.filter(u => u.googleRefreshToken).map(user => (
                             <SelectItem 
                               key={user.uid} 
                               value={user.uid}
-                              className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
+                              className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer flex items-center justify-between"
                             >
-                              {user.displayName} ({user.email})
+                              <span>{user.displayName} ({user.email})</span>
+                              {selectedResponsables[secteurItem.key]?.includes(user.uid) && <FaCheck className="text-brand-blue h-4 w-4" />}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <input 
-                        type="hidden" 
-                        name={`${secteurItem.key}-responsables[]`} 
-                        value={selectedResponsables[secteurItem.key]?.join(',') || ''} 
-                      />
+                      {(selectedResponsables[secteurItem.key] || []).map(responsableId => (
+                        <input 
+                          key={responsableId}
+                          type="hidden" 
+                          name={`${secteurItem.key}-responsables[]`} 
+                          value={responsableId} 
+                        />
+                      ))}
                     </div>
                     {selectedResponsables[secteurItem.key]?.length > 0 && (
                       <div>
@@ -437,37 +455,49 @@ export default function AdminGmailConfig() {
                           Labels Gmail pour {secteurItem.name}
                         </label>
                         <Select
-                          name={`${secteurItem.key}-labels[]`}
-                          value={selectedLabels[secteurItem.key]?.join(',') || ''}
                           disabled={!isAdmin}
-                          onValueChange={(value) => {
-                            const newValue = value.split(',').filter(Boolean);
-                            setSelectedLabels(prev => ({
-                              ...prev,
-                              [secteurItem.key]: newValue
-                            }));
+                          onValueChange={(labelName) => {
+                            setSelectedLabels(prev => {
+                              const currentSelection = prev[secteurItem.key] || [];
+                              const newSelection = currentSelection.includes(labelName)
+                                ? currentSelection.filter(name => name !== labelName)
+                                : [...currentSelection, labelName];
+                              return {
+                                ...prev,
+                                [secteurItem.key]: newSelection
+                              };
+                            });
                           }}
                         >
                           <SelectTrigger className="w-full bg-slate-900 border-slate-700 text-slate-100 focus:border-brand-blue focus:ring-brand-blue">
-                            <SelectValue placeholder="Sélectionner les labels" />
+                            <SelectValue placeholder="Sélectionner les labels">
+                            {selectedLabels[secteurItem.key]?.length > 0 
+                              ? `${selectedLabels[secteurItem.key]?.length} label(s) sélectionné(s)`
+                              : "Sélectionner les labels"
+                            }
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent className="bg-slate-900 border-slate-700 text-slate-100 max-h-[300px] overflow-y-auto">
                             {getAvailableLabelsForSector(secteurItem.key).map(label => (
                               <SelectItem 
                                 key={label} 
                                 value={label}
-                                className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
+                                className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer flex items-center justify-between"
                               >
-                                {label}
+                                <span>{label}</span>
+                                {selectedLabels[secteurItem.key]?.includes(label) && <FaCheck className="text-brand-blue h-4 w-4" />}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        {(selectedLabels[secteurItem.key] || []).map(labelName => (
                         <input 
+                          key={labelName}
                           type="hidden" 
                           name={`${secteurItem.key}-labels[]`} 
-                          value={selectedLabels[secteurItem.key]?.join(',') || ''} 
+                          value={labelName} 
                         />
+                      ))}
                       </div>
                     )}
                   </div>

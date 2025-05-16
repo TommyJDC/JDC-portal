@@ -182,8 +182,8 @@ export default function Document() {
           backgroundColor: '#111827',
           backgroundImage: `
             radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.2), transparent),
-            radial-gradient(ellipse 80% 50% at 10% 100%, rgba(244, 114, 182, 0.15), transparent),
-            radial-gradient(ellipse 80% 50% at 90% 100%, rgba(249, 115, 22, 0.15), transparent)
+            radial-gradient(ellipse 80% 50% at 10% 100%, rgba(234, 179, 8, 0.15), transparent),
+            radial-gradient(ellipse 80% 50% at 90% 100%, rgba(234, 179, 8, 0.15), transparent)
           `,
           backgroundAttachment: 'fixed',
           backgroundRepeat: 'no-repeat',

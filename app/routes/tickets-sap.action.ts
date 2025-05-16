@@ -57,6 +57,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const intent = formData.get("intent") as string;
     const sectorId = formData.get("sectorId") as string;
     const ticketId = formData.get("ticketId") as string;
+    const sendEmail = formData.get("sendEmail") === "true";
 
     if (!sectorId || !ticketId) {
         return json({ success: false, error: "ID de secteur ou de ticket manquant." }, { status: 400 });
@@ -106,7 +107,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
             const updateData: Partial<SapTicket> = {
                 status: newStatus,
-                statutSAP: newStatus,
                 technicianNotes: technicianNotes,
                 materialType: materialType,
                 materialDetails: materialDetails,
@@ -136,8 +136,8 @@ export async function action({ request }: ActionFunctionArgs) {
                 case 'pending':
                     const newAttempt = {
                         date: new Date(),
-                        method: 'phone' as const,
-                        success: false
+                        notes: technicianNotes || "Tentative de contact",
+                        outcome: "phone_attempt"
                     };
                     updateData.contactAttempts = Array.isArray(ticket.contactAttempts) ? [...ticket.contactAttempts, newAttempt] : [newAttempt];
 
@@ -199,7 +199,7 @@ export async function action({ request }: ActionFunctionArgs) {
             await updateSAPTICKET(sectorId, ticketId, updateData);
 
             // Send email if content is generated and mailId exists
-            if (emailContent && ticket.mailId && authClient) {
+            if (sendEmail && emailContent && ticket.mailId && authClient) {
                 try {
                     console.log(`[tickets-sap.action] Tentative d'envoi d'email pour le ticket ${ticketId}`);
                     console.log(`[tickets-sap.action] Détails de l'envoi:`, {
@@ -210,10 +210,17 @@ export async function action({ request }: ActionFunctionArgs) {
                         hasAuthClient: !!authClient
                     });
 
+                    let numeroSAPString: string | undefined;
+                    if (typeof ticket.numeroSAP === 'string') {
+                        numeroSAPString = ticket.numeroSAP;
+                    } else if (ticket.numeroSAP && typeof ticket.numeroSAP === 'object' && 'stringValue' in ticket.numeroSAP) {
+                        numeroSAPString = ticket.numeroSAP.stringValue;
+                    }
+
                     const sentMessageId = await sendSAPResponseEmail(
                         authClient,
                         ticket,
-                        `Réponse concernant votre ticket SAP ${ticket.numeroSAP?.stringValue}`,
+                        `Réponse concernant votre ticket SAP ${numeroSAPString || ''}`,
                         emailContent,
                         newStatus === 'rma_request' || newStatus === 'material_sent' ? 'RMA' : undefined
                     );
@@ -299,7 +306,7 @@ export async function action({ request }: ActionFunctionArgs) {
             if (solution === null || solution === undefined) {
                 return json({ success: false, error: "Solution manquante." }, { status: 400 });
             }
-            await updateSAPTICKET(sectorId, ticketId, { solution: solution });
+            await updateSAPTICKET(sectorId, ticketId, { resolution: solution });
             return json({ success: true, message: "Solution sauvegardée." });
 
         } else {

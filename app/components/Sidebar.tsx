@@ -71,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, profile }) => {
     installations: location.pathname.startsWith('/installations'),
     logistique: location.pathname.startsWith('/envois-ctn') || location.pathname.startsWith('/articles') || location.pathname.startsWith('/logistique'),
     commercial: location.pathname.startsWith('/commercial'),
+    'tickets-sap': location.pathname.startsWith('/tickets-sap') || location.pathname.startsWith('/sap-archive'),
   });
 
   const toggleMenu = (key: string) => setOpenMenus(prev => ({ ...prev, [key]: !prev[key] }));
@@ -95,7 +96,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, profile }) => {
         {(isAdmin || isAlexis) && (
           <SidebarLink to="/directeur-dashboard" icon={<FaChartLine />} label="Dashboard Directeur" active={location.pathname.startsWith('/directeur-dashboard')} />
         )}
-        <SidebarLink to="/tickets-sap" icon={<FaTicketAlt />} label="Tickets SAP" active={location.pathname.startsWith('/tickets-sap')} />
+        
+        {/* Menu Tickets SAP */}
+        <SidebarMenu
+          label="Tickets SAP"
+          icon={<FaTicketAlt />}
+          open={!!openMenus['tickets-sap']}
+          onClick={() => toggleMenu('tickets-sap')}
+          active={location.pathname.startsWith('/tickets-sap') || location.pathname.startsWith('/sap-archive')}
+        >
+          <SidebarSubLink to="/tickets-sap" label="Suivie des SAP" />
+          <SidebarSubLink to="/sap-archive" label="Archive SAP" />
+        </SidebarMenu>
 
         {/* Menu Installations */}
         <SidebarMenu
@@ -121,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, profile }) => {
         >
           <SidebarSubLink to="/envois-ctn" label="Envois CTN" />
           <SidebarSubLink to="/articles" label="Articles" />
-          <SidebarSubLink to="/logistique/grenoble" label="Grenoble" />
+          <SidebarSubLink to="/logistique/grenoble" label="Suivie demande de RMA" />
         </SidebarMenu>
         
         {/* Menu Commercial */}

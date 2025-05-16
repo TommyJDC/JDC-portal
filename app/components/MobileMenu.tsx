@@ -37,7 +37,7 @@ const navItems = [
 
 // Technique menu items
 const techniqueItems = [
-  { name: 'Tickets SAP', to: '/tickets-sap', icon: FaTicketAlt },
+  { name: 'Suivie des SAP', to: '/tickets-sap', icon: FaTicketAlt },
   { name: 'Archive SAP', to: '/sap-archive', icon: FaFileAlt },
   { name: 'Installations Kezia', to: '/installations/kezia-firestore', icon: FaFileAlt },
   { name: 'Installations CHR', to: '/installations/chr-firestore', icon: FaFileAlt },
@@ -49,7 +49,7 @@ const techniqueItems = [
 const logistiqueItems = [
   { name: 'Envois CTN', to: '/envois-ctn', icon: FaTruck },
   { name: 'Recherche Articles', to: '/articles', icon: FaSearch },
-  { name: 'Suivie de RMA', to: '/logistique/grenoble', icon: FaTruck },
+  { name: 'Suivie demande de RMA', to: '/logistique/grenoble', icon: FaTruck },
 ];
 
 // Commercial menu items

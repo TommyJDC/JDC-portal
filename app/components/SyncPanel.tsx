@@ -22,7 +22,7 @@ export function SyncPanel() {
 
   const handleSync = () => {
     setIsSyncing(true);
-    fetcher.load('/api/sync-installations');
+    fetcher.submit(null, { method: 'post', action: '/api/sync-installations' });
   };
 
   React.useEffect(() => {

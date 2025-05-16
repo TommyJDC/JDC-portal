@@ -45,7 +45,8 @@ export default function Dashboard() {
     sapTicketCountsBySector,
     allInstallations,
     sapEvolution24h,
-    installationsStats
+    installationsStats,
+    userProfile
   } = useLoaderData<typeof loader>();
 
   const recentTickets: BlockchainSapTicket[] = serializedTickets ?? [];
@@ -113,9 +114,7 @@ export default function Dashboard() {
       {/* Section Suivi des Installations */}
       <InstallationsSnapshot
         stats={installationsStats}
-        allInstallations={firestoreInstallationsData}
         lastUpdate={new Date()}
-        onRefresh={() => window.location.reload()}
       />
 
       {/* Section Statistiques Tickets SAP */}
@@ -135,16 +134,14 @@ export default function Dashboard() {
             <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['HACCP'] ?? 0}</div>
             {sapEvolution24h && (
               <div className="mt-2 text-sm flex items-center gap-1">
-                {sapEvolution24h.evolution['HACCP'] !== 0 && (
-                  <>
-                    <span className={`${sapEvolution24h.evolution['HACCP'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
-                      {sapEvolution24h.evolution['HACCP'] > 0 ? '↑' : '↓'}
-                    </span>
-                    <span className={`${sapEvolution24h.evolution['HACCP'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
-                      {Math.abs(sapEvolution24h.evolution['HACCP'])} sur 24h
-                    </span>
-                  </>
-                )}
+                <>
+                  <span className={`${(sapEvolution24h.evolution['HACCP'] ?? 0) > 0 ? 'text-red-400 animate-pulse' : (sapEvolution24h.evolution['HACCP'] ?? 0) < 0 ? 'text-green-400 animate-pulse' : 'text-gray-400'} transition-all duration-300`}>
+                    {(sapEvolution24h.evolution['HACCP'] ?? 0) > 0 ? '↑' : (sapEvolution24h.evolution['HACCP'] ?? 0) < 0 ? '↓' : '⇢'}
+                  </span>
+                  <span className={`${(sapEvolution24h.evolution['HACCP'] ?? 0) > 0 ? 'text-red-400 animate-pulse' : (sapEvolution24h.evolution['HACCP'] ?? 0) < 0 ? 'text-green-400 animate-pulse' : 'text-gray-400'} transition-all duration-300`}>
+                    {Math.abs(sapEvolution24h.evolution['HACCP'] ?? 0)} sur 24h
+                  </span>
+                </>
               </div>
             )}
           </div>
@@ -159,16 +156,14 @@ export default function Dashboard() {
             <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['CHR'] ?? 0}</div>
             {sapEvolution24h && (
               <div className="mt-2 text-sm flex items-center gap-1">
-                {sapEvolution24h.evolution['CHR'] !== 0 && (
-                  <>
-                    <span className={`${sapEvolution24h.evolution['CHR'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
-                      {sapEvolution24h.evolution['CHR'] > 0 ? '↑' : '↓'}
-                    </span>
-                    <span className={`${sapEvolution24h.evolution['CHR'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
-                      {Math.abs(sapEvolution24h.evolution['CHR'])} sur 24h
-                    </span>
-                  </>
-                )}
+                <>
+                  <span className={`${(sapEvolution24h.evolution['CHR'] ?? 0) > 0 ? 'text-red-400 animate-pulse' : (sapEvolution24h.evolution['CHR'] ?? 0) < 0 ? 'text-green-400 animate-pulse' : 'text-gray-400'} transition-all duration-300`}>
+                    {(sapEvolution24h.evolution['CHR'] ?? 0) > 0 ? '↑' : (sapEvolution24h.evolution['CHR'] ?? 0) < 0 ? '↓' : '⇢'}
+                  </span>
+                  <span className={`${(sapEvolution24h.evolution['CHR'] ?? 0) > 0 ? 'text-red-400 animate-pulse' : (sapEvolution24h.evolution['CHR'] ?? 0) < 0 ? 'text-green-400 animate-pulse' : 'text-gray-400'} transition-all duration-300`}>
+                    {Math.abs(sapEvolution24h.evolution['CHR'] ?? 0)} sur 24h
+                  </span>
+                </>
               </div>
             )}
           </div>
@@ -183,16 +178,14 @@ export default function Dashboard() {
             <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['Tabac'] ?? 0}</div>
             {sapEvolution24h && (
               <div className="mt-2 text-sm flex items-center gap-1">
-                {sapEvolution24h.evolution['Tabac'] !== 0 && (
-                  <>
-                    <span className={`${sapEvolution24h.evolution['Tabac'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
-                      {sapEvolution24h.evolution['Tabac'] > 0 ? '↑' : '↓'}
-                    </span>
-                    <span className={`${sapEvolution24h.evolution['Tabac'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
-                      {Math.abs(sapEvolution24h.evolution['Tabac'])} sur 24h
-                    </span>
-                  </>
-                )}
+                <>
+                  <span className={`${(sapEvolution24h.evolution['Tabac'] ?? 0) > 0 ? 'text-red-400 animate-pulse' : (sapEvolution24h.evolution['Tabac'] ?? 0) < 0 ? 'text-green-400 animate-pulse' : 'text-gray-400'} transition-all duration-300`}>
+                    {(sapEvolution24h.evolution['Tabac'] ?? 0) > 0 ? '↑' : (sapEvolution24h.evolution['Tabac'] ?? 0) < 0 ? '↓' : '⇢'}
+                  </span>
+                  <span className={`${(sapEvolution24h.evolution['Tabac'] ?? 0) > 0 ? 'text-red-400 animate-pulse' : (sapEvolution24h.evolution['Tabac'] ?? 0) < 0 ? 'text-green-400 animate-pulse' : 'text-gray-400'} transition-all duration-300`}>
+                    {Math.abs(sapEvolution24h.evolution['Tabac'] ?? 0)} sur 24h
+                  </span>
+                </>
               </div>
             )}
           </div>
@@ -207,16 +200,14 @@ export default function Dashboard() {
             <div className="text-3xl font-bold text-white mt-2">{sapTicketCountsBySector?.['Kezia'] ?? 0}</div>
             {sapEvolution24h && (
               <div className="mt-2 text-sm flex items-center gap-1">
-                {sapEvolution24h.evolution['Kezia'] !== 0 && (
-                  <>
-                    <span className={`${sapEvolution24h.evolution['Kezia'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
-                      {sapEvolution24h.evolution['Kezia'] > 0 ? '↑' : '↓'}
-                    </span>
-                    <span className={`${sapEvolution24h.evolution['Kezia'] > 0 ? 'text-red-400 animate-pulse' : 'text-green-400 animate-pulse'} transition-all duration-300`}>
-                      {Math.abs(sapEvolution24h.evolution['Kezia'])} sur 24h
-                    </span>
-                  </>
-                )}
+                <>
+                  <span className={`${(sapEvolution24h.evolution['Kezia'] ?? 0) > 0 ? 'text-red-400 animate-pulse' : (sapEvolution24h.evolution['Kezia'] ?? 0) < 0 ? 'text-green-400 animate-pulse' : 'text-gray-400'} transition-all duration-300`}>
+                    {(sapEvolution24h.evolution['Kezia'] ?? 0) > 0 ? '↑' : (sapEvolution24h.evolution['Kezia'] ?? 0) < 0 ? '↓' : '⇢'}
+                  </span>
+                  <span className={`${(sapEvolution24h.evolution['Kezia'] ?? 0) > 0 ? 'text-red-400 animate-pulse' : (sapEvolution24h.evolution['Kezia'] ?? 0) < 0 ? 'text-green-400 animate-pulse' : 'text-gray-400'} transition-all duration-300`}>
+                    {Math.abs(sapEvolution24h.evolution['Kezia'] ?? 0)} sur 24h
+                  </span>
+                </>
               </div>
             )}
           </div>

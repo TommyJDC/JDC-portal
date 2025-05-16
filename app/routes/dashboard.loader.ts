@@ -75,6 +75,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Déclencher les tâches planifiées (maintenant uniquement sap-notification)
   await triggerScheduledTasks();
 
+  // Déclencher la vérification de synchronisation des installations (ne pas attendre la réponse)
+  fetch(`${process.env.APP_BASE_URL || 'http://localhost:3000'}/api/sync-installations`, { method: 'POST' })
+    .then(res => {
+      if (!res.ok) {
+        console.warn('[dashboard.loader] Appel à /api/sync-installations non-OK:', res.status);
+      } else {
+        // Optionnel: logguer la réponse pour débogage
+        // res.json().then(data => console.log('[dashboard.loader] /api/sync-installations response:', data));
+      }
+    })
+    .catch(err => console.error('[dashboard.loader] Erreur en appelant /api/sync-installations:', err));
+
   try {
     data.userProfile = await getUserProfileSdk(userSession.userId); // Utiliser userSession
     if (!data.userProfile) return redirect("/user-profile"); // Rediriger si le profil n'est pas trouvé après une session valide
@@ -228,35 +240,28 @@ function filterInstallations(installations: Installation[], userProfile: UserPro
   });
 
   let filtered: Installation[];
+
   if (userProfile.role === 'Admin') {
-    console.log("[filterInstallations] Utilisateur Admin - retourne toutes les installations");
+    // Les administrateurs voient toutes les installations pour la section "Prochaines Installations"
     filtered = installations;
-  } else if (userProfile.role === 'Technique') {
-    filtered = installations.filter(inst => inst.tech === userProfile.nom);
-    console.log("[filterInstallations] Filtrage Technique:", {
-      techName: userProfile.nom,
-      installationsAvantFiltrage: installations.length,
-      installationsApresFiltrage: filtered.length
-    });
-  } else if (userProfile.role === 'Commercial') {
-    filtered = installations.filter(inst => inst.commercial === userProfile.nom);
-    console.log("[filterInstallations] Filtrage Commercial:", {
-      commercialName: userProfile.nom,
-      installationsAvantFiltrage: installations.length,
-      installationsApresFiltrage: filtered.length
-    });
-  } else {
-    filtered = installations.filter(inst => userProfile.secteurs?.includes(inst.secteur));
-    console.log("[filterInstallations] Filtrage par secteurs:", {
+    console.log("[filterInstallations] Utilisateur Admin - retourne toutes les installations.");
+  } else if (userProfile.secteurs && userProfile.secteurs.length > 0) {
+    // Les autres utilisateurs sont filtrés par leurs secteurs
+    filtered = installations.filter(inst => inst.secteur && userProfile.secteurs.includes(inst.secteur));
+    console.log("[filterInstallations] Filtrage par secteurs pour utilisateur non-Admin:", {
       userSectors: userProfile.secteurs,
       installationsAvantFiltrage: installations.length,
       installationsApresFiltrage: filtered.length
     });
+  } else {
+    // Si un utilisateur non-Admin n'a pas de secteurs, il ne voit aucune installation
+    filtered = [];
+    console.log("[filterInstallations] Aucun secteur défini pour l'utilisateur non-Admin, aucune installation retournée.");
   }
 
   console.log("[filterInstallations] Résultat final:", {
     totalInstallations: filtered.length,
-    secteurs: [...new Set(filtered.map(inst => inst.secteur))]
+    secteurs: [...new Set(filtered.map(inst => inst.secteur).filter(s => s))]
   });
 
   return filtered;

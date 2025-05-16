@@ -29,58 +29,87 @@ function hasErrorProperty(obj: any): obj is { error: string } {
 
 // Composant pour la page de recherche
 export default function ArticlesSearch() {
+  // Log de base pour vérifier que le composant est monté
+  console.log("%c[Articles Component] Component mounted", "color: #ff00ff; font-size: 20px; font-weight: bold;");
+
   // Utiliser les données du loader (articles, searchParams, error)
-  const { searchParams: loaderSearchParams, articles: loaderArticles, error: loaderError } = useLoaderData<typeof loader>();
-  const [searchParams] = useSearchParams();
+  const loaderData = useLoaderData();
+  console.log("%c[Articles Component] Loader data:", "color: #ff00ff; font-size: 20px; font-weight: bold;", loaderData);
+  
+  const { searchParams: loaderSearchParams, articles: loaderArticles, error: loaderError } = loaderData as any;
+  console.log("%c[Articles Component] Parsed data:", "color: #ff00ff; font-size: 20px; font-weight: bold;", {
+    searchParams: loaderSearchParams,
+    articlesCount: loaderArticles?.length,
+    error: loaderError
+  });
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  console.log("%c[Articles Component] Current URL search params:", "color: #ff00ff; font-size: 20px; font-weight: bold;", Object.fromEntries(searchParams.entries()));
+
   const { user, loadingAuth } = useOutletContext<OutletContextType>();
   const fetcher = useFetcher<typeof action>();
 
-  // Initialiser l'état local du formulaire avec les paramètres du loader
   const [codeSearch, setCodeSearch] = useState(loaderSearchParams.code);
   const [nomSearch, setNomSearch] = useState(loaderSearchParams.nom);
-
-  // États pour gérer l'upload/suppression d'image UI
   const [uploadingImageId, setUploadingImageId] = useState<string | null>(null);
   const [deletingImageUrl, setDeletingImageUrl] = useState<string | null>(null);
-
-  // Référence pour l'input fichier caché (inchangée)
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // États pour la modale d'image (inchangés)
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-
-  // En haut du composant ArticlesSearch
   const ARTICLES_PER_PAGE = 10;
   const [currentPage, setCurrentPage] = useState(1);
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Pagination des articles
-  const paginatedArticles = loaderArticles ? (loaderArticles as FirestoreArticle[]).slice((currentPage - 1) * ARTICLES_PER_PAGE, currentPage * ARTICLES_PER_PAGE) : []; // Modifié pour FirestoreArticle
+  const paginatedArticles = loaderArticles ? (loaderArticles as FirestoreArticle[]).slice((currentPage - 1) * ARTICLES_PER_PAGE, currentPage * ARTICLES_PER_PAGE) : [];
   const totalPages = loaderArticles ? Math.ceil(loaderArticles.length / ARTICLES_PER_PAGE) : 1;
 
-  // Effet pour synchroniser l'état du formulaire avec les searchParams de l'URL
   useEffect(() => {
     setCodeSearch(searchParams.get("code") || "");
     setNomSearch(searchParams.get("nom") || "");
   }, [searchParams]);
 
-  // Effet pour gérer les retours du fetcher (upload/delete)
   useEffect(() => {
     if (fetcher.state === 'idle' && fetcher.data) {
-      // Vérifier si l'action a échoué et si la propriété 'error' existe
       if (!fetcher.data.success && hasErrorProperty(fetcher.data)) {
         console.error("Action Error:", fetcher.data.error);
-        // On pourrait utiliser un toast ici pour informer l'utilisateur
       }
-      // Réinitialiser les états UI après l'action, que ce soit succès ou échec
-      // Le rechargement du loader mettra à jour la liste si succès
       setUploadingImageId(null);
       setDeletingImageUrl(null);
     }
   }, [fetcher.state, fetcher.data]);
 
+  // Log quand les états changent
+  useEffect(() => {
+    console.log("%c[Articles Component] State changed:", "color: #ff00ff; font-size: 20px; font-weight: bold;", {
+      codeSearch,
+      nomSearch
+    });
+  }, [codeSearch, nomSearch]);
 
-  // --- Fonctions pour gérer l'upload --- (Modifiées pour utiliser fetcher)
+  // Log quand le composant est démonté
+  useEffect(() => {
+    return () => {
+      console.log("%c[Articles Component] Component unmounted", "color: #ff00ff; font-size: 20px; font-weight: bold;");
+    };
+  }, []);
+
+  // Effet pour gérer la recherche
+  useEffect(() => {
+    if (isSearching) {
+      console.log("%c[Articles Component] Triggering search", "color: #ff00ff; font-size: 20px; font-weight: bold;", {
+        code: codeSearch,
+        nom: nomSearch
+      });
+
+      const newParams = new URLSearchParams();
+      if (codeSearch) newParams.set('code', codeSearch);
+      if (nomSearch) newParams.set('nom', nomSearch);
+      
+      setSearchParams(newParams);
+      setIsSearching(false);
+    }
+  }, [isSearching, codeSearch, nomSearch, setSearchParams]);
+
   const handleAddPhotoClick = (articleCode: string) => {
     setUploadingImageId(null);
     setDeletingImageUrl(null);
@@ -126,19 +155,18 @@ export default function ArticlesSearch() {
         setUploadingImageId(null);
         alert(`Erreur Cloudinary: ${error.message}`);
       } finally {
-         if (fileInputRef.current) {
-           fileInputRef.current.value = "";
-           fileInputRef.current.removeAttribute('data-article-code');
-         }
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+          fileInputRef.current.removeAttribute('data-article-code');
+        }
       }
     } else {
-       if (fileInputRef.current) {
-           fileInputRef.current.removeAttribute('data-article-code');
-       }
+      if (fileInputRef.current) {
+        fileInputRef.current.removeAttribute('data-article-code');
+      }
     }
   };
 
-  // --- Fonctions pour la modale image --- (inchangées)
   const openImageModal = (imageUrl: string) => {
     setSelectedImageUrl(imageUrl);
     setIsImageModalOpen(true);
@@ -149,7 +177,6 @@ export default function ArticlesSearch() {
     setSelectedImageUrl(null);
   };
 
-  // --- Fonction pour gérer la suppression d'image --- (Modifiée pour utiliser fetcher)
   const handleDeleteImage = async (articleCode: string, imageUrl: string) => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette image ? Cette action est irréversible.")) {
       return;
@@ -164,186 +191,182 @@ export default function ArticlesSearch() {
     fetcher.submit(submitData, { method: 'POST', action: '/articles', encType: 'multipart/form-data' });
   };
 
-
   const isLoadingData = fetcher.state === 'loading';
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("%c[Articles Component] Search button clicked", "color: #ff00ff; font-size: 20px; font-weight: bold;");
+    setIsSearching(true);
+  };
 
   return (
     <div className="space-y-6"> {/* p-6 est sur le layout parent, bg-gray-900 retiré */}
       <h1 className="text-2xl font-semibold text-text-primary mb-6 flex items-center">
          <FaSearch className="mr-3 text-brand-blue h-6 w-6" />
          Recherche d'Articles
-         {isLoadingData && <FaSpinner className="ml-3 text-brand-blue animate-spin" title="Chargement..." />}
+         {isSearching && <FaSpinner className="ml-3 text-brand-blue animate-spin" title="Chargement..." />}
       </h1>
+      {loaderError && <p>Erreur loader: {loaderError}</p>}
 
-      {/* Formulaire de recherche */}
-      <Form method="get" className="p-4 sm:p-6 bg-ui-surface/80 backdrop-blur-lg border border-ui-border/70 rounded-xl shadow-lg">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-end">
+      <form onSubmit={handleSearch} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="code" className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="code" className="block text-sm font-medium text-text-secondary mb-1">
               Code Article
             </label>
             <Input
-              type="text"
-              name="code"
               id="code"
+              name="code"
+              type="text"
               value={codeSearch}
-              onChange={(e) => setCodeSearch(e.target.value)}
-              placeholder="Ex : 12345"
-              disabled={isLoadingData}
-              className="bg-ui-input border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue rounded-md placeholder:text-text-tertiary text-sm"
-              autoComplete="off"
+              onChange={(e) => {
+                console.log("%c[Articles Component] Code search changed:", "color: #ff00ff; font-size: 20px; font-weight: bold;", e.target.value);
+                setCodeSearch(e.target.value);
+              }}
+              placeholder="Entrez le code article"
+              className="w-full"
             />
           </div>
           <div>
-            <label htmlFor="nom" className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="nom" className="block text-sm font-medium text-text-secondary mb-1">
               Nom Article
             </label>
             <Input
-              type="text"
-              name="nom"
               id="nom"
+              name="nom"
+              type="text"
               value={nomSearch}
-              onChange={(e) => setNomSearch(e.target.value)}
-              placeholder="Nom partiel ou complet"
-              disabled={isLoadingData}
-              className="bg-ui-input border-ui-border text-text-primary focus:border-brand-blue focus:ring-brand-blue rounded-md placeholder:text-text-tertiary text-sm"
-              autoComplete="off"
+              onChange={(e) => {
+                console.log("%c[Articles Component] Nom search changed:", "color: #ff00ff; font-size: 20px; font-weight: bold;", e.target.value);
+                setNomSearch(e.target.value);
+              }}
+              placeholder="Entrez le nom de l'article"
+              className="w-full"
             />
           </div>
-          <div className="md:col-span-2 flex justify-end"> {/* Bouton sur toute la largeur sur mobile, à droite sur desktop */}
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full md:w-auto bg-brand-blue hover:bg-brand-blue-dark text-white flex items-center justify-center gap-2 text-sm py-2.5"
-              disabled={isLoadingData}
-            >
-              {isLoadingData ? (
-                <FaSpinner className="animate-spin h-4 w-4" />
-              ) : (
-                <FaSearch className="h-4 w-4" />
-              )}
-              <span>{isLoadingData ? 'Recherche...' : 'Rechercher'}</span>
-            </Button>
-          </div>
         </div>
-      </Form>
+        <div className="flex justify-end">
+          <Button 
+            type="submit" 
+            className="bg-brand-blue hover:bg-brand-blue/90"
+          >
+            <FaSearch className="mr-2" />
+            Rechercher
+          </Button>
+        </div>
+      </form>
 
-      {/* Section des résultats */}
-      <div className="bg-ui-surface rounded-lg shadow-md p-4 sm:p-6">
-        <h2 className="text-lg font-semibold mb-4 text-text-primary">Résultats de la recherche</h2>
+      {paginatedArticles.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {paginatedArticles.map((article) => (
+            <div
+              key={article.id}
+              className="bg-ui-surface rounded-lg shadow-md p-4 border border-ui-border hover:shadow-lg transition-shadow"
+            >
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-text-primary">{article.Code}</h3>
+                  <p className="text-text-secondary">{article.Désignation}</p>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleAddPhotoClick(article.Code)}
+                    className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-full transition-colors"
+                    title="Ajouter une photo"
+                  >
+                    <FaPlus />
+                  </button>
+                </div>
+              </div>
 
-        {loaderError && <p className="text-red-400 text-sm mb-3">{loaderError}</p>}
-
-        {fetcher.data && !fetcher.data.success && hasErrorProperty(fetcher.data) && (
-          <p className="text-red-400 text-sm mb-3">{fetcher.data.error}</p>
-        )}
-
-        {isLoadingData && <div className="flex justify-center items-center py-10"><FaSpinner className="animate-spin text-brand-blue h-8 w-8" /></div>}
-
-        {!isLoadingData && !loaderError && (
-          <>
-            {paginatedArticles && paginatedArticles.length > 0 ? (
-              <div className="space-y-3">
-                {paginatedArticles.map((article: FirestoreArticle) => { 
-                  const isUploadingCurrent = uploadingImageId === article.code && fetcher.state !== 'idle';
-                  const isDeletingCurrent = (imageUrl: string) => deletingImageUrl === imageUrl && fetcher.state !== 'idle';
-                  const uniqueKey = article.id || article.code; 
-                  return (
-                    <div
-                      key={uniqueKey}
-                      className="group flex flex-col sm:flex-row items-start sm:items-center w-full bg-ui-background hover:bg-ui-background-hover rounded-lg shadow-sm border-l-4 border-brand-blue p-3 sm:p-4 transition-all duration-200 focus-within:ring-2 focus-within:ring-brand-blue"
-                      tabIndex={0}
-                    >
-                      <FaBoxOpen className="text-brand-blue text-xl flex-shrink-0 mr-3 mt-1 sm:mt-0" />
-                      <div className="flex-1 min-w-0 mb-2 sm:mb-0">
-                        <span className="text-brand-blue font-semibold text-sm block truncate">{article.code}</span>
-                        <span className="text-text-primary text-base font-medium block truncate">{article.designation}</span>
-                      </div>
-                      
-                      {/* Images */}
-                      <div className="flex flex-row flex-wrap gap-2 items-center my-2 sm:my-0 sm:ml-4">
-                        {article.images && article.images.slice(0, 3).map((imageUrl: string, index: number) => (
-                          <div key={`${uniqueKey}-img-${index}`} className="relative group/image"> 
-                            <img
-                              src={imageUrl}
-                              alt={`${article.designation} - image ${index + 1}`}
-                              className="w-10 h-10 object-cover rounded-md border border-ui-border hover:opacity-80 cursor-pointer transition-opacity"
-                              onClick={e => { e.stopPropagation(); openImageModal(imageUrl); }}
-                            />
-                            <Button
-                              type="button"
-                              variant="danger"
-                              size="icon"
-                              className="absolute -top-1.5 -right-1.5 h-5 w-5 p-0.5 opacity-0 group-hover/image:opacity-100 transition-opacity"
-                              onClick={e => { e.stopPropagation(); handleDeleteImage(article.code, imageUrl); }}
-                              disabled={isDeletingCurrent(imageUrl)}
-                              aria-label="Supprimer l'image"
-                            >
-                              {isDeletingCurrent(imageUrl) ? <FaSpinner className="animate-spin h-2.5 w-2.5" /> : <FaTrashAlt className="h-2.5 w-2.5" />}
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Bouton Ajouter Photo */}
-                      <div className="flex items-center ml-auto sm:ml-4 mt-2 sm:mt-0">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={e => { e.stopPropagation(); handleAddPhotoClick(article.code); }}
-                          disabled={isUploadingCurrent}
-                          className="border-ui-border text-text-secondary hover:bg-ui-border hover:text-text-primary flex items-center gap-1.5 text-xs py-1 px-2.5"
-                          aria-label="Ajouter une photo"
-                        >
-                          {isUploadingCurrent ? (
-                            <> <FaSpinner className="animate-spin h-3.5 w-3.5" /> Upload... </>
-                          ) : (
-                            <> <FaPlus className="h-3.5 w-3.5" /> Photo </>
-                          )}
-                        </Button>
-                      </div>
+              {article.images && article.images.length > 0 && (
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  {article.images.map((imageUrl, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={imageUrl}
+                        alt={`Article ${article.Code} - Image ${index + 1}`}
+                        className="w-full h-24 object-cover rounded-lg cursor-pointer"
+                        onClick={() => openImageModal(imageUrl)}
+                      />
+                      <button
+                        onClick={() => handleDeleteImage(article.Code, imageUrl)}
+                        className="absolute top-1 right-1 p-1 bg-red-500/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Supprimer l'image"
+                      >
+                        <FaTrashAlt className="w-3 h-3" />
+                      </button>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-3 text-sm text-text-tertiary">
+                <p>Type: {article.type || 'Non spécifié'}</p>
+                <p>Catégorie: {article.category || 'Non spécifiée'}</p>
               </div>
-            ) : (
-              <div className="text-center py-10 text-text-secondary">
-                <FaBoxOpen className="mx-auto text-4xl mb-3 opacity-40" />
-                <p>{codeSearch || nomSearch ? "Aucun article trouvé." : "Veuillez lancer une recherche."}</p>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-      {/* Input caché pour l'upload de fichier, toujours présent dans le DOM */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handleFileSelected}
-        style={{ display: 'none' }}
-      />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="p-6 rounded-lg bg-ui-surface border border-ui-border text-center text-text-secondary">
+          <FaBoxOpen className="w-12 h-12 mx-auto mb-3 text-text-tertiary" />
+          <p className="font-medium">Aucun article trouvé</p>
+          {codeSearch || nomSearch ? (
+            <p className="text-sm mt-1">Essayez avec d'autres critères de recherche</p>
+          ) : (
+            <p className="text-sm mt-1">Utilisez le formulaire ci-dessus pour rechercher des articles</p>
+          )}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex justify-center space-x-2 mt-6">
+          <Button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="bg-ui-surface hover:bg-ui-surface/80"
+          >
+            Précédent
+          </Button>
+          <span className="px-4 py-2 text-text-secondary">
+            Page {currentPage} sur {totalPages}
+          </span>
+          <Button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="bg-ui-surface hover:bg-ui-surface/80"
+          >
+            Suivant
+          </Button>
+        </div>
+      )}
+
       {isImageModalOpen && selectedImageUrl && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-          <div className="max-w-4xl max-h-[90vh] overflow-hidden relative">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="relative max-w-4xl max-h-[90vh] p-4">
             <img
               src={selectedImageUrl}
-              alt="Image agrandie"
-              className="max-w-full max-h-[90vh] object-contain rounded-md" // Ajout de rounded-md
+              alt="Image article"
+              className="max-w-full max-h-[80vh] object-contain"
             />
             <button
               onClick={closeImageModal}
-              className="absolute top-3 right-3 bg-ui-background/70 text-text-primary p-1.5 rounded-full hover:bg-ui-border transition-colors"
-              aria-label="Fermer"
+              className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70"
             >
-              <FaTimes className="h-4 w-4" />
+              <FaTimes />
             </button>
           </div>
         </div>
       )}
-      {/* TODO: Ajouter la pagination ici si nécessaire, en utilisant totalPages et currentPage */}
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileSelected}
+      />
     </div>
   );
 }

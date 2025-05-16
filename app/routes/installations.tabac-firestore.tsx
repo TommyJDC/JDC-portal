@@ -1,14 +1,14 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node"; // Ajout de ActionFunctionArgs
 import { json } from "@remix-run/node";
-import { useLoaderData, Link, useFetcher, useOutletContext } from "@remix-run/react"; // Ajout de useFetcher
+import { useLoaderData, Link, useFetcher, useOutletContext, useNavigate } from "@remix-run/react"; // Ajout de useFetcher et useNavigate
 import { authenticator } from "~/services/auth.server";
 import { getInstallationsBySector, getTechnicians } from "~/services/firestore.service.server";
 import InstallationListItem from "~/components/InstallationListItem";
 import InstallationDetails from "~/components/InstallationDetails";
 import type { Installation } from "~/types/firestore.types";
 import type { UserSessionData } from "~/services/session.server"; // Correction du type
-import { useState } from 'react';
-import { toast } from "react-hot-toast";
+import { useState, useEffect } from 'react';
+import { useToast } from "~/context/ToastContext";
 
 type OutletContextType = {
   user: UserSessionData | null; // Correction du type
@@ -82,11 +82,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function TabacInstallations() {
   const { user } = useOutletContext<OutletContextType>();
-  const { installations, technicians } = useLoaderData<{ installations: Installation[]; technicians: { id: string; name: string }[] }>();
-  const fetcher = useFetcher<ActionData>(); // Ajout du fetcher
-  const [searchTerm, setSearchTerm] = useState(''); 
+  const { installations, technicians, error } = useLoaderData<{ installations: Installation[]; technicians: { id: string; name: string }[]; error?: string }>();
+  const fetcher = useFetcher<ActionData>();
+  const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null);
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    if (user) {
+      const userSectors = user.secteurs.map(s => s.toLowerCase());
+      if (!userSectors.includes('tabac') && user.role !== 'Admin') {
+        navigate('/dashboard');
+      }
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (fetcher.state === 'idle' && fetcher.data) {
+      if (fetcher.data.success && fetcher.data.installationId) {
+        addToast({ type: 'success', message: "Installation Tabac mise à jour !" });
+        handleCloseModal();
+      } else if (fetcher.data.error) {
+        addToast({ type: 'error', message: `Erreur Tabac: ${fetcher.data.error}` });
+      }
+    }
+  }, [fetcher.state, fetcher.data, navigate, addToast]);
 
   if (!user) {
     return (
@@ -116,8 +138,6 @@ export default function TabacInstallations() {
       },
       { method: "post" }
     );
-    handleCloseModal(); 
-    toast.success("Mise à jour en cours..."); 
   };
 
   const handleInstallationClick = (installation: Installation) => {

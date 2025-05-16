@@ -10,19 +10,6 @@ publish = "build/client" # ✅ pour servir correctement les assets
   name = "vite"
   external_node_modules = ["firebase-admin", "exceljs"]
 
-  [functions.sap-notifications]
-  schedule = "@hourly"
-
-  [functions.scheduled-gmail-processing]
-  schedule = "@hourly"
-
-  [functions.sync-installations]
-  schedule = "@hourly"
-
-  [functions.getNotificationsForUser]
-  schedule = "*/15 * * * *"
-
-
 [[headers]]
 for = "/assets/*" # ✅ vise bien les fichiers d'assets, pas "/build/*"
 
